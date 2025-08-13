@@ -19,6 +19,9 @@ MONGO_INITDB_DATABASE=clash_royale
 BACKUP_HOUR=03
 BACKUP_MINUTE=30
 BACKUP_RETENTION_DAYS=7
+
+# Clash Royale API KEY
+DATA_SCRAPER_KEY = ey31asd23...
 ```
 
 ### Environment Variables Explained
@@ -35,6 +38,11 @@ BACKUP_RETENTION_DAYS=7
 - `BACKUP_HOUR`: Hour (0-23) when daily backups run (default: `03` = 3 AM)
 - `BACKUP_MINUTE`: Minute (0-59) when daily backups run (default: `30`)
 - `BACKUP_RETENTION_DAYS`: Number of days to keep backup files (default: `7`)
+
+#### Clash Royale API KEY
+- `DATA_SCRAPER_KEY`: API Key used to run the cyclic tracking and refreshing of selected player(s)
+
+Get your API KEY from the official Clash Royale API website https://developer.clashroyale.com
 
 ### 2. Docker Setup
 
