@@ -10,3 +10,10 @@ db.createUser({
   pwd:  appPwd,
   roles: [{ role: "readWrite", db: appDb }]
 });
+
+print(`[init] creating index on 'battles' collection for 'battleTime' and 'referencePlayerTag'`);
+
+db.battles.createIndex(
+  { referencePlayerTag: 1, battleTime: -1 },
+  { name: "referencePlayerTag_battleTime_index" }
+);
