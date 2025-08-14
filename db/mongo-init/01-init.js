@@ -15,5 +15,5 @@ print(`[init] creating index on 'battles' collection for 'battleTime' and 'refer
 
 db.battles.createIndex(
   { referencePlayerTag: 1, battleTime: -1 },
-  { name: "referencePlayerTag_battleTime_index" }
+  { unique: true, name: "referencePlayerTag_battleTime_index" }
 );
