@@ -29,6 +29,25 @@ services:
     networks:
       - cr-analytics
 
+  data_scraper:
+    build:
+      context: ./backend/data_scraper
+      dockerfile: Dockerfile
+    container_name: data_scraper
+    environment:
+      - MONGO_APP_USER=your_user
+      - MONGO_APP_PWD=your_password
+      - MONGO_APP_DB=your_database
+    depends_on:
+      - mongo
+    env_file:
+      - .env
+    volumes:
+      - ./backend/data_scraper:/app
+    command: ["python", "src/main.py"]
+    networks:
+      - cr-analytics
+
 volumes:
   mongo_data:
 
