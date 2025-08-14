@@ -27,7 +27,7 @@ def init_db_connection():
         print("[DB] Failed to connect to MongoDB:", e)
         raise
 
-def insert_battle_logs(battle_logs):
+def insert_battles(battle_logs):
     try:
         if not isinstance(battle_logs, list):
             raise ValueError("battle_logs must be a list of dictionaries.")
@@ -37,3 +37,15 @@ def insert_battle_logs(battle_logs):
         print("[DB] Inserted documents IDs:", result.inserted_ids)
     except Exception as e:
         print("[DB] Error during insertion:", e)
+
+def print_all_battles():
+    try:
+        count = db.battles.count_documents({})
+        print(f"[DB] Found {count} documents in 'battles' collection")
+
+        # Preview first few
+        for doc in db.battles.find().limit(5):
+            print(doc)
+
+    except Exception as e:
+        print("[DB] Error fetching documents:", e)

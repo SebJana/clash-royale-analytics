@@ -1,6 +1,6 @@
 from api import fetch_battle_logs
 from clean import clean_battle_log_list
-from access_mongo_db import init_db_connection, insert_battle_logs
+from access_mongo_db import init_db_connection, insert_battles, print_all_battles
 import time
 
 # Morten "#R09228V"
@@ -19,7 +19,7 @@ battle_logs = fetch_battle_logs(player_tag=TAG)
 # Check if the API call failed and returned an empty json
 if battle_logs != {}:
     # API response when there is a maintenance break
-    if battle_logs.get('reason') != 'inMaintenance':
+    if battle_logs[0].get('reason') != 'inMaintenance':
         print("[DEBUG] Cleaning battle logs")
         cleaned_battle_logs = clean_battle_log_list(battle_logs, player_tag=TAG)
 
@@ -27,4 +27,6 @@ if battle_logs != {}:
         init_db_connection()
 
         print("[DEBUG] Inserting battle logs into DB")
-        insert_battle_logs(cleaned_battle_logs)
+        insert_battles(cleaned_battle_logs)
+
+        print_all_battles()
