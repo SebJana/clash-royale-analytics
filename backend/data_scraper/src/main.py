@@ -9,24 +9,29 @@ TAG = "#YYRJQY28"
 
 # TODO check if mongo is up and running
 # TODO time interval based refreshs
-time.sleep(10)
+time.sleep(60) # upon start sleep for database to settle in
 
-print("[DEBUG] Fetching battle logs")
-battle_logs = fetch_battle_logs(player_tag=TAG)
+while True:
+    print("[DEBUG] Fetching battle logs")
+    battle_logs = fetch_battle_logs(player_tag=TAG)
 
-# TODO proper error handling and exception checking
+    # TODO proper error handling and exception checking
+    # TODO check if there is team and opponent and both have cards
 
-# Check if the API call failed and returned an empty json
-if battle_logs != {}:
-    # API response when there is a maintenance break
-    if battle_logs[0].get('reason') != 'inMaintenance':
-        print("[DEBUG] Cleaning battle logs")
-        cleaned_battle_logs = clean_battle_log_list(battle_logs, player_tag=TAG)
+    # Check if the API call failed and returned an empty json
+    if battle_logs != {}:
+        # API response when there is a maintenance break
+        if battle_logs[0].get('reason') != 'inMaintenance':
+            print("[DEBUG] Cleaning battle logs")
+            cleaned_battle_logs = clean_battle_log_list(battle_logs, player_tag=TAG)
 
-        print("[DEBUG] Initializing DB connection")
-        init_db_connection()
+            print("[DEBUG] Initializing DB connection")
+            init_db_connection()
 
-        print("[DEBUG] Inserting battle logs into DB")
-        insert_battles(cleaned_battle_logs)
+            print("[DEBUG] Inserting battle logs into DB")
+            insert_battles(cleaned_battle_logs)
 
-        print_all_battles()
+            # Optional debug
+            print_all_battles()
+    
+    time.sleep(60*60)

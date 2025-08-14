@@ -27,6 +27,7 @@ def init_db_connection():
         print("[DB] Failed to connect to MongoDB:", e)
         raise
 
+
 def insert_battles(battle_logs):
     try:
         if not isinstance(battle_logs, list):
@@ -37,6 +38,7 @@ def insert_battles(battle_logs):
         print("[DB] Inserted documents IDs:", result.inserted_ids)
     except Exception as e:
         print("[DB] Error during insertion:", e)
+
 
 def print_all_battles():
     try:

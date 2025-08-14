@@ -43,6 +43,21 @@ def remove_unnecessary_card_fields(cards):
         for key in keys_to_remove:
             card.pop(key, None)
 
+def determine_game_result(battle):
+    # Default to zero as crown amount if it can't be found in the json
+    own_crowns = battle.get("team")[0].get("crowns", 0)
+    opponent_crowns = battle.get("opponent")[0].get("crowns", 0)
+    
+    # Check who won
+    if own_crowns > opponent_crowns:
+        return "Victory"
+
+    if own_crowns < opponent_crowns:
+        return "Defeat"
+
+    # Upon same crown amount
+    return "Draw"
+
 def clean_battle_log_list(battle_logs, player_tag):
     for battle in battle_logs:
         # Add a reference player tag to each battle
@@ -56,6 +71,9 @@ def clean_battle_log_list(battle_logs, player_tag):
 
         # For each battle in the log format and clean it
         clean_battle_log(battle)
+
+        # See if game ended in victory/defeat or draw
+        battle['gameResult'] = determine_game_result(battle)
 
         # Remove the unnecessary stats from each battle
         keys_to_remove = ["deckSelection", "isHostedMatch", "leagueNumber", "isLadderTournament"]
