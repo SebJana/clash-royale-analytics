@@ -1,15 +1,20 @@
 from api import fetch_battle_logs
 from clean import clean_battle_log_list
-from db import init_db_connection, insert_battle_logs
+from access_mongo_db import init_db_connection, insert_battle_logs
 import time
 
 # Morten "#R09228V"
 TAG = "#YYRJQY28"
 
+
+# TODO check if mongo is up and running
+# TODO time interval based refreshs
 time.sleep(10)
 
 print("[DEBUG] Fetching battle logs")
 battle_logs = fetch_battle_logs(player_tag=TAG)
+
+# TODO proper error handling and exception checking
 
 # Check if the API call failed and returned an empty json
 if battle_logs != {}:

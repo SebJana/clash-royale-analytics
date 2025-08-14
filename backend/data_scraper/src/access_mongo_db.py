@@ -14,6 +14,8 @@ uri = f"mongodb://{user}:{password}@{host}:{port}/{db_name}?authSource={db_name}
 client = None
 db = None
 
+# TODO add status wether client is (still) connected
+
 # Initialize MongoDB client and database
 def init_db_connection():
     global client, db
