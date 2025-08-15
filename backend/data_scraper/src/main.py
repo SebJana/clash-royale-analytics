@@ -42,14 +42,13 @@ while True:
     players = []
     try:
         players = read_tracked_players()
-    # If error occurs upon reading the file, the loop will iterate over an empty list
-    # and just remain idle
+    # If error occurs upon reading the file stop the data scraping loop
     except FileNotFoundError:
         print("[ERROR] tracked_players.json file not found")
-        continue
+        break
     except json.JSONDecodeError:
         print("[ERROR] tracked_players.json file is malformed")
-        continue
+        break
 
     # Space out the API calls
     time.sleep(COOL_DOWN_SLEEP_DURATION) # Additional to runtime of code
