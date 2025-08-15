@@ -17,3 +17,23 @@ db.battles.createIndex(
   { referencePlayerTag: 1, battleTime: -1 },
   { unique: true, name: "referencePlayerTag_battleTime_index" }
 );
+
+print(`[init] creating additional indexes for common query patterns`);
+
+// Index for querying battles by player and game result
+db.battles.createIndex(
+  { referencePlayerTag: 1, gameResult: 1 },
+  { name: "referencePlayerTag_gameResult_index" }
+);
+
+// Compound index for player performance analysis over time
+db.battles.createIndex(
+  { referencePlayerTag: 1, gameResult: 1, battleTime: -1 },
+  { name: "referencePlayerTag_result_time_index" }
+);
+
+// Index for player's game mode preferences over time
+db.battles.createIndex(
+  { referencePlayerTag: 1, gameMode: 1, battleTime: -1 },
+  { name: "referencePlayerTag_gameMode_time_index" }
+);
