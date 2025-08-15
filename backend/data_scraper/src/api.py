@@ -14,17 +14,43 @@ headers = {
 
 
 def url_encode_player_tag(player_tag: str):
+    """
+    URL encodes a Clash Royale player tag for use in API requests.
+    
+    Replaces the '#' character with '%23' to make the player tag URL-safe
+    for use in HTTP requests to the Clash Royale API.
+    
+    Args:
+        player_tag (str): The player tag starting with '#' (e.g., "#YYRJQY28")
+        
+    Returns:
+        str: URL-encoded player tag (e.g., "%23YYRJQY28")
+    """
     return player_tag.replace("#", "%23")
 
 
 def fetch_battle_logs(player_tag):
+    """
+    Fetches battle logs for a specific player from the Clash Royale API.
+    
+    Makes an HTTP GET request to the Clash Royale API to retrieve the battle
+    history for the specified player. The response contains a list of recent
+    battle logs with detailed information about each match.
+    
+    Args:
+        player_tag (str): The player tag (e.g., "#YYRJQY28")
+        
+    Returns:
+        list: List of battle log dictionaries from the API response
+        
+    Raises:
+        HTTPError: If the API request fails (4xx/5xx status codes)
+        RequestException: If there are network connectivity issues
+    """
     tag = url_encode_player_tag(player_tag)
     battle_url = BASE_URL + f"/players/{tag}/battlelog"
     
-    try:
-        response = requests.get(battle_url, headers=headers)
-        return response.json()
+    response = requests.get(battle_url, headers=headers)
+    response.raise_for_status()  # will throw HTTPError for 4xx/5xx
     
-    except Exception as e:
-        print("Error fetching data:", e)
-        return {}
+    return response.json()

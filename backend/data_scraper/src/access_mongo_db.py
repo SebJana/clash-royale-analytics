@@ -33,14 +33,13 @@ def insert_battles(battle_logs):
         if not isinstance(battle_logs, list):
             raise ValueError("battle_logs must be a list of dictionaries.")
 
-        print("[DEBUG] Attempting simple insert_many operation")
         result = db.battles.insert_many(battle_logs)
         print("[DB] Inserted documents IDs:", result.inserted_ids)
     except Exception as e:
         print("[DB] Error during insertion:", e)
 
 
-def print_all_battles():
+def print_collection_count():
     try:
         count = db.battles.count_documents({})
         print(f"[DB] Found {count} documents in 'battles' collection")
@@ -50,4 +49,4 @@ def print_all_battles():
             print(doc)
 
     except Exception as e:
-        print("[DB] Error fetching documents:", e)
+        print("[DB] [ERROR] fetching documents:", e)

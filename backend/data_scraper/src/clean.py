@@ -1,6 +1,81 @@
 from datetime import datetime
 
+def check_if_valid_logs(battle_logs):
+    """
+    Validates the API response to ensure it contains valid battle log data.
+    
+    Args:
+        battle_logs: The response from the Clash Royale API
+        
+    Returns:
+        bool: True if the response is valid, False otherwise
+    """
+    # Check if battle_logs is None or empty
+    if not battle_logs:
+        return False
+    
+    # Check if it's a list (expected format)
+    if not isinstance(battle_logs, list):
+        return False
+    
+    # Check if the list is empty
+    if len(battle_logs) == 0:
+        return False
+    
+    # Validate first battle log structure
+    first_battle = battle_logs[0]
+    
+    # Check if it's a dictionary
+    if not isinstance(first_battle, dict):
+        print(f"[VALIDATION] Expected battle to be dict, got {type(first_battle)}")
+        return False
+    
+    # Check for required fields
+    required_fields = ['battleTime', 'team', 'opponent', 'arena', 'gameMode']
+    for field in required_fields:
+        if field not in first_battle:
+            print(f"[VALIDATION] Missing required field: {field}")
+            return False
+    
+    # Validate team and opponent structure
+    team = first_battle.get('team')
+    opponent = first_battle.get('opponent')
+    
+    if not isinstance(team, list) or not isinstance(opponent, list):
+        print("[VALIDATION] Team or opponent is not a list")
+        return False
+    
+    if len(team) == 0 or len(opponent) == 0:
+        print("[VALIDATION] Team or opponent list is empty")
+        return False
+    
+    # Check if team and opponent players have required fields
+    for player in team + opponent:
+        if not isinstance(player, dict):
+            print("[VALIDATION] Player is not a dictionary")
+            return False
+        
+        if 'cards' not in player:
+            print("[VALIDATION] Player missing cards field")
+            return False
+        
+        if not isinstance(player['cards'], list):
+            print("[VALIDATION] Player cards is not a list")
+            return False
+    
+    return True
+
 def adjust_card_levels(cards):
+    """
+    Adjusts card levels from the old Clash Royale level system to the new level system.
+    
+    The old system had different max levels per rarity, while the new system
+    normalizes all cards to level 14/15 with different starting levels per rarity.
+    
+    Args:
+        cards (list): List of card dictionaries to adjust levels for
+    """
+    
     # Clash Royale changed the level system, but their API still returns the old
     # levels. Back then all cards started at level 1 and could be leveled up.
     # Level 13 for common cards, level 11 for rare cards, level 8 for epic cards, ...
@@ -34,6 +109,16 @@ def adjust_card_levels(cards):
 
 
 def remove_unnecessary_card_fields(cards):
+    """
+    Removes unnecessary fields from card objects to reduce storage size.
+    
+    Keeps essential fields like name and id for card identification while
+    removing metadata that can be retrieved from other sources.
+    
+    Args:
+        cards (list): List of card dictionaries to clean
+    """
+    
     # Remove fields that aren't necessary for storing
     # Keep name and id for each card, so that when id should ever change
     # the already stored data can still be connected to the card via the name
@@ -44,6 +129,19 @@ def remove_unnecessary_card_fields(cards):
             card.pop(key, None)
 
 def determine_game_result(battle):
+    """
+    Determines the result of a battle based on crown counts.
+    
+    Compares the crown count between the reference player's team and opponents
+    to determine if the battle was a victory, defeat, or draw.
+    
+    Args:
+        battle (dict): Battle log dictionary containing team and opponent data
+        
+    Returns:
+        str: "Victory", "Defeat", or "Draw"
+    """
+    
     # Default to zero as crown amount if it can't be found in the json
     own_crowns = battle.get("team")[0].get("crowns", 0)
     opponent_crowns = battle.get("opponent")[0].get("crowns", 0)
@@ -59,6 +157,20 @@ def determine_game_result(battle):
     return "Draw"
 
 def clean_battle_log_list(battle_logs, player_tag):
+    """
+    Processes and cleans a list of battle logs from the Clash Royale API.
+    
+    Adds metadata, converts timestamps, determines game results, and removes
+    unnecessary fields to prepare the data for database storage.
+    
+    Args:
+        battle_logs (list): List of raw battle log dictionaries from the API
+        player_tag (str): The player tag to use as reference for the battles
+        
+    Returns:
+        list: List of cleaned and processed battle log dictionaries
+    """
+    
     for battle in battle_logs:
         # Add a reference player tag to each battle
         # Tag combined with time is unique identifier for each battle
@@ -70,7 +182,7 @@ def clean_battle_log_list(battle_logs, player_tag):
         battle['battleTime'] = battle_time.strftime("%Y-%m-%d %H:%M:%S")
 
         # For each battle in the log format and clean it
-        clean_battle_log(battle)
+        clean_battle(battle)
 
         # See if game ended in victory/defeat or draw
         battle['gameResult'] = determine_game_result(battle)
@@ -91,31 +203,31 @@ def clean_battle_log_list(battle_logs, player_tag):
     
     return battle_logs
 
-def clean_battle_log(battle_log):
-    for team_player in battle_log.get("team"):
+def clean_battle(battle):
+    """
+    Cleans individual battle data by processing player information.
+    
+    Removes unnecessary player fields, adjusts card levels, and cleans up
+    card data for both team and opponent players in the battle.
+    
+    Args:
+        battle (dict): Single battle log dictionary to clean
+    """
+    
+    team = battle.get('team')
+    opponent = battle.get('opponent')
+
+    # Loop over every player in the battle: team player(s) and opponent player(s)
+    for player in team + opponent:
         # Remove the clan for each player 
-        team_player.pop("clan", None)
+        player.pop("clan", None)
 
-        # Clean and adjust the own/teammate deck cards
-        adjust_card_levels(team_player.get("cards"))
-        remove_unnecessary_card_fields(team_player.get("cards"))
+        # Clean and adjust the players deck cards
+        adjust_card_levels(player.get("cards"))
+        remove_unnecessary_card_fields(player.get("cards"))
 
-        # Clean and adjust the own/teammate support card(s) [Tower Troop]
-        adjust_card_levels(team_player.get("supportCards"))
-        remove_unnecessary_card_fields(team_player.get("supportCards"))
+        # Clean and adjust the players support card(s) [Tower Troop]
+        adjust_card_levels(player.get("supportCards"))
+        remove_unnecessary_card_fields(player.get("supportCards"))
 
-        team_player.pop("globalRank", None)
-
-    for opponent_player in battle_log.get("opponent"):
-        # Remove the clan for each player 
-        opponent_player.pop("clan", None)
-
-        # Clean and adjust the enemies deck cards
-        adjust_card_levels(opponent_player.get("cards"))
-        remove_unnecessary_card_fields(opponent_player.get("cards"))
-
-        # Clean and adjust the enemies support card(s) [Tower Troop]
-        adjust_card_levels(opponent_player.get("supportCards"))
-        remove_unnecessary_card_fields(opponent_player.get("supportCards"))
-
-        opponent_player.pop("globalRank", None)
+        player.pop("globalRank", None)
