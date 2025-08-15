@@ -20,8 +20,9 @@ BACKUP_HOUR=03
 BACKUP_MINUTE=30
 BACKUP_RETENTION_DAYS=7
 
-# Clash Royale API KEY
-DATA_SCRAPER_KEY = ey31asd23...
+# Clash Royale API Keys
+DATA_SCRAPER_API_KEY = ey31asd23...
+APP_API_KEY = ey41eas...
 ```
 
 ### Environment Variables Explained
@@ -39,14 +40,15 @@ DATA_SCRAPER_KEY = ey31asd23...
 - `BACKUP_MINUTE`: Minute (0-59) when daily backups run (default: `30`)
 - `BACKUP_RETENTION_DAYS`: Number of days to keep backup files (default: `7`)
 
-#### Clash Royale API KEY
-- `DATA_SCRAPER_KEY`: API Key used to run the cyclic tracking and refreshing of selected player(s)
+#### Clash Royale API Keys
+- `DATA_SCRAPER_API_KEY`: API Key used to run the cyclic tracking and refreshing of selected player(s)
+- `APP_API_KEY`: API Key used to query on-demand data for an active user
 
-Get your API KEY from the official Clash Royale API website https://developer.clashroyale.com
+It’s possible to use the same key for both parameters/roles, but for modulation purposes and to comply with the request limitations stated by Clash Royale, it’s advised to use separate keys. Get your API Keys from the official Clash Royale API website: https://developer.clashroyale.com
 
 ### 2. Docker Setup
 
-Start the MongoDB and backup services:
+Start all services by running:
 
 ```bash
 docker compose up -d
@@ -59,11 +61,11 @@ Example Commands for restoring data
 #### On Linux/macOS/WSL
 ```bash
 cd db
-./restore.sh ./backups/clash_royale_2025-08-13_16-40-01
+./restore.sh ./backups/clash_royale_YYYY-MM-DD_HH-MM-SS
 ```
 
 #### On Windows PowerShell
 ```bash
 cd db
-.\restore.ps1 .\backups\clash_royale_2025-08-13_16-40-01
+.\restore.ps1 .\backups\clash_royale_YYYY-MM-DD_HH-MM-SS
 ```

@@ -4,7 +4,7 @@ import os
 
 load_dotenv(find_dotenv())
 
-API_TOKEN = os.getenv("DATA_SCRAPER_KEY")
+API_TOKEN = os.getenv("DATA_SCRAPER_API_KEY")
 BASE_URL = "https://api.clashroyale.com/v1"
 
 headers = {
