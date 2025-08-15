@@ -1,13 +1,13 @@
 from api import fetch_battle_logs
 from clean import clean_battle_log_list, check_if_valid_logs
-from access_mongo_db import init_db_connection, insert_battles, print_collection_count
+from access_mongo_db import MongoDBWriter
 import time
 import requests
 import json
 
-
-REQUEST_CYCLE_TIME = 60 * 60 # 1 hour
-COOL_DOWN_SLEEP_TIME = 30 # 30 seconds
+INIT_SLEEP_DURATION = 60 # 60 seconds
+REQUEST_CYCLE_DURATION = 60 * 60 # 1 hour
+COOL_DOWN_SLEEP_DURATION = 30 # 30 seconds
 
 def read_tracked_players():
     """
@@ -30,10 +30,12 @@ def read_tracked_players():
 
     return player_tag_list
 
-# TODO actual health check to see if mongo is up and running
-time.sleep(10) # upon start sleep for database to settle in
 
-init_db_connection()
+time.sleep(INIT_SLEEP_DURATION) # upon start sleep for database to settle in
+
+# Init the database connection
+db_manager = MongoDBWriter()
+db_manager.connect()
 
 while True:
     # Loop over every tracked player
@@ -50,15 +52,21 @@ while True:
         continue
 
     # Space out the API calls
-    time.sleep(COOL_DOWN_SLEEP_TIME) # Additional to runtime of code
+    time.sleep(COOL_DOWN_SLEEP_DURATION) # Additional to runtime of code
 
     for player in players:
         # Try to fetch the last battles for each player
         try:
             battle_logs = fetch_battle_logs(player_tag=player)
 
+            # Check if we got any battle logs
+            if not battle_logs:
+                print(f"[WARNING] No battle logs returned for player {player}")
+                continue
+
             # API response if there is a maintenance break
-            if battle_logs[0].get('reason') == 'inMaintenance':
+            if isinstance(battle_logs, list) and len(battle_logs) > 0 and battle_logs[0].get('reason') == 'inMaintenance':
+                print("[INFO] API is in maintenance mode, skipping this cycle")
                 break # Leave the requests loop and return in the next cycle
 
             # Check if the response has all the necessary fields
@@ -70,18 +78,31 @@ while True:
             cleaned_battle_logs = clean_battle_log_list(battle_logs, player_tag=player)
 
             # Insert battles into MongoDB
-            insert_battles(cleaned_battle_logs)
+            # If any error occurs here, the class handles the output for the logs 
+            db_manager.insert_battles(cleaned_battle_logs)
 
-            # Optional debug
-            # print_collection_count()
-            
+            # Optional debug (uncomment to check first documents and document count)
+            # db_manager.print_collection_info()
+        
+
+        # Check which type of error occurred
         except requests.exceptions.HTTPError as http_err:
             # Sending too many requests
             if http_err.response.status_code == 429:
-                print("[ERROR] Rate limit hit")
+                print("[ERROR] Rate limit hit - consider increasing COOL_DOWN_SLEEP_TIME")
+                time.sleep(COOL_DOWN_SLEEP_DURATION * 10) # Extra delay for rate limiting
+            elif http_err.response.status_code == 403:
+                print("[ERROR] API access forbidden - check your API token")
+            elif http_err.response.status_code == 404:
+                print(f"[ERROR] Player {player} not found")
+            else:
+                print(f"[ERROR] HTTP error {http_err.response.status_code}: {http_err}")
+        
         except requests.exceptions.RequestException as req_err:
-            print("[ERROR] Network error")
+            print(f"[ERROR] Network error: {req_err}")
+        except ValueError as val_err:
+            print(f"[ERROR] Data validation error: {val_err}")
         except Exception as e:
-            print("[ERROR] Unknown error occurred")
+            print(f"[ERROR] Unknown error occurred for player {player}: {e}")
 
-    time.sleep(REQUEST_CYCLE_TIME)
+    time.sleep(REQUEST_CYCLE_DURATION)
