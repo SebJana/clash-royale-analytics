@@ -7,8 +7,10 @@ services:
     env_file:
       - .env
     volumes:
-    - ./db/data:/data/db
-    - ./db/mongo-init/:/docker-entrypoint-initdb.d:ro
+      # TODO: Change to named volume for better performance and portability
+      # - mongo_data:/data/db
+      - ./db/data:/data/db
+      - ./db/mongo-init/:/docker-entrypoint-initdb.d:ro
     networks:
       - cr-analytics
 
@@ -38,14 +40,13 @@ services:
       - mongo
     env_file:
       - .env
-    volumes:
-      - ./backend/data_scraper:/app
-    command: ["python", "src/main.py"]
     networks:
       - cr-analytics
+    restart: unless-stopped
 
 volumes:
-  mongo_data:
+  # TODO: Uncomment when switching from bind mount to named volume
+  # mongo_data:
 
 networks:
   cr-analytics:
