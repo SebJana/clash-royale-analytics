@@ -1,20 +1,23 @@
 # Use an official Python runtime as a parent image
 FROM python:3.11-slim
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 
 # Set the working directory in the container
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY requirements.txt /app/
+COPY data_scraper/requirements.txt /app/requirements.txt
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+# Copy shared mongo connection + data scraper source
+COPY mongo/ /app/mongo/
+COPY data_scraper/src/ /app/src/
+COPY data_scraper/tracked_players.json /app/tracked_players.json
 
-# Define environment variable (log print in container logs)
-ENV PYTHONUNBUFFERED=1
+# Make the package importable
+ENV PYTHONPATH=/app
 
 # Run the application
 CMD ["python", "src/main.py"]

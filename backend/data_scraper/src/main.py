@@ -1,6 +1,6 @@
 from api import fetch_battle_logs
 from clean import clean_battle_log_list, check_if_valid_logs
-from access_mongo_db import MongoDBWriter
+from mongo import MongoConn, insert_battles, get_battles_count, print_first_battles
 import time
 import requests
 import json
@@ -34,21 +34,35 @@ def read_tracked_players():
 time.sleep(INIT_SLEEP_DURATION) # upon start sleep for database to settle in
 
 # Init the database connection
-db_manager = MongoDBWriter()
-db_manager.connect()
+conn = MongoConn(app_name="cr-analytics-data-scraper")
+try:
+    conn.connect()
+except Exception as e:
+    print(f"[ERROR] Failed to connect to database: {e}")
+    print("[ERROR] Exiting data scraper")
+    exit(1)
 
 while True:
+    print("[INFO] Starting new data scraping cycle...")
+    
     # Loop over every tracked player
     players = []
     try:
         players = read_tracked_players()
-    # If error occurs upon reading the file stop the data scraping loop
+        print(f"[INFO] Found {len(players)} tracked players: {players}")
+    # If error occurs upon reading the file, the loop will iterate over an empty list
+    # and just remain idle
     except FileNotFoundError:
         print("[ERROR] tracked_players.json file not found")
-        break
+        continue
     except json.JSONDecodeError:
         print("[ERROR] tracked_players.json file is malformed")
-        break
+        continue
+
+    if not players:
+        print("[WARNING] No players to track, sleeping until next cycle")
+        time.sleep(REQUEST_CYCLE_DURATION)
+        continue
 
     # Space out the API calls
     time.sleep(COOL_DOWN_SLEEP_DURATION) # Additional to runtime of code
@@ -78,10 +92,12 @@ while True:
 
             # Insert battles into MongoDB
             # If any error occurs here, the class handles the output for the logs 
-            db_manager.insert_battles(cleaned_battle_logs)
+            insert_battles(conn, cleaned_battle_logs)
 
             # Optional debug (uncomment to check first documents and document count)
-            # db_manager.print_collection_info()
+            battles_count = get_battles_count(conn)
+            print(f"[INFO] There are now {battles_count} battles in the collection")
+            print_first_battles(conn)
         
 
         # Check which type of error occurred

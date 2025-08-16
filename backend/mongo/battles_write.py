@@ -1,0 +1,39 @@
+from pymongo.errors import BulkWriteError
+from .connection import MongoConn
+
+def _ensure_connected(conn: MongoConn):
+    if not conn.is_connection_alive():
+        print("[DB] Connection lost, attempting to reconnect...")
+        conn.connect()
+
+def insert_battles(conn: MongoConn, battle_logs):
+        """
+        Inserts battle logs into the battles collection.
+        
+        Args:
+            conn (MongoConn): Active connection to the mongo database
+            battle_logs (list): List of battle log dictionaries to insert
+            
+        Raises:
+            ValueError: If battle_logs is not a list
+            Exception: If insertion fails
+        """
+        _ensure_connected(conn)
+
+        if not isinstance(battle_logs, list):
+            raise ValueError("battle_logs must be a list of dictionaries.")
+
+        try:
+            result = conn.db.battles.insert_many(battle_logs, ordered=False)
+            print(f"[DB] Inserted {len(result.inserted_ids)} documents into battles collection")
+        
+        except BulkWriteError as bwe:
+            # Check if it's a duplicate key error (E11000)
+            if any(err.get("code") == 11000 for err in bwe.details.get("writeErrors", [])):
+                print("[DB] [INFO] Duplicate key error — some documents were already in the collection.")
+            else:
+                print(f"[DB] Bulk write error: {bwe.details}")
+                raise
+        except Exception as e:
+            print(f"[DB] [ERROR] during insertion: {e}")
+            raise
