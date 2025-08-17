@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 from mongo import MongoConn, insert_tracked_player, get_tracked_players
 from pymongo.errors import DuplicateKeyError
 
+from clash_royale_api import check_valid_player_tag
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -30,7 +32,8 @@ async def ping():
 
 @app.post("/tracked-players/{player_tag}")
 async def add_tracked_player(player_tag: str, conn: MongoConn = Depends(get_conn)):
-    # TODO add check if thats a valid tag via calling Clash Royale API
+    if not check_valid_player_tag(player_tag):
+        raise HTTPException(status_code=403, detail=f"Player with tag {player_tag} does not exist")
     try:
        insert_tracked_player(conn, player_tag)
        return {"status": "Player is now being tracked", "tag": player_tag} 
