@@ -44,6 +44,21 @@ services:
       - cr-analytics
     restart: unless-stopped
 
+  api:
+    build:
+      context: ./backend/
+      dockerfile: app/Dockerfile
+    container_name: api
+    depends_on:
+      - mongo
+    env_file:
+      - .env
+    networks:
+      - cr-analytics
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
 #volumes:
   # TODO: Uncomment when switching from bind mount to named volume
   # mongo_data:

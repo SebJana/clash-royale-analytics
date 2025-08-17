@@ -11,6 +11,14 @@ db.createUser({
   roles: [{ role: "readWrite", db: appDb }]
 });
 
+
+print(`[init] creating index on 'player' collection for unique 'playerTag'`);
+db.players.createIndex(
+  { playerTag: 1 },
+  { unique: true, name: "tag_unique" }
+)
+
+
 print(`[init] creating index on 'battles' collection for 'battleTime' and 'referencePlayerTag'`);
 
 db.battles.createIndex(

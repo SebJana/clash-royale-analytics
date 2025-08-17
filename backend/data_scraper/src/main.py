@@ -1,6 +1,8 @@
 from api import fetch_battle_logs
 from clean import clean_battle_log_list, check_if_valid_logs
-from mongo import MongoConn, insert_battles, get_battles_count, print_first_battles
+from mongo import MongoConn
+from mongo import insert_battles, get_battles_count, print_first_battles
+from mongo import get_tracked_players
 import time
 import requests
 import json
@@ -8,27 +10,6 @@ import json
 INIT_SLEEP_DURATION = 60 # 60 seconds
 REQUEST_CYCLE_DURATION = 60 * 60 # 1 hour
 COOL_DOWN_SLEEP_DURATION = 30 # 30 seconds
-
-def read_tracked_players():
-    """
-    Reads the list of tracked players from the JSON configuration file.
-    
-    Loads the tracked_players.json file which contains a mapping of player tags
-    to player names, and returns the player tags (keys) as a list for API requests.
-    
-    Returns:
-        list: List of player tag strings (e.g., ["#YYRJQY28", "#YQQYGJ82"])
-        
-    Raises:
-        FileNotFoundError: If tracked_players.json file doesn't exist
-        json.JSONDecodeError: If the JSON file is malformed
-    """
-    with open("tracked_players.json", "r", encoding="utf-8") as f:
-        tracked_players = json.load(f)
-    
-    player_tag_list = list(tracked_players.keys())
-
-    return player_tag_list
 
 
 time.sleep(INIT_SLEEP_DURATION) # upon start sleep for database to settle in
@@ -46,17 +27,11 @@ while True:
     print("[INFO] Starting new data scraping cycle...")
     
     # Loop over every tracked player
-    players = []
+    players = set()
     try:
-        players = read_tracked_players()
+        players = get_tracked_players(conn)
         print(f"[INFO] Found {len(players)} tracked players: {players}")
-    # If error occurs upon reading the file, the loop will iterate over an empty list
-    # and just remain idle
-    except FileNotFoundError:
-        print("[ERROR] tracked_players.json file not found")
-        continue
-    except json.JSONDecodeError:
-        print("[ERROR] tracked_players.json file is malformed")
+    except Exception as e:
         continue
 
     if not players:
@@ -65,7 +40,7 @@ while True:
         continue
 
     # Space out the API calls
-    time.sleep(COOL_DOWN_SLEEP_DURATION) # Additional to runtime of code
+    time.sleep(COOL_DOWN_SLEEP_DURATION) # Additional delay to runtime of code
 
     for player in players:
         # Try to fetch the last battles for each player
