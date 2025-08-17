@@ -4,8 +4,8 @@ from pymongo import MongoClient
 def build_uri_from_parts():
     user = os.getenv("MONGO_APP_USER")
     pwd  = os.getenv("MONGO_APP_PWD")
-    host = os.getenv("MONGO_APP_HOST", "mongo")
-    port = int(os.getenv("MONGO_APP_PORT", "27017"))
+    host = "mongo"
+    port = "27017"
     db   = os.getenv("MONGO_APP_DB")
 
     if not all([user, pwd, db]):

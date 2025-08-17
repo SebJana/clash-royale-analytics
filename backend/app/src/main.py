@@ -28,8 +28,8 @@ app = FastAPI(lifespan=lifespan)
 async def ping():
     return {"status": "ok"}
 
-@app.post("/players/{player_tag}")
-async def add_player(player_tag: str, conn: MongoConn = Depends(get_conn)):
+@app.post("/tracked-players/{player_tag}")
+async def add_tracked_player(player_tag: str, conn: MongoConn = Depends(get_conn)):
     # TODO add check if thats a valid tag via calling Clash Royale API
     try:
        insert_tracked_player(conn, player_tag)
@@ -39,7 +39,7 @@ async def add_player(player_tag: str, conn: MongoConn = Depends(get_conn)):
     except Exception:
         raise HTTPException(status_code=500, detail="Player could not be inserted")
 
-@app.get("/players")
+@app.get("/tracked-players")
 async def list_players(conn: MongoConn = Depends(get_conn)):
     tags = get_tracked_players(conn)
     print(tags)
