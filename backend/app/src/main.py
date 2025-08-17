@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Depends, Request, HTTPException
+import requests
 from contextlib import asynccontextmanager
 from mongo import MongoConn, insert_tracked_player, get_tracked_players
 from pymongo.errors import DuplicateKeyError
 
-from clash_royale_api import check_valid_player_tag
+from clash_royale_api import check_valid_player_tag, fetch_player_stats
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,3 +48,25 @@ async def list_players(conn: MongoConn = Depends(get_conn)):
     tags = get_tracked_players(conn)
     print(tags)
     return {"activePlayers": list(tags)}
+
+@app.get("/player-stats/{player_tag}")
+async def get_player_stats(player_tag: str):
+    try:
+        player_stats = fetch_player_stats(player_tag)
+        return player_stats
+    
+    except requests.HTTPError as e:
+        status = e.response.status_code if e.response else 502
+        # Common Clash Royale API errors
+        if status == 404:
+            raise HTTPException(status_code=404, detail="Player not found")
+        elif status == 403:
+            raise HTTPException(status_code=403, detail="Forbidden – check API token or IP whitelist")
+        elif status == 429:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded, try again later")
+        else:
+            raise HTTPException(status_code=status, detail="Clash Royale API error")
+
+    except requests.RequestException:
+        # Network / timeout / DNS errors
+        raise HTTPException(status_code=502, detail="Network error while contacting Clash Royale API")
