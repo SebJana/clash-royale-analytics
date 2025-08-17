@@ -42,14 +42,14 @@ def check_tag_syntax(player_tag: str):
 
     TAG_PATTERN = re.compile(r"^[A-Z0-9]$")
 
-    # Strip and captialize 
+    # Strip and capitalize 
     tag = player_tag.strip().upper()
 
     # Missing the starting code symbol
     if tag.startswith != '#':
         return False
 
-    # Invalid Length
+    # Invalid length
     if len(tag) < 8  or len(tag) > 11:
         return False
     
@@ -57,7 +57,7 @@ def check_tag_syntax(player_tag: str):
     if not TAG_PATTERN.fullmatch(tag[1::]):
         return False
     
-    # Valid, if all checks passed
+    # Valid if all checks passed
     return True
 
 
@@ -97,7 +97,7 @@ def fetch_player_stats(player_tag: str):
         player_tag (str): The player tag (e.g., "#YYRJQY28")
         
     Returns:
-        dict: Dictionary of the player information
+        list: All of the player's stats and information
         
     Raises:
         HTTPError: If the API request fails (4xx/5xx status codes)
@@ -108,6 +108,27 @@ def fetch_player_stats(player_tag: str):
     player_url = BASE_URL + f"/players/{tag}"
 
     response = requests.get(player_url, headers=headers)
+    response.raise_for_status()  # will throw HTTPError for 4xx/5xx
+
+    return response.json()
+
+def fetch_cards():
+    """
+    Fetches every card's information from the Clash Royale API.
+
+    Makes an HTTP GET request to the Clash Royale API to retrieve all game cards.
+        
+    Returns:
+        list: All cards in the game as items
+        
+    Raises:
+        HTTPError: If the API request fails (4xx/5xx status codes)
+        RequestException: If there are network connectivity issues
+    """
+
+    cards_url = BASE_URL + "/cards"
+
+    response = requests.get(cards_url, headers=headers)
     response.raise_for_status()  # will throw HTTPError for 4xx/5xx
 
     return response.json()
