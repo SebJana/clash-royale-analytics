@@ -14,6 +14,8 @@ MONGO_APP_DB=clash_royale
 MONGO_APP_USER=data_scraper
 MONGO_APP_PWD=YOUR_SECURE_USER_PASSWORD
 MONGO_INITDB_DATABASE=clash_royale
+MONGO_HOST=mongo
+MONGO_PORT=27017
 
 # MongoDB Backup Configuration
 BACKUP_HOUR=03
@@ -34,6 +36,9 @@ APP_API_KEY = ey41eas...
 - `MONGO_APP_USER`: Application user for database operations (default: `data_scraper`)
 - `MONGO_APP_PWD`: Secure password for the application user
 - `MONGO_INITDB_DATABASE`: Database to initialize with the application user (must match `MONGO_APP_DB`)
+- `MONGO_HOST`: Hostname of the MongoDB service (default: mongo when running in Docker Compose)
+- `MONGO_PORT`: Port number where MongoDB is exposed (default: 27017)
+
 
 #### Backup Configuration
 - `BACKUP_HOUR`: Hour (0-23) when daily backups run (default: `03` = 3 AM)
