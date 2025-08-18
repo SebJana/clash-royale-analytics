@@ -42,6 +42,7 @@ async def main():
             continue
 
         for player in players:
+            print(f"[INFO] Running data scraping cycle for Player {player} ...")
             # Try to fetch the last battles for each player
             try:
                 battle_logs = fetch_battle_logs(player_tag=player)
