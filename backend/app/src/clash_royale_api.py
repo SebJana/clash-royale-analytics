@@ -85,6 +85,7 @@ def check_valid_player_tag(player_tag: str):
         # Network/timeout/etc.
         return False
 
+# TODO rework Clash Royale API calls to async using httpx
 
 def fetch_player_stats(player_tag: str):
     """

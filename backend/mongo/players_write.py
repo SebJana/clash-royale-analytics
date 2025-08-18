@@ -2,12 +2,12 @@ from pymongo.errors import DuplicateKeyError
 from datetime import datetime
 from .connection import MongoConn
 
-def _ensure_connected(conn: MongoConn):
-    if not conn.is_connection_alive():
+async def _ensure_connected(conn: MongoConn):
+    if not await conn.is_connection_alive():
         print("[DB] Connection lost, attempting to reconnect...")
-        conn.connect()
+        await conn.connect()
 
-def insert_tracked_player(conn: MongoConn, player_tag):
+async def insert_tracked_player(conn: MongoConn, player_tag):
         """
         Inserts a player to be tracked into the players collection.
         
@@ -19,12 +19,12 @@ def insert_tracked_player(conn: MongoConn, player_tag):
             DuplicateKeyError: If the player already exists in the collection
             Exception: If insertion fails
         """
-        _ensure_connected(conn)
+        await _ensure_connected(conn)
 
         try:
             current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
 
-            conn.db.players.insert_one({
+            await conn.db.players.insert_one({
                 "playerTag": player_tag,
                 "active": True,
                 "insertedAt": current_time

@@ -1,11 +1,11 @@
 from .connection import MongoConn
 
-def _ensure_connected(conn: MongoConn):
-    if not conn.is_connection_alive():
+async def _ensure_connected(conn: MongoConn):
+    if not await conn.is_connection_alive():
         print("[DB] Connection lost, attempting to reconnect...")
-        conn.connect()
+        await conn.connect()
 
-def get_battles_count(conn: MongoConn):
+async def get_battles_count(conn: MongoConn):
     """
     Gets the total count of documents in the battles collection.
     
@@ -19,16 +19,16 @@ def get_battles_count(conn: MongoConn):
         Exception: If query fails
     """
 
-    _ensure_connected(conn)
+    await _ensure_connected(conn)
     
     try:
-        count = conn.db.battles.count_documents({})
+        count = await conn.db.battles.count_documents({})
         return count
     except Exception as e:
         print(f"[DB] [ERROR] fetching document count: {e}")
         raise
 
-def print_first_battles(conn: MongoConn, limit=5):
+async def print_first_battles(conn: MongoConn, limit=5):
     """
     Prints collection count and previews a few documents.
     
@@ -37,17 +37,17 @@ def print_first_battles(conn: MongoConn, limit=5):
         limit (int): Number of documents to preview (default: 5)
     """
 
-    _ensure_connected(conn)
+    await _ensure_connected(conn)
 
     try:
         # Preview first few documents
-        for doc in conn.db.battles.find().limit(limit):
+        async for doc in conn.db.battles.find().limit(limit):
             print(doc)
 
     except Exception as e:
         print(f"[DB] [ERROR] fetching collection info: {e}")
 
-def get_last_battles(conn: MongoConn, player_tag, limit = 30):
+async def get_last_battles(conn: MongoConn, player_tag, limit = 30):
     """
     Fetches the most recent battles for a specific player.
 
@@ -63,7 +63,7 @@ def get_last_battles(conn: MongoConn, player_tag, limit = 30):
         Exception: If there is an error while fetching the battles from the database.
     """
 
-    _ensure_connected(conn)
+    await _ensure_connected(conn)
 
     try:
         projection = {
@@ -83,7 +83,7 @@ def get_last_battles(conn: MongoConn, player_tag, limit = 30):
             .limit(limit)
         )
         
-        return list(last_battles)
+        return await last_battles.to_list(length=None)
 
     except Exception as e:
         print(f"[DB] [ERROR] fetching collection info: {e}")

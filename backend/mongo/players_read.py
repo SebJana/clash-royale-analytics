@@ -1,11 +1,11 @@
 from .connection import MongoConn
 
-def _ensure_connected(conn: MongoConn):
-    if not conn.is_connection_alive():
+async def _ensure_connected(conn: MongoConn):
+    if not await conn.is_connection_alive():
         print("[DB] Connection lost, attempting to reconnect...")
-        conn.connect()
+        await conn.connect()
 
-def get_tracked_players(conn: MongoConn):
+async def get_tracked_players(conn: MongoConn):
         """
         Retrieves a set of all players that are tracked.
         
@@ -18,7 +18,7 @@ def get_tracked_players(conn: MongoConn):
         Raises:
             Exception: If fetching tracked players fails
         """
-        _ensure_connected(conn)
+        await _ensure_connected(conn)
 
         try:
             cursor = conn.db.players.find(
@@ -31,7 +31,7 @@ def get_tracked_players(conn: MongoConn):
             # Turn the player tags into a set to avoid duplicates if those were
             # to happen in the players collection
             tags = set()
-            for doc in cursor:
+            async for doc in cursor:
                 tags.add(doc["playerTag"])
             return tags
 

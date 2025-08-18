@@ -11,7 +11,7 @@ async def lifespan(app: FastAPI):
     # Startup
     conn = MongoConn("cr-analytics-api")
     try:
-        conn.connect()
+        await conn.connect()
         app.state.mongo = conn
     except Exception as e:
         print(f"[ERROR] Failed to connect to database: {e}")
@@ -36,7 +36,7 @@ async def add_tracked_player(player_tag: str, conn: MongoConn = Depends(get_conn
     if not check_valid_player_tag(player_tag):
         raise HTTPException(status_code=403, detail=f"Player with tag {player_tag} does not exist")
     try:
-       insert_tracked_player(conn, player_tag)
+       await insert_tracked_player(conn, player_tag)
        return {"status": "Player is now being tracked", "tag": player_tag} 
     except DuplicateKeyError:
         return {"status": "Player is already tracked", "tag": player_tag}
@@ -45,8 +45,7 @@ async def add_tracked_player(player_tag: str, conn: MongoConn = Depends(get_conn
 
 @app.get("/tracked-players")
 async def list_players(conn: MongoConn = Depends(get_conn)):
-    tags = get_tracked_players(conn)
-    print(tags)
+    tags = await get_tracked_players(conn)
     return {"activePlayers": list(tags)}
 
 @app.get("/player-stats/{player_tag}")
@@ -94,7 +93,7 @@ async def get_cards():
 @app.get("/battles/{player_tag}/last/{amount}")
 async def get_cards(player_tag: str, amount: int, conn: MongoConn = Depends(get_conn)):
     try:
-        battles = get_last_battles(conn, player_tag, amount)
+        battles = await get_last_battles(conn, player_tag, amount)
         
         if not battles:
             raise HTTPException(status_code=404, detail=f"No battles found for {player_tag}")
