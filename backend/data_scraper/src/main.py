@@ -41,9 +41,6 @@ async def main():
             await asyncio.sleep(REQUEST_CYCLE_DURATION)
             continue
 
-        # Space out the API calls
-        await asyncio.sleep(COOL_DOWN_SLEEP_DURATION) # Additional delay to runtime of code
-
         for player in players:
             # Try to fetch the last battles for each player
             try:
@@ -95,6 +92,9 @@ async def main():
                 print(f"[ERROR] Data validation error: {val_err}")
             except Exception as e:
                 print(f"[ERROR] Unknown error occurred for player {player}: {e}")
+
+            # Space out the API calls
+            await asyncio.sleep(COOL_DOWN_SLEEP_DURATION) # Additional delay to runtime of code
 
         await asyncio.sleep(REQUEST_CYCLE_DURATION)
 
