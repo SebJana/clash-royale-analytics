@@ -1,7 +1,7 @@
-from fastapi import FastAPI, Depends, Request, HTTPException
+from fastapi import FastAPI, Depends, Request, HTTPException, Path
 import requests
 from contextlib import asynccontextmanager
-from mongo import MongoConn, insert_tracked_player, get_tracked_players
+from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_last_battles
 from pymongo.errors import DuplicateKeyError
 
 from clash_royale_api import check_valid_player_tag, fetch_player_stats, fetch_cards
@@ -90,3 +90,16 @@ async def get_cards():
     except requests.RequestException:
         # Network / timeout / DNS errors
         raise HTTPException(status_code=502, detail="Network error while contacting Clash Royale API")
+    
+@app.get("/battles/{player_tag}/last/{amount}")
+async def get_cards(player_tag: str, amount: int, conn: MongoConn = Depends(get_conn)):
+    try:
+        battles = get_last_battles(conn, player_tag, amount)
+        
+        if not battles:
+            raise HTTPException(status_code=404, detail=f"No battles found for {player_tag}")
+
+        return {"player_tag": player_tag, "count": len(battles), "battles": battles}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch last {amount} of games for Player {player_tag}")

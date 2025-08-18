@@ -5,7 +5,6 @@ from mongo import insert_battles, get_battles_count, print_first_battles
 from mongo import get_tracked_players
 import time
 import requests
-import json
 
 INIT_SLEEP_DURATION = 60 # 60 seconds
 REQUEST_CYCLE_DURATION = 60 * 60 # 1 hour
@@ -72,9 +71,8 @@ while True:
             # Optional debug (uncomment to check first documents and document count)
             battles_count = get_battles_count(conn)
             print(f"[INFO] There are now {battles_count} battles in the collection")
-            print_first_battles(conn)
+            # print_first_battles(conn)
         
-
         # Check which type of error occurred
         except requests.exceptions.HTTPError as http_err:
             # Sending too many requests

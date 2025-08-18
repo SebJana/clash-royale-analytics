@@ -41,9 +41,50 @@ def print_first_battles(conn: MongoConn, limit=5):
 
     try:
         # Preview first few documents
-        print(f"[DB] Previewing first {limit} documents:")
         for doc in conn.db.battles.find().limit(limit):
             print(doc)
 
     except Exception as e:
         print(f"[DB] [ERROR] fetching collection info: {e}")
+
+def get_last_battles(conn: MongoConn, player_tag, limit = 30):
+    """
+    Fetches the most recent battles for a specific player.
+
+    Args:
+        conn (MongoConn): Active connection to the MongoDB database.
+        player_tag (str): The tag of the player whose battles are to be fetched.
+        limit (int): The maximum number of battles to fetch (default: 30).
+
+    Returns:
+        list: A list of dictionaries containing the players last battles
+
+    Raises:
+        Exception: If there is an error while fetching the battles from the database.
+    """
+
+    _ensure_connected(conn)
+
+    try:
+        projection = {
+            "_id": 0,
+            "battleTime": 1,
+            "gameResult": 1,
+            "gameMode": 1,
+            "team": 1,
+            "opponent": 1,
+            "arena": 1
+        }
+
+        last_battles = (
+            conn.db.battles
+            .find({"referencePlayerTag": player_tag}, projection)
+            .sort("battleTime", -1)
+            .limit(limit)
+        )
+        
+        return list(last_battles)
+
+    except Exception as e:
+        print(f"[DB] [ERROR] fetching collection info: {e}")
+        raise

@@ -24,8 +24,7 @@ def insert_battles(conn: MongoConn, battle_logs):
             raise ValueError("battle_logs must be a list of dictionaries.")
 
         try:
-            result = conn.db.battles.insert_many(battle_logs, ordered=False)
-            print(f"[DB] Inserted {len(result.inserted_ids)} documents into battles collection")
+            conn.db.battles.insert_many(battle_logs, ordered=False)
         
         except BulkWriteError as bwe:
             # Check if it's a duplicate key error (E11000)
