@@ -1,5 +1,4 @@
 import requests
-import re
 from dotenv import load_dotenv, find_dotenv
 import os
 
@@ -40,21 +39,23 @@ def check_tag_syntax(player_tag: str):
         bool: True if valid, False otherwise
     """
 
-    TAG_PATTERN = re.compile(r"^[A-Z0-9]$")
+    ALPHABET = set("0289PYLQGRJCUV")  # Supercell-Tag-Alphabet
 
-    # Strip and capitalize 
-    tag = player_tag.strip().upper()
+    # Strip the tag 
+    tag = player_tag.strip()
 
     # Missing the starting code symbol
-    if tag.startswith != '#':
+    if not tag.startswith("#"):
         return False
 
+    core = tag[1:]  # Part without the leading '#'
+
     # Invalid length
-    if len(tag) < 8  or len(tag) > 11:
+    if len(core) < 8  or len(core) > 11:
         return False
     
     # Check if the tag without the '#' is only numbers and upper letters
-    if not TAG_PATTERN.fullmatch(tag[1::]):
+    if not all(ch in ALPHABET for ch in core):
         return False
     
     # Valid if all checks passed
