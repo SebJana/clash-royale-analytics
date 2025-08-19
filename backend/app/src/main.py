@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Depends, Request, HTTPException, Path
+from fastapi import FastAPI, Depends, Request, HTTPException
 import requests
 from contextlib import asynccontextmanager
-from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_last_battles
+from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_last_battles, get_unique_decks
 from pymongo.errors import DuplicateKeyError
 
+from models import PlayerBetweenRequest
 from clash_royale_api import check_valid_player_tag, fetch_player_stats, fetch_cards
 
 @asynccontextmanager
@@ -51,6 +52,7 @@ async def list_players(conn: MongoConn = Depends(get_conn)):
 @app.get("/player-stats/{player_tag}")
 async def get_player_stats(player_tag: str):
     try:
+        # TODO cache the player stats (minutes/hours)
         player_stats = fetch_player_stats(player_tag)
         return player_stats
     
@@ -73,6 +75,7 @@ async def get_player_stats(player_tag: str):
 @app.get("/cards")
 async def get_cards():
     try:
+        # TODO cache the cards result (hours-day)
         cards = fetch_cards()
         return cards
     
@@ -91,7 +94,7 @@ async def get_cards():
         raise HTTPException(status_code=502, detail="Network error while contacting Clash Royale API")
     
 @app.get("/battles/{player_tag}/last/{amount}")
-async def get_cards(player_tag: str, amount: int, conn: MongoConn = Depends(get_conn)):
+async def last_battles(player_tag: str, amount: int, conn: MongoConn = Depends(get_conn)):
     try:
         battles = await get_last_battles(conn, player_tag, amount)
         
@@ -102,3 +105,19 @@ async def get_cards(player_tag: str, amount: int, conn: MongoConn = Depends(get_
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch last {amount} of games for Player {player_tag}")
+    
+@app.post("/decks/unique")
+async def unique_decks(request: PlayerBetweenRequest, conn: MongoConn = Depends(get_conn)):
+    try:
+        # TODO check valid player (is in get_tracked_players() response?)
+        # TODO check valid date range
+
+        unique_decks = await get_unique_decks(conn, request.player_tag, request.start_date, request.end_date)
+        
+        if not unique_decks:
+            raise HTTPException(status_code=404, detail=f"No decks found for {request.player_tag}")
+
+        return {"player_tag": request.player_tag, "count": len(unique_decks), "unique decks": unique_decks}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch unique decks for Player {request.player_tag}")
