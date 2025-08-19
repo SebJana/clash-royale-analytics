@@ -177,9 +177,10 @@ def clean_battle_log_list(battle_logs, player_tag):
         battle['referencePlayerTag'] = player_tag
 
         # Turn the date/time format into ISO time
-        battle_time = battle.get('battleTime')
+        battle_time = battle.get("battleTime")  # e.g. "20250817T022935.000Z"
+        # Parse to datetime
         battle_time = datetime.strptime(battle_time, "%Y%m%dT%H%M%S.000Z")
-        battle['battleTime'] = battle_time.strftime("%Y-%m-%d %H:%M:%S")
+        battle["battleTime"] = battle_time
 
         # For each battle in the log format and clean it
         clean_battle(battle)
