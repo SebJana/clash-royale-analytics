@@ -1,5 +1,57 @@
 # Clash Royale Analytics
 
+A comprehensive data analytics system for Clash Royale that automatically tracks player battle logs, provides detailed statistics, and offers powerful querying capabilities through a REST API.
+
+## 🚀 What Can You Do With This System?
+
+This platform enables you to:
+- **Track Players Automatically**: Monitor any Clash Royale player's battles 24/7
+- **Analyze Performance**: Get detailed win rates, deck analysis, and progression tracking  
+- **Study the Meta**: See what decks and strategies top players are using
+- **Historical Analysis**: Query battle data across custom date ranges
+- **Build Applications**: Use the REST API to create dashboards, bots, or mobile apps
+
+📖 **[View Complete Capabilities Guide](CAPABILITIES.md)** - See everything you can accomplish
+
+📚 **[API Documentation](API_DOCUMENTATION.md)** - Complete endpoint reference
+
+🎯 **[Setup Tutorial](TUTORIAL.md)** - Step-by-step guide with examples
+
+## Quick Start
+
+### 1. Get API Keys
+Get your API keys from the [official Clash Royale API](https://developer.clashroyale.com)
+
+### 2. Setup Environment
+```bash
+cp .env.example .env
+# Edit .env with your API keys and secure passwords
+```
+
+### 3. Start System
+```bash
+docker compose up -d
+```
+
+### 4. Add Players to Track
+```bash
+curl -X POST "http://localhost:8000/tracked-players/%23YYRJQY28"
+```
+
+### 5. Query Data
+```bash
+curl "http://localhost:8000/player-stats/%23YYRJQY28"
+curl "http://localhost:8000/battles/%23YYRJQY28/last/10"
+```
+
+## Architecture
+
+- **Data Scraper**: Continuously collects battle logs every hour
+- **REST API**: FastAPI service providing data access endpoints  
+- **MongoDB**: Scalable database with optimized indexing
+- **Backup System**: Automated daily backups with retention policies
+- **Docker Deployment**: Complete containerized setup
+
 ## Setup
 
 ### 1. Environment Configuration
