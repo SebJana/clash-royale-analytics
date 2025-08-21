@@ -1,20 +1,27 @@
-from api import fetch_battle_logs
 from clean import clean_battle_log_list, check_if_valid_logs
+from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn
 from mongo import insert_battles, get_battles_count, print_first_battles
 from mongo import get_tracked_players
-import requests
+from dotenv import load_dotenv, find_dotenv
+import os
+import httpx
 import asyncio
 
 INIT_SLEEP_DURATION = 60 # 60 seconds
 REQUEST_CYCLE_DURATION = 60 * 60 # 1 hour
 COOL_DOWN_SLEEP_DURATION = 30 # 30 seconds
 
+load_dotenv(find_dotenv())
+API_TOKEN = os.getenv("DATA_SCRAPER_API_KEY")
 
 async def main():
     """Main async function for the data scraper"""
     
     await asyncio.sleep(INIT_SLEEP_DURATION) # upon start sleep for database to settle in
+
+    # Init the CR API connection
+    cr_api = ClashRoyaleAPI(api_key=API_TOKEN)
 
     # Init the database connection
     conn = MongoConn(app_name="cr-analytics-data-scraper")
@@ -45,13 +52,14 @@ async def main():
             print(f"[INFO] Running data scraping cycle for Player {player} ...")
             # Try to fetch the last battles for each player
             try:
-                battle_logs = fetch_battle_logs(player_tag=player)
+                battle_logs = await cr_api.get_player_battle_logs(player_tag=player)
 
                 # Check if we got any battle logs
                 if not battle_logs:
                     print(f"[WARNING] No battle logs returned for player {player}")
                     continue
-
+                
+                # TODO move this check to the API module
                 # API response if there is a maintenance break
                 if isinstance(battle_logs, list) and len(battle_logs) > 0 and battle_logs[0].get('reason') == 'inMaintenance':
                     print("[INFO] API is in maintenance mode, skipping this cycle")
@@ -75,22 +83,34 @@ async def main():
                 # await print_first_battles(conn)
             
             # Check which type of error occurred
-            except requests.exceptions.HTTPError as http_err:
+            except httpx.HTTPStatusError as http_err:
+                code = http_err.response.status_code
                 # Sending too many requests
-                if http_err.response.status_code == 429:
+                if code == 429: # TODO upon too many request, wait and retry fetching
                     print("[ERROR] Rate limit hit - consider increasing COOL_DOWN_SLEEP_TIME")
                     await asyncio.sleep(COOL_DOWN_SLEEP_DURATION * 10) # Extra delay for rate limiting
-                elif http_err.response.status_code == 403:
+                elif code == 403:
                     print("[ERROR] API access forbidden - check your API token")
-                elif http_err.response.status_code == 404:
+                elif code == 404:
                     print(f"[ERROR] Player {player} not found")
                 else:
-                    print(f"[ERROR] HTTP error {http_err.response.status_code}: {http_err}")
+                    body = http_err.response.text[:200]
+                    reason = http_err.response.reason_phrase
+                    print(f"[ERROR] HTTP {code} {reason}: {body}")
             
-            except requests.exceptions.RequestException as req_err:
-                print(f"[ERROR] Network error: {req_err}")
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout) as net_err:
+                print(f"[ERROR] Network/timeout error: {net_err}")
+                # Small backoff to avoid tight loops
+                await asyncio.sleep(1)
+
+            except httpx.RequestError as req_err:
+                # Catch-all for other client-side errors (DNS, TLS, etc.)
+                print(f"[ERROR] Request error: {req_err}")
+
             except ValueError as val_err:
+                # e.g., JSON decode issues if you do resp.json() on non-JSON
                 print(f"[ERROR] Data validation error: {val_err}")
+
             except Exception as e:
                 print(f"[ERROR] Unknown error occurred for player {player}: {e}")
 
