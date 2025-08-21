@@ -1,5 +1,5 @@
-from .api_client import ClashRoyaleAPI
+from .api_client import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 
 __all__ = [
-    "ClashRoyaleAPI",
+    "ClashRoyaleAPI", "ClashRoyaleMaintenanceError",
 ]

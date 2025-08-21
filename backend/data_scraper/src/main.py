@@ -1,5 +1,5 @@
 from clean import clean_battle_log_list, check_if_valid_logs
-from clash_royale_api import ClashRoyaleAPI
+from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from mongo import MongoConn
 from mongo import insert_battles, get_battles_count, print_first_battles
 from mongo import get_tracked_players
@@ -58,12 +58,6 @@ async def main():
                 if not battle_logs:
                     print(f"[WARNING] No battle logs returned for player {player}")
                     continue
-                
-                # TODO move this check to the API module
-                # API response if there is a maintenance break
-                if isinstance(battle_logs, list) and len(battle_logs) > 0 and battle_logs[0].get('reason') == 'inMaintenance':
-                    print("[INFO] API is in maintenance mode, skipping this cycle")
-                    break # Leave the requests loop and return in the next cycle
 
                 # Check if the response has all the necessary fields
                 if not check_if_valid_logs(battle_logs):
@@ -83,6 +77,11 @@ async def main():
                 # await print_first_battles(conn)
             
             # Check which type of error occurred
+            # API response if there currently is a maintenance break
+            except ClashRoyaleMaintenanceError as e:
+                print(f"[WARNING] {e.detail} ... Skipping the current cycle")
+                break # Skip the cycle
+
             except httpx.HTTPStatusError as http_err:
                 code = http_err.response.status_code
                 # Sending too many requests

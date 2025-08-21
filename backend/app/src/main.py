@@ -4,7 +4,7 @@ from dotenv import load_dotenv, find_dotenv
 import os
 from typing import Annotated
 from contextlib import asynccontextmanager
-from clash_royale_api import ClashRoyaleAPI
+from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_last_battles, get_unique_decks
 from pymongo.errors import DuplicateKeyError
 
@@ -59,8 +59,12 @@ async def ping():
 
 @app.post("/tracked-players/{player_tag}")
 async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi):
-    if not await cr_api.check_existing_player(player_tag):
-        raise HTTPException(status_code=403, detail=f"Player with tag {player_tag} does not exist")
+    try:
+        if not await cr_api.check_existing_player(player_tag):
+            raise HTTPException(status_code=403, detail=f"Player with tag {player_tag} does not exist")
+    except ClashRoyaleMaintenanceError as e:
+        raise HTTPException(status_code=e.code, detail=e.detail)
+    
     try:
        await insert_tracked_player(mongo_conn, player_tag)
        return {"status": "Player is now being tracked", "tag": player_tag} 
@@ -81,6 +85,9 @@ async def get_player_stats(player_tag: str, cr_api: CrApi):
         player_stats = await cr_api.get_player_info(player_tag)
         return player_stats
     
+    except ClashRoyaleMaintenanceError as e:
+        raise HTTPException(status_code=e.code, detail=e.detail)
+
     except httpx.HTTPStatusError as http_err:
         status = http_err.response.status_code if http_err.response else 502
         # Common Clash Royale API errors
@@ -103,7 +110,10 @@ async def get_cards(cr_api: CrApi):
         # TODO cache the cards result (hours-day)
         cards = await cr_api.get_cards()
         return cards
-    
+
+    except ClashRoyaleMaintenanceError as e:
+        raise HTTPException(status_code=e.code, detail=e.detail)
+
     except httpx.HTTPStatusError as http_err:
         status = http_err.response.status_code if http_err.response else 502
         # Common Clash Royale API errors

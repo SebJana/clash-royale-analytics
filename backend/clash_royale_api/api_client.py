@@ -3,6 +3,14 @@ import httpx
 CLASH_BASE_URL = "https://api.clashroyale.com/v1"
 ALPHABET = set("0289PYLQGRJCUV")  # Supercell tag alphabet
 
+class ClashRoyaleMaintenanceError(Exception):
+    """Raised when the Clash Royale API is in maintenance mode."""
+
+    def __init__(self, detail: str = "Clash Royale API is in maintenance. Try again later.", code: int = 503):
+        super().__init__(detail)
+        self.detail = detail
+        self.code = code
+
 class ClashRoyaleAPI:
     """
     Async Clash Royale API client (single API key, no rotation).
@@ -70,6 +78,26 @@ class ClashRoyaleAPI:
             str: URL-encoded player tag (e.g., "%23YYRJQY28")
         """
         return player_tag.replace("#", "%23")
+    
+    @staticmethod
+    def _check_maintenance(response):
+        """
+        Checks if the Clash Royale API is in maintenance mode.
+
+        Args:
+            response (Any): The API response (usually a list of dicts)
+
+        Raises:
+            ClashRoyaleMaintenanceError: If the API is in maintenance mode.
+        """
+        if (
+            isinstance(response, list) 
+            and len(response) > 0 
+            and response[0].get("reason") == "inMaintenance"
+        ):
+            raise ClashRoyaleMaintenanceError(
+                "Clash Royale API is in maintenance mode. Try again later."
+            )
 
 
     async def _request(self, endpoint: str):
@@ -101,6 +129,10 @@ class ClashRoyaleAPI:
             headers={"Authorization": f"Bearer {self._api_key}"},
         )
         resp.raise_for_status()  # will raise httpx.HTTPStatusError on 4xx/5xx
+
+        # Check for maintenance
+        self._check_maintenance(resp)
+
         return resp.json()
     
     async def check_existing_player(self, player_tag: str):
