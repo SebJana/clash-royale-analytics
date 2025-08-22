@@ -83,7 +83,7 @@ async def get_last_battles(conn: MongoConn, player_tag, limit = 30):
         print(f"[DB] [ERROR] fetching collection info: {e}")
         raise
 
-async def get_unique_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
+async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
     """
     Fetches every unique deck that the player has played in the given time frame.
 
@@ -99,12 +99,13 @@ async def get_unique_decks_win_percentage(conn: MongoConn, player_tag, start_dat
         Exception: If there is an error while fetching the battles from the database.
     """
 
-    start_dt = datetime.combine(start_date, datetime.min.time())
-    end_dt   = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
-
     try:
         await ensure_connected(conn)
         check_valid_date_range(start_date, end_date)
+
+        # Convert date to date and time
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt   = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
 
         pipeline = [
             # Match the relevant files for the player and the time frame
@@ -200,4 +201,128 @@ async def get_unique_decks_win_percentage(conn: MongoConn, player_tag, start_dat
         print(f"[DB] [ERROR] fetching decks info: {e}")
         raise
 
+async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
+    """
+    Fetches a usage and win percentage for every used card for the player in the specified time range.
 
+    Args:
+        conn (MongoConn): Active connection to the MongoDB database.
+        player_tag (str): The tag of the player whose unique decks are to be fetched.
+        start_date (str): Date after which the game happened.
+        end_date (str): Date before which the game happened.
+
+    Returns:
+        list: A list of dictionaries containing the card win-rate and usages
+    Raises:
+        Exception: If there is an error while fetching the battles from the database.
+    """
+
+    try:
+        await ensure_connected(conn)
+        check_valid_date_range(start_date, end_date)
+
+        # Convert date to date and time
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt   = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
+
+        pipeline = [
+            {"$match": {
+                "referencePlayerTag": player_tag,
+                "battleTime": {"$gte": start_dt, "$lt": end_dt}
+            }},
+            # Extract the cards from the decks for the given player
+            {"$addFields": {
+                "deckCards": {
+                    "$map": {
+                        "input": {
+                            "$ifNull": [
+                                {"$getField": {
+                                    "field": "cards",
+                                    "input": {
+                                        "$first": {
+                                            "$filter": {
+                                                "input": "$team",
+                                                "as": "m",
+                                                "cond": {"$eq": ["$$m.tag", player_tag]}
+                                            }
+                                        }
+                                    }
+                                }},
+                                []
+                            ]
+                        },
+                        "as": "c",
+                        "in": { "id": "$$c.id", "name": {"$ifNull": ["$$c.name", "UNKNOWN"]} }
+                    }
+                }
+            }},
+            {"$facet": {
+                "cards": [
+                    {"$unwind": "$deckCards"},
+                    {"$group": {
+                        "_id": {"id": "$deckCards.id", "name": "$deckCards.name"},
+                        "usage": {"$sum": 1},  # Usage in battle
+                        "wins":  {"$sum": {"$cond": [{"$eq": ["$gameResult", "Victory"]}, 1, 0]}}
+                    }},
+                    {"$project": {
+                        "_id": 0,
+                        "card": "$_id",
+                        "usage": 1,
+                        "wins": 1,
+                        "winRate": {
+                            "$cond": [
+                                {"$eq": ["$usage", 0]},
+                                0,
+                                {"$multiply": [{"$divide": ["$wins", "$usage"]}, 100]}
+                            ]
+                        },
+                        "firstSeen": 1,
+                        "lastSeen": 1
+                    }},
+                    {"$sort": {"usage": -1, "lastSeen": -1}}
+                ],
+                "meta": [
+                    {"$count": "totalBattles"}
+                ]
+            }},
+            # usagePct = usage / totalBattles * 100
+            {"$set": {
+                "totalBattles": {"$ifNull": [{"$first": "$meta.totalBattles"}, 0]}
+            }},
+            {"$project": {
+                "totalBattles": 1,
+                "cards": {
+                    "$map": {
+                        "input": "$cards",
+                        "as": "c",
+                        "in": {
+                            "$mergeObjects": [
+                                "$$c",
+                                {
+                                    "usageRate": {
+                                        "$cond": [
+                                            {"$eq": ["$totalBattles", 0]},
+                                            0,
+                                            {"$multiply": [
+                                                {"$divide": ["$$c.usage", "$totalBattles"]},
+                                                100
+                                            ]}
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }}
+        ]
+
+        res = await conn.db.battles.aggregate(pipeline, allowDiskUse=True).to_list(length=1)
+        if not res:
+            return {"cards": [], "totalBattles": 0}
+
+        return res[0]
+
+    except Exception as e:
+        print(f"[DB] [ERROR] fetching card stats: {e}")
+        raise

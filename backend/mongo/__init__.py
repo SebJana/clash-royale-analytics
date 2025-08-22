@@ -1,5 +1,5 @@
 from .connection import MongoConn
-from .battles_read import get_battles_count, print_first_battles, get_last_battles, get_unique_decks_win_percentage
+from .battles_read import get_battles_count, print_first_battles, get_last_battles, get_decks_win_percentage, get_cards_win_percentage
 from .battles_write import insert_battles
 
 from .players_read import get_tracked_players
@@ -9,7 +9,8 @@ __all__ = [
     "MongoConn",
     # battles
     ## read
-    "get_battles_count", "print_first_battles", "get_last_battles", "get_unique_decks_win_percentage",
+    "get_battles_count", "print_first_battles", "get_last_battles",
+    "get_decks_win_percentage", "get_cards_win_percentage",
     ## write
     "insert_battles", 
 

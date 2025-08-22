@@ -5,7 +5,8 @@ import os
 from typing import Annotated
 from contextlib import asynccontextmanager
 from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
-from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_last_battles, get_unique_decks_win_percentage
+from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_last_battles
+from mongo import get_decks_win_percentage, get_cards_win_percentage
 from pymongo.errors import DuplicateKeyError
 
 from models import PlayerBetweenRequest
@@ -139,20 +140,40 @@ async def last_battles(player_tag: str, amount: int, mongo_conn: DbConn):
         return {"player_tag": player_tag, "count": len(battles), "battles": battles}
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch last {amount} of games for Player {player_tag}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch last {amount} of games for player {player_tag}: {e}")
     
-@app.post("/decks/unique")
-async def unique_decks(request: PlayerBetweenRequest, mongo_conn: DbConn):
+@app.post("/decks/{player_tag}/stats")
+async def deck_percentage_stats(request: PlayerBetweenRequest, mongo_conn: DbConn):
     try:
         # TODO check valid player (is in get_tracked_players() response?)
-        # TODO check valid date range
 
-        unique_decks = await get_unique_decks_win_percentage(mongo_conn, request.player_tag, request.start_date, request.end_date)
+        decks = await get_decks_win_percentage(mongo_conn, request.player_tag, request.start_date, request.end_date)
         
-        if not unique_decks:
+        if not decks:
             raise HTTPException(status_code=404, detail=f"No decks found for {request.player_tag}")
 
-        return {"player_tag": request.player_tag, "count": len(unique_decks), "unique decks": unique_decks}
+        return {"player_tag": request.player_tag, "count": len(decks), "decks": decks}
     
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {request.start_date} – {request.end_date}")
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch unique decks for Player {request.player_tag}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch deck statistics for player {request.player_tag}: {e}")
+    
+@app.post("/cards/{player_tag}/stats")
+async def card_percentage_stats(request: PlayerBetweenRequest, mongo_conn: DbConn):
+    try:
+        # TODO check valid player (is in get_tracked_players() response?)
+
+        cards = await get_cards_win_percentage(mongo_conn, request.player_tag, request.start_date, request.end_date)
+
+        if not cards:
+            raise HTTPException(status_code=404, detail=f"No cards found for {request.player_tag}")
+
+        return {"player_tag": request.player_tag, "card_statistics": cards}
+    
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {request.start_date} – {request.end_date}")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch the card statistics for player {request.player_tag}: {e}")
