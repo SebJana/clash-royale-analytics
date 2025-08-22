@@ -1,10 +1,6 @@
 from .connection import MongoConn
+from .utils import ensure_connected, check_valid_date_range
 from datetime import datetime, timedelta
-
-async def _ensure_connected(conn: MongoConn):
-    if not await conn.is_connection_alive():
-        print("[DB] Connection lost, attempting to reconnect...")
-        await conn.connect()
 
 async def get_battles_count(conn: MongoConn):
     """
@@ -19,10 +15,9 @@ async def get_battles_count(conn: MongoConn):
     Raises:
         Exception: If query fails
     """
-
-    await _ensure_connected(conn)
     
     try:
+        await ensure_connected(conn)
         count = await conn.db.battles.count_documents({})
         return count
     except Exception as e:
@@ -38,9 +33,8 @@ async def print_first_battles(conn: MongoConn, limit=5):
         limit (int): Number of documents to preview (default: 5)
     """
 
-    await _ensure_connected(conn)
-
     try:
+        await ensure_connected(conn)
         # Preview first few documents
         async for doc in conn.db.battles.find().limit(limit):
             print(doc)
@@ -64,9 +58,8 @@ async def get_last_battles(conn: MongoConn, player_tag, limit = 30):
         Exception: If there is an error while fetching the battles from the database.
     """
 
-    await _ensure_connected(conn)
-
     try:
+        await ensure_connected(conn)
         projection = {
             "_id": 0,
             "battleTime": 1,
@@ -90,7 +83,7 @@ async def get_last_battles(conn: MongoConn, player_tag, limit = 30):
         print(f"[DB] [ERROR] fetching collection info: {e}")
         raise
 
-async def get_unique_decks(conn: MongoConn, player_tag, start_date, end_date):
+async def get_unique_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
     """
     Fetches every unique deck that the player has played in the given time frame.
 
@@ -106,12 +99,13 @@ async def get_unique_decks(conn: MongoConn, player_tag, start_date, end_date):
         Exception: If there is an error while fetching the battles from the database.
     """
 
-    await _ensure_connected(conn)
-
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt   = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
 
     try:
+        await ensure_connected(conn)
+        check_valid_date_range(start_date, end_date)
+
         pipeline = [
             # Match the relevant files for the player and the time frame
             {
@@ -205,3 +199,5 @@ async def get_unique_decks(conn: MongoConn, player_tag, start_date, end_date):
     except Exception as e:
         print(f"[DB] [ERROR] fetching decks info: {e}")
         raise
+
+

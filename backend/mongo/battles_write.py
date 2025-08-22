@@ -1,10 +1,6 @@
 from pymongo.errors import BulkWriteError
 from .connection import MongoConn
-
-async def _ensure_connected(conn: MongoConn):
-    if not await conn.is_connection_alive():
-        print("[DB] Connection lost, attempting to reconnect...")
-        await conn.connect()
+from .utils import ensure_connected
 
 async def insert_battles(conn: MongoConn, battle_logs):
         """
@@ -18,12 +14,13 @@ async def insert_battles(conn: MongoConn, battle_logs):
             ValueError: If battle_logs is not a list
             Exception: If insertion fails
         """
-        await _ensure_connected(conn)
-
-        if not isinstance(battle_logs, list):
-            raise ValueError("battle_logs must be a list of dictionaries.")
 
         try:
+            await ensure_connected(conn)
+
+            if not isinstance(battle_logs, list):
+                raise ValueError("battle_logs must be a list of dictionaries.")
+            
             await conn.db.battles.insert_many(battle_logs, ordered=False)
         
         except BulkWriteError as bwe:

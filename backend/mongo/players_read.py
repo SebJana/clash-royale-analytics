@@ -1,9 +1,5 @@
 from .connection import MongoConn
-
-async def _ensure_connected(conn: MongoConn):
-    if not await conn.is_connection_alive():
-        print("[DB] Connection lost, attempting to reconnect...")
-        await conn.connect()
+from .utils import ensure_connected
 
 async def get_tracked_players(conn: MongoConn):
         """
@@ -18,9 +14,10 @@ async def get_tracked_players(conn: MongoConn):
         Raises:
             Exception: If fetching tracked players fails
         """
-        await _ensure_connected(conn)
-
+        
         try:
+            await ensure_connected(conn)
+
             cursor = conn.db.players.find(
                 # only active/tracked players
                 {"active": True},

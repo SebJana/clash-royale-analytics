@@ -5,7 +5,7 @@ import os
 from typing import Annotated
 from contextlib import asynccontextmanager
 from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
-from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_last_battles, get_unique_decks
+from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_last_battles, get_unique_decks_win_percentage
 from pymongo.errors import DuplicateKeyError
 
 from models import PlayerBetweenRequest
@@ -139,7 +139,7 @@ async def last_battles(player_tag: str, amount: int, mongo_conn: DbConn):
         return {"player_tag": player_tag, "count": len(battles), "battles": battles}
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch last {amount} of games for Player {player_tag}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch last {amount} of games for Player {player_tag}: {e}")
     
 @app.post("/decks/unique")
 async def unique_decks(request: PlayerBetweenRequest, mongo_conn: DbConn):
@@ -147,7 +147,7 @@ async def unique_decks(request: PlayerBetweenRequest, mongo_conn: DbConn):
         # TODO check valid player (is in get_tracked_players() response?)
         # TODO check valid date range
 
-        unique_decks = await get_unique_decks(mongo_conn, request.player_tag, request.start_date, request.end_date)
+        unique_decks = await get_unique_decks_win_percentage(mongo_conn, request.player_tag, request.start_date, request.end_date)
         
         if not unique_decks:
             raise HTTPException(status_code=404, detail=f"No decks found for {request.player_tag}")
@@ -155,4 +155,4 @@ async def unique_decks(request: PlayerBetweenRequest, mongo_conn: DbConn):
         return {"player_tag": request.player_tag, "count": len(unique_decks), "unique decks": unique_decks}
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch unique decks for Player {request.player_tag}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch unique decks for Player {request.player_tag}: {e}")
