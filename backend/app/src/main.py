@@ -9,7 +9,7 @@ from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_las
 from mongo import get_decks_win_percentage, get_cards_win_percentage
 from pymongo.errors import DuplicateKeyError
 
-from models import PlayerBetweenRequest
+from models import BetweenRequest
 
 load_dotenv(find_dotenv())
 API_TOKEN = os.getenv("APP_API_KEY")
@@ -58,7 +58,7 @@ app = FastAPI(lifespan=lifespan)
 async def ping():
     return {"status": "ok"}
 
-@app.post("/tracked-players/{player_tag}")
+@app.post("/players/{player_tag}")
 async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi):
     try:
         if not await cr_api.check_existing_player(player_tag):
@@ -74,12 +74,12 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
     except Exception:
         raise HTTPException(status_code=500, detail="Player could not be inserted")
 
-@app.get("/tracked-players")
-async def list_players(mongo_conn: DbConn):
+@app.get("/players")
+async def list_tracked_players(mongo_conn: DbConn):
     tags = await get_tracked_players(mongo_conn)
     return {"activePlayers": list(tags)}
 
-@app.get("/player-stats/{player_tag}")
+@app.get("/players/{player_tag}/stats")
 async def get_player_stats(player_tag: str, cr_api: CrApi):
     try:
         # TODO cache the player stats (minutes/hours)
@@ -142,38 +142,38 @@ async def last_battles(player_tag: str, amount: int, mongo_conn: DbConn):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch last {amount} of games for player {player_tag}: {e}")
     
-@app.post("/decks/{player_tag}/stats")
-async def deck_percentage_stats(request: PlayerBetweenRequest, mongo_conn: DbConn):
+@app.get("/players/{player_tag}/decks/stats")
+async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, dates: BetweenRequest = Depends()):
     try:
         # TODO check valid player (is in get_tracked_players() response?)
 
-        decks = await get_decks_win_percentage(mongo_conn, request.player_tag, request.start_date, request.end_date)
+        decks = await get_decks_win_percentage(mongo_conn, player_tag, dates.start_date, dates.end_date)
         
         if not decks:
-            raise HTTPException(status_code=404, detail=f"No decks found for {request.player_tag}")
+            raise HTTPException(status_code=404, detail=f"No decks found for {player_tag}")
 
-        return {"player_tag": request.player_tag, "count": len(decks), "decks": decks}
+        return {"player_tag": player_tag, "count": len(decks), "decks": decks}
     
     except ValueError as e:
-        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {request.start_date} – {request.end_date}")
+        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {dates.start_date} – {dates.end_date}")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch deck statistics for player {request.player_tag}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch deck statistics for player {dates.player_tag}: {e}")
     
-@app.post("/cards/{player_tag}/stats")
-async def card_percentage_stats(request: PlayerBetweenRequest, mongo_conn: DbConn):
+@app.get("/players/{player_tag}/cards/stats")
+async def card_percentage_stats(player_tag: str, mongo_conn: DbConn, dates: BetweenRequest = Depends()):
     try:
         # TODO check valid player (is in get_tracked_players() response?)
 
-        cards = await get_cards_win_percentage(mongo_conn, request.player_tag, request.start_date, request.end_date)
+        cards = await get_cards_win_percentage(mongo_conn, player_tag, dates.start_date, dates.end_date)
 
         if not cards:
-            raise HTTPException(status_code=404, detail=f"No cards found for {request.player_tag}")
+            raise HTTPException(status_code=404, detail=f"No cards found for {player_tag}")
 
-        return {"player_tag": request.player_tag, "card_statistics": cards}
+        return {"player_tag": player_tag, "card_statistics": cards}
     
     except ValueError as e:
-        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {request.start_date} – {request.end_date}")
+        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {dates.start_date} – {dates.end_date}")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch the card statistics for player {request.player_tag}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch the card statistics for player {dates.player_tag}: {e}")

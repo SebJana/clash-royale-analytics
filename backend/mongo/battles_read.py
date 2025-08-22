@@ -83,6 +83,7 @@ async def get_last_battles(conn: MongoConn, player_tag, limit = 30):
         print(f"[DB] [ERROR] fetching collection info: {e}")
         raise
 
+# TODO differentiate between evolution card and regular card
 async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
     """
     Fetches every unique deck that the player has played in the given time frame.
@@ -201,6 +202,7 @@ async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_
         print(f"[DB] [ERROR] fetching decks info: {e}")
         raise
 
+# TODO differentiate between evolution card and regular card
 async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
     """
     Fetches a usage and win percentage for every used card for the player in the specified time range.
