@@ -22,6 +22,9 @@ BACKUP_HOUR=03
 BACKUP_MINUTE=30
 BACKUP_RETENTION_DAYS=7
 
+# Redis credentials
+REDIS_PASSWORD=YOUR_SECURE_REDIS_PASSWORD
+
 # Clash Royale API Keys
 DATA_SCRAPER_API_KEY = ey31asd23...
 APP_API_KEY = ey41eas...
@@ -44,6 +47,9 @@ APP_API_KEY = ey41eas...
 - `BACKUP_HOUR`: Hour (0-23) when daily backups run (default: `03` = 3 AM)
 - `BACKUP_MINUTE`: Minute (0-59) when daily backups run (default: `30`)
 - `BACKUP_RETENTION_DAYS`: Number of days to keep backup files (default: `7`)
+
+#### Redis credentials
+- `REDIS_PASSWORD`:= Secure password for the redis database
 
 #### Clash Royale API Keys
 - `DATA_SCRAPER_API_KEY`: API Key used to run the cyclic tracking and refreshing of selected player(s)

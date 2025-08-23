@@ -3,3 +3,4 @@ uvicorn
 motor
 httpx
 python-dotenv
+redis

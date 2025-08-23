@@ -4,6 +4,7 @@ from dotenv import load_dotenv, find_dotenv
 import os
 from typing import Annotated
 from contextlib import asynccontextmanager
+from redis_service import RedisConn, get_redis_json, set_redis_json, build_redis_key
 from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_last_battles
 from mongo import get_decks_win_percentage, get_cards_win_percentage
@@ -13,12 +14,26 @@ from models import BetweenRequest
 
 load_dotenv(find_dotenv())
 API_TOKEN = os.getenv("APP_API_KEY")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    # Redis
+    redis_conn = RedisConn(host="redis", port=6379, password=REDIS_PASSWORD)
+    try:
+        await redis_conn.connect()
+        app.state.redis = redis_conn
+    except Exception as e:
+        print(f"[ERROR] Failed to connect to redis: {e}")
+        print("[ERROR] Exiting api")
+        exit(1)
+
+    # Clash Royale API
     cr_api = ClashRoyaleAPI(api_key=API_TOKEN)
     app.state.cr_api = cr_api
+
+    # MongoDB
     mongo_conn = MongoConn("cr-analytics-api")
     try:
         await mongo_conn.connect()
@@ -28,9 +43,11 @@ async def lifespan(app: FastAPI):
         print("[ERROR] Exiting api")
         exit(1)
     yield
+
     # Shutdown
     await app.state.cr_api.close()
     mongo_conn.close()
+    await redis_conn.close()
 
 # Dependency that returns the database connection
 def get_mongo(request: Request) -> MongoConn:
@@ -38,6 +55,13 @@ def get_mongo(request: Request) -> MongoConn:
     if db is None:
         raise HTTPException(status_code=500, detail="Database not initialized")
     return db
+
+# Dependency that returns the redis connection
+def get_redis(request: Request) -> RedisConn:
+    r = getattr(request.app.state, "redis", None)
+    if r is None:
+        raise HTTPException(status_code=500, detail="Redis not initialized")
+    return r
 
 # Dependency that returns the Cr API client
 def get_cr_api(request: Request) -> ClashRoyaleAPI:
@@ -50,6 +74,7 @@ def get_cr_api(request: Request) -> ClashRoyaleAPI:
 # Global dependencies for usage in the routes
 CrApi = Annotated[ClashRoyaleAPI, Depends(get_cr_api)]
 DbConn = Annotated[MongoConn, Depends(get_mongo)]
+RedConn = Annotated[RedisConn, Depends(get_redis)]
 
 
 app = FastAPI(lifespan=lifespan)
@@ -106,10 +131,20 @@ async def get_player_stats(player_tag: str, cr_api: CrApi):
         raise HTTPException(status_code=500, detail=f"Error while contacting Clash Royale API: {e}")
     
 @app.get("/cards")
-async def get_cards(cr_api: CrApi):
+async def get_cards(cr_api: CrApi, redis_conn: RedConn):
     try:
-        # TODO cache the cards result (hours-day)
+        # Check cache
+        key = build_redis_key("cards", "cr_api")
+        cached_cards = await get_redis_json(redis_conn, key)
+
+        if cached_cards is not None:
+            print("In Cache!")
+            return cached_cards
+        
+        # If not cached, fetch them from Clash Royale and cache them
+        print("Not in Cache!")
         cards = await cr_api.get_cards()
+        await set_redis_json(redis_conn, key, cards, ttl= 60 * 60) # 1 Hour TTL
         return cards
 
     except ClashRoyaleMaintenanceError as e:
@@ -126,8 +161,8 @@ async def get_cards(cr_api: CrApi):
             raise HTTPException(status_code=status, detail="Clash Royale API error")
 
     except Exception as e:
-        # Network / timeout / DNS errors
-        raise HTTPException(status_code=502, detail=f"Error while contacting Clash Royale API: {e}")
+        # Network / timeout / DNS errors / Redis error
+        raise HTTPException(status_code=502, detail=f"Error trying to fetch the cards: {e}")
     
 @app.get("/battles/{player_tag}/last/{amount}")
 async def last_battles(player_tag: str, amount: int, mongo_conn: DbConn):

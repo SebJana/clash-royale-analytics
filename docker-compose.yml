@@ -13,13 +13,19 @@ services:
       - ./db/mongo-init/:/docker-entrypoint-initdb.d:ro
     networks:
       - cr-analytics
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   mongo-backup:
     build: ./db/backup
     container_name: mongo-backup
     restart: unless-stopped
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     env_file:
       - .env
     environment:
@@ -37,12 +43,34 @@ services:
       dockerfile: data_scraper/Dockerfile
     container_name: data_scraper
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     env_file:
       - .env
     networks:
       - cr-analytics
     restart: unless-stopped
+
+  redis:
+    image: redis:8.0-alpine
+    # upon hitting max memory, delete least recently used elements
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 1gb           
+      --maxmemory-policy allkeys-lru 
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - cr-analytics
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "PING"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   api:
     build:
@@ -50,7 +78,10 @@ services:
       dockerfile: app/Dockerfile
     container_name: api
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     networks:
@@ -59,9 +90,10 @@ services:
       - "8000:8000"
     restart: unless-stopped
 
-#volumes:
+volumes:
   # TODO: Uncomment when switching from bind mount to named volume
   # mongo_data:
+  redis-data:
 
 networks:
   cr-analytics:
