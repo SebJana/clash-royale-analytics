@@ -13,19 +13,13 @@ services:
       - ./db/mongo-init/:/docker-entrypoint-initdb.d:ro
     networks:
       - cr-analytics
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   mongo-backup:
     build: ./db/backup
     container_name: mongo-backup
     restart: unless-stopped
     depends_on:
-      mongo:
-        condition: service_healthy
+      - mongo
     env_file:
       - .env
     environment:
@@ -43,8 +37,7 @@ services:
       dockerfile: data_scraper/Dockerfile
     container_name: data_scraper
     depends_on:
-      mongo:
-        condition: service_healthy
+      - mongo
     env_file:
       - .env
     networks:
@@ -66,11 +59,6 @@ services:
     restart: unless-stopped
     networks:
       - cr-analytics
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "PING"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
 
   api:
     build:
@@ -78,10 +66,8 @@ services:
       dockerfile: app/Dockerfile
     container_name: api
     depends_on:
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - mongo
+      - redis
     env_file:
       - .env
     networks:

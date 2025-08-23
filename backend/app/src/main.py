@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, Request, HTTPException
 import httpx
 from dotenv import load_dotenv, find_dotenv
 import os
+import asyncio
 from typing import Annotated
 from contextlib import asynccontextmanager
 from redis_service import RedisConn, get_redis_json, set_redis_json, build_redis_key
@@ -12,13 +13,20 @@ from pymongo.errors import DuplicateKeyError
 
 from models import BetweenRequest
 
+
 load_dotenv(find_dotenv())
 API_TOKEN = os.getenv("APP_API_KEY")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 
+INIT_SLEEP_DURATION = 60 # 60 seconds
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    # TODO swap out sleep with retry and cooldown connection logic
+    await asyncio.sleep(INIT_SLEEP_DURATION) # upon start sleep for database/redis to settle in
+
     # Redis
     redis_conn = RedisConn(host="redis", port=6379, password=REDIS_PASSWORD)
     try:
@@ -142,9 +150,9 @@ async def get_cards(cr_api: CrApi, redis_conn: RedConn):
             return cached_cards
         
         # If not cached, fetch them from Clash Royale and cache them
-        print("Not in Cache!")
+        print("Not in Cache!") 
         cards = await cr_api.get_cards()
-        await set_redis_json(redis_conn, key, cards, ttl= 60 * 60) # 1 Hour TTL
+        await set_redis_json(redis_conn, key, cards, ttl= 24 * 60 * 60) # 1 Hour TTL
         return cards
 
     except ClashRoyaleMaintenanceError as e:
