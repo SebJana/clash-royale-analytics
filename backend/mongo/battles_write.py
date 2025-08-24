@@ -1,6 +1,6 @@
 from pymongo.errors import BulkWriteError
 from .connection import MongoConn
-from .utils import ensure_connected
+from .validation_utils import ensure_connected
 
 async def insert_battles(conn: MongoConn, battle_logs):
         """

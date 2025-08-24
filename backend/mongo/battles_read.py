@@ -1,6 +1,6 @@
 from .connection import MongoConn
-from .utils import ensure_connected, check_valid_date_range
-from datetime import datetime, timedelta
+from .validation_utils import ensure_connected, check_valid_date_range
+from .query_utils import match_tag_date_range_stage, extract_deck_cards_stage
 
 async def get_battles_count(conn: MongoConn):
     """
@@ -103,55 +103,10 @@ async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_
         await ensure_connected(conn)
         check_valid_date_range(start_date, end_date)
 
-        # Convert date to date and time
-        start_dt = datetime.combine(start_date, datetime.min.time())
-        end_dt   = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
-
         pipeline = [
             # Match the relevant files for the player and the time frame
-            {
-                "$match": {
-                    "referencePlayerTag": player_tag,
-                    "battleTime": {"$gte": start_dt, "$lt": end_dt}
-                }
-            },
-
-            # Pull the cards for the referencedPlayer including evolution level
-            {
-                "$addFields": {
-                    "deckCards": {
-                        "$map": {
-                            "input": {
-                                "$ifNull": [
-                                    {
-                                        "$getField": {
-                                            "field": "cards",
-                                            "input": {
-                                                "$first": {
-                                                    "$filter": {
-                                                        "input": "$team",
-                                                        "as": "m",
-                                                        "cond": {"$eq": ["$$m.tag", player_tag]}
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    },
-                                    []
-                                ]
-                            },
-                            "as": "c",
-                            "in": {
-                                "id": "$$c.id",
-                                "name": {"$ifNull": ["$$c.name", "UNKNOWN"]},
-                                "level": {"$ifNull": ["$$c.level", 1]},
-                                "evolutionLevel": { "$toInt": { "$ifNull": ["$$c.evolutionLevel", 0] } }
-                            }
-                        }
-                    }
-                }
-            },
-
+            match_tag_date_range_stage(player_tag, start_date, end_date),
+            extract_deck_cards_stage(player_tag),
             # Sort the decks by card properties - evolution level first, then id
             {"$addFields": {
                 "deckSorted": {
@@ -242,46 +197,9 @@ async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_
         await ensure_connected(conn)
         check_valid_date_range(start_date, end_date)
 
-        # Convert date to date and time
-        start_dt = datetime.combine(start_date, datetime.min.time())
-        end_dt   = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
-
         pipeline = [
-            {"$match": {
-                "referencePlayerTag": player_tag,
-                "battleTime": {"$gte": start_dt, "$lt": end_dt}
-            }},
-            # Extract the cards from the decks for the given player including evolution data
-            {"$addFields": {
-                "deckCards": {
-                    "$map": {
-                        "input": {
-                            "$ifNull": [
-                                {"$getField": {
-                                    "field": "cards",
-                                    "input": {
-                                        "$first": {
-                                            "$filter": {
-                                                "input": "$team",
-                                                "as": "m",
-                                                "cond": {"$eq": ["$$m.tag", player_tag]}
-                                            }
-                                        }
-                                    }
-                                }},
-                                []
-                            ]
-                        },
-                        "as": "c",
-                        "in": { 
-                            "id": "$$c.id", 
-                            "name": {"$ifNull": ["$$c.name", "UNKNOWN"]},
-                            "level": {"$ifNull": ["$$c.level", 1]},
-                            "evolutionLevel": { "$toInt": { "$ifNull": ["$$c.evolutionLevel", 0] } }
-                        }
-                    }
-                }
-            }},
+            match_tag_date_range_stage(player_tag, start_date, end_date),
+            extract_deck_cards_stage(player_tag),
             {"$facet": {
                 "cards": [
                     {"$unwind": "$deckCards"},

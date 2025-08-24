@@ -1,5 +1,5 @@
 from .connection import MongoConn
-from .utils import ensure_connected
+from .validation_utils import ensure_connected
 
 async def get_tracked_players(conn: MongoConn):
         """
@@ -23,7 +23,7 @@ async def get_tracked_players(conn: MongoConn):
                 {"active": True},
                 # projection: only fetch player tags
                 {"_id": 0, "playerTag": 1}
-            )
+            ).sort("playerTag", 1) # sort ascending
 
             # Turn the player tags into a set to avoid duplicates if those were
             # to happen in the players collection

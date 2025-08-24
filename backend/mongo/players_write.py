@@ -1,7 +1,7 @@
 from pymongo.errors import DuplicateKeyError
 from datetime import datetime
 from .connection import MongoConn
-from .utils import ensure_connected
+from .validation_utils import ensure_connected
 
 async def insert_tracked_player(conn: MongoConn, player_tag):
         """
