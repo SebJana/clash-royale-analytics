@@ -35,6 +35,8 @@ async def main():
     while True:
         print("[INFO] Starting new data scraping cycle...")
         
+        # TODO (potentially) request cards and cache them here in redis, overwriting the current ones
+
         # Loop over every tracked player
         players = set()
         try:

@@ -1,6 +1,8 @@
 {
     "_id": "68a2100b7f02d8610129c78d",
     "type": "trail",
+    "referencePlayerTag": "#YYRJQY28",
+    "gameResult": "Defeat",
     "battleTime": "ISODate(2025-08-17T02:29:35Z)",
     "arena": "Legendary Arena",
     "gameMode": "TeamVsTeam",
@@ -253,7 +255,5 @@
             ],
             "elixirLeaked": 7.57
         }
-    ],
-    "referencePlayerTag": "#YYRJQY28",
-    "gameResult": "Defeat"
+    ]
 }
