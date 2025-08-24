@@ -153,7 +153,7 @@ async def get_cards(cr_api: CrApi, redis_conn: RedConn):
         # If not cached, fetch them from Clash Royale and cache them
         print("Not in Cache!") 
         cards = await cr_api.get_cards()
-        await set_redis_json(redis_conn, key, cards, ttl= 24 * 60 * 60) # 1 Hour TTL
+        await set_redis_json(redis_conn, key, cards, ttl= 24 * 60 * 60) # 24 Hour TTL
         return cards
 
     except ClashRoyaleMaintenanceError as e:

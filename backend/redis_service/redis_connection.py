@@ -1,6 +1,7 @@
 import redis.asyncio as redis
 import hashlib
 import json
+import random
 
 class RedisConn:
     """
@@ -65,8 +66,26 @@ async def set_redis_json(conn: RedisConn, key: str, value, ttl: int):
         value: Python object to serialize and store.
         ttl (int): Time-to-live in seconds (key expires automatically).
     """
+    jittered_ttl = jitter_ttl(ttl)
+    await conn.client.setex(key, jittered_ttl, json.dumps(value))
+
+def jitter_ttl(ttl: int) ->  int:
+    """
+    Return a TTL jittered by ±10% to avoid synchronized expirations
+
+    Jittering spreads key expirations over a small random window, smoothing load and
+    improving cache hit stability.
+
+    Args:
+        ttl (int): Base time-to-live in seconds.
+
+    Returns:
+        int: Jittered TTL in seconds.
+    """
     
-    await conn.client.setex(key, ttl, json.dumps(value))
+    random_multiplier = random.uniform(0.9, 1.1) # ±10% variance
+    
+    return ttl * random_multiplier
 
 def build_redis_key(resource: str, service: str, params: dict | None = None) -> str:
     """
