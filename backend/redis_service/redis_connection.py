@@ -94,9 +94,9 @@ async def set_redis_json(conn: RedisConn, key: str, value, ttl: int):
     payload = json.dumps(value, default=_json_default, separators=(",", ":"))
     await conn.client.setex(key, jittered_ttl, payload)
 
-def jitter_ttl(ttl: int) ->  int:
+def jitter_ttl(ttl: int, pct: float = 0.10, min_ttl: int = 60) -> int:
     """
-    Return a TTL jittered by ±10% to avoid synchronized expirations
+    Return a TTL jittered by pct% to avoid synchronized expirations
 
     Jittering spreads key expirations over a small random window, smoothing load and
     improving cache hit stability.
@@ -108,9 +108,12 @@ def jitter_ttl(ttl: int) ->  int:
         int: Jittered TTL in seconds.
     """
     
-    random_multiplier = int(random.uniform(0.9, 1.1)) # ±10% variance
+    if ttl <= 0:
+        raise ValueError(f"ttl must be > 0 (got {ttl})")
     
-    return ttl * random_multiplier
+    random_factor = random.uniform(1 - pct, 1 + pct)     # e.g., 0.9 .. 1.1 for ±10%
+    jittered = int(round(ttl * random_factor))           # round the product to an int
+    return max(min_ttl, jittered)
 
 def _to_param_str(val) -> str:
     """

@@ -192,7 +192,7 @@ async def last_battles(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn,
         # 2) the current datetime, which equals the last req.limit battles
         cutoff = req.before or datetime.now()
         
-        params = {"playerTag": player_tag, "before": cutoff}
+        params = {"playerTag": player_tag, "before": cutoff, "limit": req.limit}
         key = build_redis_key("battles", "cr_api", params)
         cached_battles = await get_redis_json(redis_conn, key)
         
