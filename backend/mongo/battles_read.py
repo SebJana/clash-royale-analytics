@@ -1,6 +1,7 @@
 from .connection import MongoConn
 from .validation_utils import ensure_connected, check_valid_date_range
-from .query_utils import match_tag_date_range_stage, extract_deck_cards_stage
+from .query_utils import match_tag_before_datetime_stage, match_tag_date_range_stage, extract_deck_cards_stage
+from datetime import datetime
 
 async def get_battles_count(conn: MongoConn):
     """
@@ -42,46 +43,86 @@ async def print_first_battles(conn: MongoConn, limit=5):
     except Exception as e:
         print(f"[DB] [ERROR] fetching collection info: {e}")
 
-async def get_last_battles(conn: MongoConn, player_tag, limit = 30):
+async def get_last_battles(conn: MongoConn, player_tag, before_datetime, limit = 20):
     """
-    Fetches the most recent battles for a specific player.
+    Fetches all battles within the limited amount that the player had before a given date and time 
 
     Args:
         conn (MongoConn): Active connection to the MongoDB database.
-        player_tag (str): The tag of the player whose battles are to be fetched.
-        limit (int): The maximum number of battles to fetch (default: 30).
+        player_tag (str): The tag of the player whose last battles are to be fetched.
+        before_datetime (datetime.datetime): Date and time before which the game happened.
+        limit (int): Amount of battles to be fetched that happened before the given datetime (default: 20)
 
     Returns:
-        list: A list of dictionaries containing the players last battles
-
+        dict: Containing
+            - battles (list) : a list of dictionaries containing the players last battles
+            - latestBattleTime (datetime): latest battleTime of the returned battles
+            - earliestBattleTime (datetime): earliest battleTime of the returned battles
+            
     Raises:
         Exception: If there is an error while fetching the battles from the database.
     """
 
     try:
         await ensure_connected(conn)
-        projection = {
-            "_id": 0,
-            "battleTime": 1,
-            "gameResult": 1,
-            "gameMode": 1,
-            "team": 1,
-            "opponent": 1,
-            "arena": 1
-        }
-
-        last_battles = (
-            conn.db.battles
-            .find({"referencePlayerTag": player_tag}, projection)
-            .sort("battleTime", -1)
-            .limit(limit)
-        )
         
-        return await last_battles.to_list(length=None)
+        if not isinstance(before_datetime, datetime):
+            raise TypeError("end_datetime must be a datetime")
+
+        pipeline = [
+            match_tag_before_datetime_stage(player_tag, before_datetime),
+            # Keep only what's needed in downstream stages 
+            {"$project": {
+                "_id": 0,
+                "battleTime": 1,
+                "gameResult": 1,
+                "gameMode": 1,
+                "team": 1,
+                "opponent": 1,
+                "arena": 1
+            }},
+
+            {"$facet": {
+                "battles": [
+                    {"$sort": {"battleTime": -1}},  # newest first, stable
+                    {"$limit": limit},
+                    # Drop _id from the output
+                    {"$project": {
+                        "_id": 0,
+                        "battleTime": 1,
+                        "gameResult": 1,
+                        "gameMode": 1,
+                        "team": 1,
+                        "opponent": 1,
+                        "arena": 1
+                    }}
+                ],
+                "meta": [
+                    {"$group": {
+                        "_id": None,
+                        "latest": {"$max": "$battleTime"},
+                        "earliest": {"$min": "$battleTime"},
+                    }}
+                ]
+            }},
+
+            # Flatten meta fields, handle empty input safely
+            {"$project": {
+                "battles": 1, # Include battles list
+                "latestBattleTime":  {"$ifNull": [{"$first": "$meta.latest"}, None]},
+                "earliestBattleTime":{"$ifNull": [{"$first": "$meta.earliest"}, None]}
+            }}
+        ]
+        
+        res = await conn.db.battles.aggregate(pipeline, allowDiskUse=True).to_list(length=1)
+        if not res:
+            return {"battles": [], "latestBattleTime": None, "earliestBattleTime": None}
+        return res[0]
 
     except Exception as e:
-        print(f"[DB] [ERROR] fetching collection info: {e}")
+        print(f"[DB] [ERROR] fetching decks info: {e}")
         raise
+
 
 async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
     """

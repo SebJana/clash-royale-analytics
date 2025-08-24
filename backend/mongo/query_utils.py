@@ -1,5 +1,35 @@
 from datetime import datetime, timedelta
 
+def match_tag_before_datetime_stage(player_tag: str, before_datetime):
+    """
+    Build a MongoDB $match stage that filters battles for a given player tag
+    that happened before a given datetime
+
+    Args:
+        player_tag (str): Player tag (e.g., "#YYRJQY28") to match against `referencePlayerTag`.
+        before_datetime (datetime.datetime): Beginning of lookup datetime (inclusive).
+
+    Returns:
+        dict: An aggregation stage of the form:
+              {
+                "$match": {
+                    "referencePlayerTag": <player_tag>,
+                    "battleTime": {"$lt": <end_datetime>}
+                }
+              }
+
+    Notes: This function is a pure builder and does not execute any database operation
+    """
+
+    return {
+        # Match the relevant files for the player and the time frame
+        "$match": {
+            "referencePlayerTag": player_tag,
+            "battleTime": {"$lt": before_datetime}
+        }
+    } 
+
+
 def match_tag_date_range_stage(player_tag: str, start_date, end_date):
     """
     Build a MongoDB $match stage that filters battles for a given player tag
@@ -9,7 +39,7 @@ def match_tag_date_range_stage(player_tag: str, start_date, end_date):
     `end_date + 1 day` at 00:00:00 (exclusive).
 
     Args:
-        player_tag (str): Player tag (e.g., "YYRJQY28") to match against `referencePlayerTag`.
+        player_tag (str): Player tag (e.g., "#YYRJQY28") to match against `referencePlayerTag`.
         start_date (datetime.date): First day (inclusive).
         end_date (datetime.date): Last day (inclusive).
 

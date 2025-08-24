@@ -3,6 +3,7 @@ import httpx
 from dotenv import load_dotenv, find_dotenv
 import os
 import asyncio
+from datetime import datetime
 from typing import Annotated
 from contextlib import asynccontextmanager
 from redis_service import RedisConn, get_redis_json, set_redis_json, build_redis_key
@@ -11,7 +12,7 @@ from mongo import MongoConn, insert_tracked_player, get_tracked_players, get_las
 from mongo import get_decks_win_percentage, get_cards_win_percentage
 from pymongo.errors import DuplicateKeyError
 
-from models import BetweenRequest
+from models import BetweenRequest, BattlesRequest
 
 
 load_dotenv(find_dotenv())
@@ -24,7 +25,7 @@ INIT_SLEEP_DURATION = 60 # 60 seconds
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    # TODO swap out sleep with retry and cooldown connection logic
+    # TODO swap out sleep with retry and cool down connection logic
     await asyncio.sleep(INIT_SLEEP_DURATION) # upon start sleep for database/redis to settle in
 
     # Redis
@@ -172,19 +173,33 @@ async def get_cards(cr_api: CrApi, redis_conn: RedConn):
         # Network / timeout / DNS errors / Redis error
         raise HTTPException(status_code=502, detail=f"Error trying to fetch the cards: {e}")
     
-@app.get("/battles/{player_tag}/last/{amount}")
-async def last_battles(player_tag: str, amount: int, mongo_conn: DbConn):
+
+@app.get("/players/{player_tag}/battles")
+async def last_battles(player_tag: str, mongo_conn: DbConn, req: BattlesRequest = Depends()):
     try:
-        battles = await get_last_battles(mongo_conn, player_tag, amount)
+        # TODO check valid player (is in get_tracked_players() response?)    
+        # Cap the amount of battles a user can query at once
+        if req.limit < 1 or req.limit > 50:
+            raise HTTPException(status_code=403, detail=f"Given limit is invalid: {req.limit}")
+        
+        # Either use:
+        # 1) the specified before datetime
+        # 2) the current datetime, which equals the last req.limit battles
+        cutoff = req.before or datetime.now()
+        
+        battles = await get_last_battles(mongo_conn, player_tag, cutoff, req.limit)
         
         if not battles:
             raise HTTPException(status_code=404, detail=f"No battles found for {player_tag}")
 
-        return {"player_tag": player_tag, "count": len(battles), "battles": battles}
+        return {"player_tag": player_tag, "last_battles": battles}
     
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=f"Given datetime is invalid: {cutoff.isoformat()}")
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch last {amount} of games for player {player_tag}: {e}")
-    
+        raise HTTPException(status_code=500, detail=f"Failed to fetch battles for player {player_tag}: {e}")
+ 
 @app.get("/players/{player_tag}/decks/stats")
 async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, dates: BetweenRequest = Depends()):
     try:
@@ -201,7 +216,7 @@ async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, dates: Betw
         raise HTTPException(status_code=403, detail=f"Given date range is invalid: {dates.start_date} – {dates.end_date}")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch deck statistics for player {dates.player_tag}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch deck statistics for player {player_tag}: {e}")
     
 @app.get("/players/{player_tag}/cards/stats")
 async def card_percentage_stats(player_tag: str, mongo_conn: DbConn, dates: BetweenRequest = Depends()):
@@ -219,4 +234,4 @@ async def card_percentage_stats(player_tag: str, mongo_conn: DbConn, dates: Betw
         raise HTTPException(status_code=403, detail=f"Given date range is invalid: {dates.start_date} – {dates.end_date}")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch the card statistics for player {dates.player_tag}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch the card statistics for player {player_tag}: {e}")
