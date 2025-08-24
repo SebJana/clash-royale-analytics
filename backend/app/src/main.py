@@ -114,10 +114,17 @@ async def list_tracked_players(mongo_conn: DbConn):
     return {"activePlayers": list(tags)}
 
 @app.get("/players/{player_tag}/stats")
-async def get_player_stats(player_tag: str, cr_api: CrApi):
+async def get_player_stats(player_tag: str, cr_api: CrApi, redis_conn: RedConn):
     try:
-        # TODO cache the player stats (minutes/hours)
+        params = {"playerTag": player_tag}
+        key = build_redis_key("stats", "cr_api", params)
+        cached_stats = await get_redis_json(redis_conn, key)
+
+        if cached_stats is not None:
+            return cached_stats
+
         player_stats = await cr_api.get_player_info(player_tag)
+        await set_redis_json(redis_conn, key, player_stats, ttl= 15 * 60) # 15 mins
         return player_stats
     
     except ClashRoyaleMaintenanceError as e:
@@ -147,11 +154,9 @@ async def get_cards(cr_api: CrApi, redis_conn: RedConn):
         cached_cards = await get_redis_json(redis_conn, key)
 
         if cached_cards is not None:
-            print("In Cache!")
             return cached_cards
         
         # If not cached, fetch them from Clash Royale and cache them
-        print("Not in Cache!") 
         cards = await cr_api.get_cards()
         await set_redis_json(redis_conn, key, cards, ttl= 24 * 60 * 60) # 24 Hour TTL
         return cards
@@ -175,7 +180,7 @@ async def get_cards(cr_api: CrApi, redis_conn: RedConn):
     
 
 @app.get("/players/{player_tag}/battles")
-async def last_battles(player_tag: str, mongo_conn: DbConn, req: BattlesRequest = Depends()):
+async def last_battles(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, req: BattlesRequest = Depends()):
     try:
         # TODO check valid player (is in get_tracked_players() response?)    
         # Cap the amount of battles a user can query at once
@@ -187,51 +192,73 @@ async def last_battles(player_tag: str, mongo_conn: DbConn, req: BattlesRequest 
         # 2) the current datetime, which equals the last req.limit battles
         cutoff = req.before or datetime.now()
         
+        params = {"playerTag": player_tag, "before": cutoff}
+        key = build_redis_key("battles", "cr_api", params)
+        cached_battles = await get_redis_json(redis_conn, key)
+        
+        if cached_battles is not None:
+            return {"player_tag": player_tag, "last_battles": cached_battles}
+        
         battles = await get_last_battles(mongo_conn, player_tag, cutoff, req.limit)
         
         if not battles:
             raise HTTPException(status_code=404, detail=f"No battles found for {player_tag}")
 
+        await set_redis_json(redis_conn, key, battles, ttl= 15 * 60) # 15 min TTL
         return {"player_tag": player_tag, "last_battles": battles}
     
     except ValueError as e:
         raise HTTPException(status_code=403, detail=f"Given datetime is invalid: {cutoff.isoformat()}")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch battles for player {player_tag}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch battles for player {player_tag} {e}")
  
 @app.get("/players/{player_tag}/decks/stats")
-async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, dates: BetweenRequest = Depends()):
+async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, req: BetweenRequest = Depends()):
     try:
         # TODO check valid player (is in get_tracked_players() response?)
+        params = {"playerTag": player_tag, "startDate": req.start_date, "endDate": req.end_date}
+        key = build_redis_key("decks", "cr_api", params)
+        cached_decks = await get_redis_json(redis_conn, key)
 
-        decks = await get_decks_win_percentage(mongo_conn, player_tag, dates.start_date, dates.end_date)
+        if cached_decks is not None:
+            return {"player_tag": player_tag, "deck_statistics": cached_decks}
+        
+        decks = await get_decks_win_percentage(mongo_conn, player_tag, req.start_date, req.end_date)
         
         if not decks:
             raise HTTPException(status_code=404, detail=f"No decks found for {player_tag}")
 
+        await set_redis_json(redis_conn, key, decks, ttl= 15 * 60) # 15 min TTL
         return {"player_tag": player_tag, "deck_statistics": decks}
     
     except ValueError as e:
-        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {dates.start_date} – {dates.end_date}")
+        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {req.start_date} – {req.end_date}")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch deck statistics for player {player_tag}: {e}")
     
 @app.get("/players/{player_tag}/cards/stats")
-async def card_percentage_stats(player_tag: str, mongo_conn: DbConn, dates: BetweenRequest = Depends()):
+async def card_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, req: BetweenRequest = Depends()):
     try:
         # TODO check valid player (is in get_tracked_players() response?)
-
-        cards = await get_cards_win_percentage(mongo_conn, player_tag, dates.start_date, dates.end_date)
+        params = {"playerTag": player_tag, "startDate": req.start_date, "endDate": req.end_date}
+        key = build_redis_key("cards", "cr_api", params)
+        cached_cards = await get_redis_json(redis_conn, key)
+        
+        if cached_cards is not None:
+            return {"player_tag": player_tag, "card_statistics": cached_cards}
+        
+        cards = await get_cards_win_percentage(mongo_conn, player_tag, req.start_date, req.end_date)
 
         if not cards:
             raise HTTPException(status_code=404, detail=f"No cards found for {player_tag}")
 
+        await set_redis_json(redis_conn, key, cards, ttl= 15 * 60) # 15 min TTL
         return {"player_tag": player_tag, "card_statistics": cards}
     
     except ValueError as e:
-        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {dates.start_date} – {dates.end_date}")
+        raise HTTPException(status_code=403, detail=f"Given date range is invalid: {req.start_date} – {req.end_date}")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch the card statistics for player {player_tag}: {e}")

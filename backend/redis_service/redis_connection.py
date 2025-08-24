@@ -1,6 +1,8 @@
 import redis.asyncio as redis
 import hashlib
 import json
+from urllib.parse import quote
+from datetime import date, datetime, time
 import random
 
 class RedisConn:
@@ -56,6 +58,27 @@ async def get_redis_json(conn: RedisConn, key: str):
     raw_data = await conn.client.get(key)
     return json.loads(raw_data) if raw_data else None
 
+def _json_default(object):
+    """
+    JSON serializer function for objects not serializable by default.
+    
+    Handles datetime, date, and time objects by converting them to ISO format strings.
+    Used as the 'default' parameter in json.dumps() to handle these common types.
+    
+    Args:
+        object: The object that couldn't be serialized by the default JSON encoder.
+        
+    Returns:
+        str: ISO format string representation of datetime/date/time objects.
+        
+    Raises:
+        TypeError: If the object type is not supported for serialization.
+    """
+    
+    if isinstance(object, (datetime, date, time)):
+        return object.isoformat()  # format datetimes as string for storage
+    raise TypeError(f"Object of type {type(object)} is not JSON serializable")
+
 async def set_redis_json(conn: RedisConn, key: str, value, ttl: int):
     """
     Serialize a Python object to JSON and store it in Redis with TTL.
@@ -66,8 +89,10 @@ async def set_redis_json(conn: RedisConn, key: str, value, ttl: int):
         value: Python object to serialize and store.
         ttl (int): Time-to-live in seconds (key expires automatically).
     """
+    
     jittered_ttl = jitter_ttl(ttl)
-    await conn.client.setex(key, jittered_ttl, json.dumps(value))
+    payload = json.dumps(value, default=_json_default, separators=(",", ":"))
+    await conn.client.setex(key, jittered_ttl, payload)
 
 def jitter_ttl(ttl: int) ->  int:
     """
@@ -83,9 +108,35 @@ def jitter_ttl(ttl: int) ->  int:
         int: Jittered TTL in seconds.
     """
     
-    random_multiplier = random.uniform(0.9, 1.1) # ±10% variance
+    random_multiplier = int(random.uniform(0.9, 1.1)) # ±10% variance
     
     return ttl * random_multiplier
+
+def _to_param_str(val) -> str:
+    """
+    Convert a parameter value to its string representation for Redis key building.
+    
+    Handles different data types by converting them to consistent string formats:
+    - datetime/date/time objects: ISO format strings
+    - lists/tuples: comma-separated values
+    - booleans: 'true' or 'false' strings
+    - other types: string conversion
+    
+    Args:
+        val: The parameter value to convert to string.
+        
+    Returns:
+        str: String representation of the parameter value.
+    """
+    
+    # Convert param data to a string
+    if isinstance(val, (datetime, date, time)):
+        return val.isoformat()
+    if isinstance(val, (list, tuple)):
+        return ",".join(_to_param_str(x) for x in val)
+    if isinstance(val, bool):
+        return "true" if val else "false"
+    return str(val)
 
 def build_redis_key(resource: str, service: str, params: dict | None = None) -> str:
     """
@@ -104,10 +155,14 @@ def build_redis_key(resource: str, service: str, params: dict | None = None) -> 
     # Sort params to keep key deterministic even if order changes
     parts = [service, resource]
     if params: # Only append params to key if they exist
-        for k, v in sorted(params.items()):
-            parts.append(f"{k}={v}")
+        for key, val in sorted(params.items()):
+            # Use quote to get rid of and encode delimiters like '#', ":", ...
+            key_str = quote(str(key), safe="")
+            val_str = quote(_to_param_str(val), safe="")
+            parts.append(f"{key_str}={val_str}")
+    
+    
     key = ":".join(parts) # Build key string
-
     # Check if the key is not too long
     if len(key) < 512:
         return key
