@@ -83,8 +83,6 @@ async def get_last_battles(conn: MongoConn, player_tag, limit = 30):
         print(f"[DB] [ERROR] fetching collection info: {e}")
         raise
 
-# TODO differentiate between evolution card and regular card
-# TODO add usage rate percentage 
 async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
     """
     Fetches every unique deck that the player has played in the given time frame.
@@ -118,7 +116,7 @@ async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_
                 }
             },
 
-            # Pull the cards for the referencedPlayer
+            # Pull the cards for the referencedPlayer including evolution level
             {
                 "$addFields": {
                     "deckCards": {
@@ -145,65 +143,85 @@ async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_
                             "as": "c",
                             "in": {
                                 "id": "$$c.id",
-                                "name": {"$ifNull": ["$$c.name", "UNKNOWN"]}
+                                "name": {"$ifNull": ["$$c.name", "UNKNOWN"]},
+                                "level": {"$ifNull": ["$$c.level", 1]},
+                                "evolutionLevel": { "$toInt": { "$ifNull": ["$$c.evolutionLevel", 0] } }
                             }
                         }
                     }
                 }
             },
 
-            # Sort the decks 
+            # Sort the decks by card properties - evolution level first, then id
             {"$addFields": {
                 "deckSorted": {
-                    "$sortArray": { "input": "$deckCards", "sortBy": { "id": 1 } }
+                    "$sortArray": { 
+                        "input": "$deckCards", 
+                        "sortBy": { 
+                            "evolutionLevel": -1,
+                            "id": 1
+                        } 
+                    }
                 }
             }},
 
-            # Group by decks
-            {
-                "$group": {
-                    "_id": "$deckSorted",
-                    "count": {"$sum": 1},
-                    "wins": {
-                        "$sum": {"$cond": [{"$eq": ["$gameResult", "Victory"]}, 1, 0]}
+            # Group by decks and get metadata
+            {"$facet": {
+                "decks": [
+                    {
+                        "$group": {
+                            "_id": "$deckSorted",
+                            "count": {"$sum": 1},
+                            "wins": {
+                                "$sum": {"$cond": [{"$eq": ["$gameResult", "Victory"]}, 1, 0]}
+                            },
+                            "firstSeen": {"$min": "$battleTime"},
+                            "lastSeen": {"$max": "$battleTime"},
+                            "modes": {"$addToSet": "$gameMode"}
+                        }
                     },
-                    "firstSeen": {"$min": "$battleTime"},
-                    "lastSeen": {"$max": "$battleTime"},
-                    "modes": {"$addToSet": "$gameMode"}
-                }
-            },
-            # Calculate a win rate for the end result
-            {
-                "$project": {
-                    "_id": 0,
-                    "deck": "$_id", # array of {id, name} for every card
-                    "count": 1,
-                    "wins": 1,
-                    "winRate": {
-                        "$cond": [
-                            {"$eq": ["$count", 0]},
-                            0,
-                            {"$multiply": [{"$divide": ["$wins", "$count"]}, 100]}
-                        ]
+                    # Calculate a win rate and evolution metrics for the end result
+                    {
+                        "$project": {
+                            "_id": 0,
+                            "deck": "$_id", # array of {id, name} for every card
+                            "count": 1,
+                            "wins": 1,
+                            "winRate": {
+                                "$cond": [
+                                    {"$eq": ["$count", 0]},
+                                    0,
+                                    {"$multiply": [{"$divide": ["$wins", "$count"]}, 100]}
+                                ]
+                            },
+                            "firstSeen": 1,
+                            "lastSeen": 1,
+                            "modes": 1
+                        }
                     },
-                    "firstSeen": 1,
-                    "lastSeen": 1,
-                    "modes": 1
-                }
-            },
-
-            # Sort unique decks by count and lastSeen 
-            {"$sort": {"count": -1, "lastSeen": -1}}
+                    # Sort unique decks by count (descending) and lastSeen 
+                    {"$sort": {"count": -1, "lastSeen": -1}}
+                ],
+                "meta": [
+                    {"$count": "totalBattles"}
+                ]
+            }},
+            {"$project": {
+                "totalBattles": {"$ifNull": [{"$first": "$meta.totalBattles"}, 0]},
+                "decks": "$decks"
+            }}
         ]
 
-        cursor = conn.db.battles.aggregate(pipeline, allowDiskUse=True)
-        return await cursor.to_list(length=None)
+        result = await conn.db.battles.aggregate(pipeline, allowDiskUse=True).to_list(length=1)
+        if not result:
+            return {"decks": [], "totalBattles": 0}
+
+        return result[0]
 
     except Exception as e:
         print(f"[DB] [ERROR] fetching decks info: {e}")
         raise
 
-# TODO differentiate between evolution card and regular card
 async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
     """
     Fetches a usage and win percentage for every used card for the player in the specified time range.
@@ -233,7 +251,7 @@ async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_
                 "referencePlayerTag": player_tag,
                 "battleTime": {"$gte": start_dt, "$lt": end_dt}
             }},
-            # Extract the cards from the decks for the given player
+            # Extract the cards from the decks for the given player including evolution data
             {"$addFields": {
                 "deckCards": {
                     "$map": {
@@ -255,7 +273,12 @@ async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_
                             ]
                         },
                         "as": "c",
-                        "in": { "id": "$$c.id", "name": {"$ifNull": ["$$c.name", "UNKNOWN"]} }
+                        "in": { 
+                            "id": "$$c.id", 
+                            "name": {"$ifNull": ["$$c.name", "UNKNOWN"]},
+                            "level": {"$ifNull": ["$$c.level", 1]},
+                            "evolutionLevel": { "$toInt": { "$ifNull": ["$$c.evolutionLevel", 0] } }
+                        }
                     }
                 }
             }},
@@ -263,9 +286,13 @@ async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_
                 "cards": [
                     {"$unwind": "$deckCards"},
                     {"$group": {
-                        "_id": {"id": "$deckCards.id", "name": "$deckCards.name"},
+                        "_id": {
+                            "id": "$deckCards.id", 
+                            "name": "$deckCards.name",
+                            "evolutionLevel": "$deckCards.evolutionLevel"
+                        },
                         "usage": {"$sum": 1},  # Usage in battle
-                        "wins":  {"$sum": {"$cond": [{"$eq": ["$gameResult", "Victory"]}, 1, 0]}}
+                        "wins":  {"$sum": {"$cond": [{"$eq": ["$gameResult", "Victory"]}, 1, 0]}},
                     }},
                     {"$project": {
                         "_id": 0,
@@ -278,45 +305,20 @@ async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_
                                 0,
                                 {"$multiply": [{"$divide": ["$wins", "$usage"]}, 100]}
                             ]
-                        },
-                        "firstSeen": 1,
-                        "lastSeen": 1
+                        }
                     }},
-                    {"$sort": {"usage": -1, "lastSeen": -1}}
+                    {"$sort": {"usage": -1}}
                 ],
                 "meta": [
                     {"$count": "totalBattles"}
                 ]
             }},
-            # usagePct = usage / totalBattles * 100
             {"$set": {
                 "totalBattles": {"$ifNull": [{"$first": "$meta.totalBattles"}, 0]}
             }},
             {"$project": {
                 "totalBattles": 1,
-                "cards": {
-                    "$map": {
-                        "input": "$cards",
-                        "as": "c",
-                        "in": {
-                            "$mergeObjects": [
-                                "$$c",
-                                {
-                                    "usageRate": {
-                                        "$cond": [
-                                            {"$eq": ["$totalBattles", 0]},
-                                            0,
-                                            {"$multiply": [
-                                                {"$divide": ["$$c.usage", "$totalBattles"]},
-                                                100
-                                            ]}
-                                        ]
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
+                "cards": "$cards"
             }}
         ]
 

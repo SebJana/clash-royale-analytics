@@ -195,7 +195,7 @@ async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, dates: Betw
         if not decks:
             raise HTTPException(status_code=404, detail=f"No decks found for {player_tag}")
 
-        return {"player_tag": player_tag, "count": len(decks), "decks": decks}
+        return {"player_tag": player_tag, "deck_statistics": decks}
     
     except ValueError as e:
         raise HTTPException(status_code=403, detail=f"Given date range is invalid: {dates.start_date} – {dates.end_date}")
