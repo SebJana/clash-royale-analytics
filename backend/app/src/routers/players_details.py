@@ -2,14 +2,14 @@ from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime
 import httpx
 
-from core.deps import DbConn, CrApi, RedConn
+from core.deps import DbConn, CrApi, RedConn, require_tracked_player
 from core.settings import settings
 from models.schema import BetweenRequest, BattlesRequest
 from clash_royale_api import ClashRoyaleMaintenanceError
 from redis_service import get_redis_json, set_redis_json, build_redis_key
 from mongo import get_last_battles, get_decks_win_percentage, get_cards_win_percentage, insert_tracked_player
 
-router = APIRouter(prefix="/players", tags=["Player Details"])
+router = APIRouter(prefix="/players", tags=["Player Details"], dependencies=[Depends(require_tracked_player)])
 
 @router.get("/{player_tag}/stats")
 async def get_player_stats(player_tag: str, cr_api: CrApi, redis_conn: RedConn):
@@ -47,7 +47,6 @@ async def get_player_stats(player_tag: str, cr_api: CrApi, redis_conn: RedConn):
 @router.get("/{player_tag}/battles")
 async def last_battles(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, req: BattlesRequest = Depends()):
     try:
-        # TODO check valid player (is in get_tracked_players() response?)    
         # Cap the amount of battles a user can query at once
         if req.limit < 1 or req.limit > 50:
             raise HTTPException(status_code=403, detail=f"Given limit is invalid: {req.limit}")
@@ -81,7 +80,6 @@ async def last_battles(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn,
 @router.get("/{player_tag}/decks/stats")
 async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, req: BetweenRequest = Depends()):
     try:
-        # TODO check valid player (is in get_tracked_players() response?)
         params = {"playerTag": player_tag, "startDate": req.start_date, "endDate": req.end_date}
         key = build_redis_key("decks", "cr_api", params)
         cached_decks = await get_redis_json(redis_conn, key)
@@ -106,7 +104,6 @@ async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn:
 @router.get("/{player_tag}/cards/stats")
 async def card_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, req: BetweenRequest = Depends()):
     try:
-        # TODO check valid player (is in get_tracked_players() response?)
         params = {"playerTag": player_tag, "startDate": req.start_date, "endDate": req.end_date}
         key = build_redis_key("cards", "cr_api", params)
         cached_cards = await get_redis_json(redis_conn, key)

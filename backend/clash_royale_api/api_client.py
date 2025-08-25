@@ -30,7 +30,7 @@ class ClashRoyaleAPI:
 
     # --- helpers -------------------------------------------------------------
     @staticmethod
-    def _check_tag_syntax(player_tag: str):
+    def check_tag_syntax(player_tag: str):
         """
         Checks wether the player tag starts with a '#' and has the correct length
         
@@ -147,7 +147,7 @@ class ClashRoyaleAPI:
             bool: True if syntax is valid AND the API confirms the player exists; else False.
         """
 
-        if not self._check_tag_syntax(player_tag):
+        if not self.check_tag_syntax(player_tag):
             return False
 
         # If no error on request --> player with that tag exists
@@ -176,7 +176,7 @@ class ClashRoyaleAPI:
             RequestException: If there are network connectivity issues
         """
         
-        if not self._check_tag_syntax(player_tag):
+        if not self.check_tag_syntax(player_tag):
             raise ValueError(f"Invalid player tag syntax: {player_tag!r}")
         
         tag = self._url_encode_player_tag(player_tag)
@@ -201,7 +201,7 @@ class ClashRoyaleAPI:
             RequestException: If there are network connectivity issues
         """
 
-        if not self._check_tag_syntax(player_tag):
+        if not self.check_tag_syntax(player_tag):
             raise ValueError(f"Invalid player tag syntax: {player_tag!r}")
         
         tag = self._url_encode_player_tag(player_tag)

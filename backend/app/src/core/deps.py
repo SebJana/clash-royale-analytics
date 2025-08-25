@@ -3,7 +3,7 @@ from typing import Annotated
 
 from redis_service import RedisConn
 from clash_royale_api import ClashRoyaleAPI
-from mongo import MongoConn
+from mongo import MongoConn, check_player_tracked
 
 # Dependency that returns the database connection
 def get_mongo(request: Request) -> MongoConn:
@@ -31,3 +31,32 @@ def get_cr_api(request: Request) -> ClashRoyaleAPI:
 CrApi = Annotated[ClashRoyaleAPI, Depends(get_cr_api)]
 DbConn = Annotated[MongoConn, Depends(get_mongo)]
 RedConn = Annotated[RedisConn, Depends(get_redis)]
+
+
+# Dependency that ensures the given player tag is active in the players collection
+async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbConn):
+    """
+    FastAPI dependency that ensures a given player tag is valid and currently tracked.
+
+    Args:
+        player_tag (str): Player tag from the path.
+        cr_api (CrApi): Injected Clash Royale API client (for syntax validation).
+        mongo_conn (DbConn): Injected Mongo connection (for tracked/active check).
+
+    Returns:
+        str: The player tag when validation succeeds.
+
+    Raises:
+        HTTPException 403 if the tag is syntactically invalid or the player is not being tracked.
+    """
+    
+    # Check the syntax is valid (takes load off of db and ensures tag is mongo query safe)
+    if not cr_api.check_tag_syntax(player_tag):
+        raise HTTPException(status_code=403, detail=f"Player with tag {player_tag} doesn't exist")
+    
+    # Check if the player is in players collection and active 
+    if not await check_player_tracked(mongo_conn, player_tag):
+        raise HTTPException(status_code=403, detail=f"Player with tag {player_tag} isn't being tracked")
+    
+    print("Tracked: ", await check_player_tracked(mongo_conn, player_tag))
+    return player_tag # When its a valid and tracked player, return the tag

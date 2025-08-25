@@ -15,6 +15,9 @@ COOL_DOWN_SLEEP_DURATION = 30 # 30 seconds
 load_dotenv(find_dotenv())
 API_TOKEN = os.getenv("DATA_SCRAPER_API_KEY")
 
+# TODO move from init sleep to retry and cooldown startup logic
+# TODO refactor and modularize
+
 async def main():
     """Main async function for the data scraper"""
     

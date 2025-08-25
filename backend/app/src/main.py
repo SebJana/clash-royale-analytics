@@ -10,7 +10,6 @@ from mongo import MongoConn
 from routers import cards
 
 # TODO swap out sleep with retry and cool down connection logic
-# TODO global check if player exists in db via get_tracked_players()
 # TODO (potentially) global error handling
 # TODO add internal logging and don't send error detail as HttpException
 
@@ -52,10 +51,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Include routers
-app.include_router(players_tracked.router)
-app.include_router(players_details.router)
-app.include_router(cards.router)
+app.include_router(players_tracked.router, prefix="/api")
+app.include_router(players_details.router, prefix="/api")
+app.include_router(cards.router, prefix="/api")
 
-@app.get("/ping")
+@app.get("/api/ping")
 async def ping():
     return {"status": "ok"}
