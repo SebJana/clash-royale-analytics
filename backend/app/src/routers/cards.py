@@ -8,7 +8,7 @@ from redis_service import get_redis_json, set_redis_json, build_redis_key
 
 router = APIRouter(prefix="/cards", tags=["Cards"])
 
-@router.get("/")
+@router.get("")
 async def get_cards(cr_api: CrApi, redis_conn: RedConn):
     try:
         # Check cache

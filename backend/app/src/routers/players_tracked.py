@@ -6,7 +6,7 @@ from mongo import get_tracked_players, insert_tracked_player, deactivate_tracked
 
 router = APIRouter(prefix="/players", tags=["Tracked Players"])
 
-@router.get("/")
+@router.get("")
 async def list_tracked_players(mongo_conn: DbConn):
     try:
         tags = await get_tracked_players(mongo_conn)
