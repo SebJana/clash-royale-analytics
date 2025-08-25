@@ -36,6 +36,7 @@ async def main():
         print("[INFO] Starting new data scraping cycle...")
         
         # TODO (potentially) request cards and cache them here in redis, overwriting the current ones
+        # TODO upon hitting "Player doesn't exist" remove from tracked players, as player deleted their account? 
 
         # Loop over every tracked player
         players = set()
