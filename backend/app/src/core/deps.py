@@ -58,5 +58,4 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
     if not await check_player_tracked(mongo_conn, player_tag):
         raise HTTPException(status_code=403, detail=f"Player with tag {player_tag} isn't being tracked")
     
-    print("Tracked: ", await check_player_tracked(mongo_conn, player_tag))
     return player_tag # When its a valid and tracked player, return the tag

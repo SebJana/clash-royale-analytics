@@ -3,34 +3,75 @@ from datetime import datetime
 from .connection import MongoConn
 from .validation_utils import ensure_connected
 
-async def insert_tracked_player(conn: MongoConn, player_tag):
+async def insert_tracked_player(conn: MongoConn, player_tag: str) -> str:
+    """
+    Insert (or reactivate) a player in the `players` collection.
+
+    - If the player doesn't exist: create with active=True.
+    - If the player exists: set active=True again (reactivate).
+
+    Returns:
+        str: "created", "reactivated", or "already_active"
+    """
+    try:
+        await ensure_connected(conn)
+        now = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+
+        # Try to reactivate if it exists but is inactive
+        res = await conn.db.players.update_one(
+            {"playerTag": player_tag, "active": False},
+            {"$set": {"active": True, "reactivatedAt": now, "updatedAt": now}},
+            upsert=False,
+        )
+        if res.matched_count == 1:
+            return "reactivated"
+
+        # If not matched above, upsert (create if missing, otherwise just ensure active)
+        res = await conn.db.players.update_one(
+            {"playerTag": player_tag},
+            {
+                "$set": {"playerTag": player_tag, "active": True, "updatedAt": now},
+                "$setOnInsert": {"insertedAt": now},
+            },
+            upsert=True,
+        )
+
+        if res.upserted_id is not None:
+            return "created"
+
+        return "already_active"
+
+    except Exception as e:
+        print(f"[DB] [ERROR] during insert/reactivate for player: {player_tag}", e)
+        raise
+
+async def deactivate_tracked_player(conn: MongoConn, player_tag) -> int:
         """
-        Inserts a player to be tracked into the players collection.
+        Deactivates a player that is being tracked into the players collection.
         
         Args:
             conn (MongoConn): Active connection to the mongo database
             player_tag (str): The player tag starting with '#' (e.g., "#YYRJQY28")
+        
+        Returns:
+            int: The amount of affected players by the update
                         
         Raises:
-            DuplicateKeyError: If the player already exists in the collection
-            Exception: If insertion fails
+            Exception: If the update of the player fails
         """
 
         try:
             await ensure_connected(conn)
             current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-
-            await conn.db.players.insert_one({
-                "playerTag": player_tag,
-                "active": True,
-                "insertedAt": current_time
-            })
-
-            print(f"[DB] Inserted player {player_tag} into players collection")
+            
+            res = await conn.db.players.update_one(
+                {"playerTag": player_tag, "active": True},
+                {"$set": {"active": False, "deactivatedAt": current_time}},
+            )
+            
+            # Return the amount of players updated 
+            return res.matched_count 
         
-        except DuplicateKeyError:
-            print("[DB] [INFO] Duplicate key — player already exists.")
-            raise
         except Exception as e:
-            print(f"[DB] [ERROR] during insertion: {e}")
+            print(f"[DB] [ERROR] during update: {e}")
             raise

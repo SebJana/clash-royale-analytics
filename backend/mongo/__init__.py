@@ -3,7 +3,7 @@ from .battles_read import get_battles_count, print_first_battles, get_last_battl
 from .battles_write import insert_battles
 
 from .players_read import get_tracked_players, check_player_tracked
-from .players_write import insert_tracked_player
+from .players_write import insert_tracked_player, deactivate_tracked_player
 
 __all__ = [
     "MongoConn",
@@ -18,5 +18,5 @@ __all__ = [
     ## read
     "get_tracked_players", "check_player_tracked", 
     ## write
-    "insert_tracked_player",
+    "insert_tracked_player", "deactivate_tracked_player",
 ]

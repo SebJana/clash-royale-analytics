@@ -33,6 +33,7 @@ class ClashRoyaleAPI:
     def check_tag_syntax(player_tag: str):
         """
         Checks wether the player tag starts with a '#' and has the correct length
+        and matches the Supercell alphabet.
         
         Args:
             player_tag (str): The player tag starting with '#' (e.g., "#YYRJQY28")
@@ -45,15 +46,17 @@ class ClashRoyaleAPI:
 
         # Strip the tag 
         tag = player_tag.strip()
-
+        
+        
         # Missing the starting code symbol
         if not tag.startswith("#"):
             return False
 
         core = tag[1:]  # Part without the leading '#'
-
+        
+        # TODO check actual max or min length
         # Invalid length
-        if len(core) < 8  or len(core) > 11:
+        if len(core) < 4  or len(core) > 12:
             return False
         
         # Check if the tag without the '#' is only numbers and upper letters
@@ -152,7 +155,7 @@ class ClashRoyaleAPI:
 
         # If no error on request --> player with that tag exists
         try:
-            _ = await self.get_player_logs(player_tag)
+            _ = await self.get_player_info(player_tag)
             return True
         except Exception:
             return False
