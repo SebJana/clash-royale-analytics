@@ -1,8 +1,8 @@
-from clean import clean_battle_log_list, check_if_valid_logs
+from clean import clean_battle_log_list, check_valid_logs, get_player_name
 from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from mongo import MongoConn
-from mongo import insert_battles, get_battles_count, print_first_battles
-from mongo import get_tracked_players
+from mongo import insert_battles, set_player_name, get_battles_count, print_first_battles
+from mongo import get_tracked_player_tags
 from dotenv import load_dotenv, find_dotenv
 import os
 import httpx
@@ -44,7 +44,7 @@ async def main():
         # Loop over every tracked player
         players = set()
         try:
-            players = await get_tracked_players(conn)
+            players = await get_tracked_player_tags(conn)
             print(f"[INFO] Found {len(players)} tracked players: {players}")
         except Exception as e:
             continue
@@ -66,16 +66,22 @@ async def main():
                     continue
 
                 # Check if the response has all the necessary fields
-                if not check_if_valid_logs(battle_logs):
+                if not check_valid_logs(battle_logs):
                     print(f"[ERROR] Battle logs for Player {player} couldn't be used")
                     continue 
 
                 # Prepare the data for storage
                 cleaned_battle_logs = clean_battle_log_list(battle_logs, player_tag=player)
+                player_name = get_player_name(battle_logs, player_tag=player)
 
                 # Insert battles into MongoDB
                 # If any error occurs here, the class handles the output for the logs 
                 await insert_battles(conn, cleaned_battle_logs)
+                
+                # Set the name of the player into MongoDB
+                # Update the name on every run of the scraping, because this name is basis for users
+                # being able to find people by name, which can be changed and therefore needs to be updated
+                await set_player_name(conn, player_tag=player, player_name=player_name)
 
                 # Optional debug (uncomment to check first documents and document count)
                 battles_count = await get_battles_count(conn)

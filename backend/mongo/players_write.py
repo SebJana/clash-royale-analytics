@@ -45,6 +45,37 @@ async def insert_tracked_player(conn: MongoConn, player_tag: str) -> str:
         print(f"[DB] [ERROR] during insert/reactivate for player: {player_tag}", e)
         raise
 
+async def set_player_name(conn: MongoConn, player_tag: str, player_name: str):
+    """
+    Updates the name of an existing player (by tag) in the players collection.
+    It does not insert a new document if the player does not exist (upsert=False).
+
+    Args:
+        conn (MongoConn): Active MongoDB connection instance.
+        player_tag (str): The unique tag of the player (e.g., "#YYRJQY28").
+        player_name (str): The new name to set for the player.
+
+    Raises:
+        Exception: Any exception that occurs during the database update operation.
+    """
+    
+    try:
+        await ensure_connected(conn)
+        
+        # Set the name for the player with the specified tag
+        res = await conn.db.players.update_one(
+            {"playerTag": player_tag},
+            {"$set": {"playerName": player_name}},
+            upsert=False,
+        )
+        
+        if res.matched_count == 0:
+            print(f"[DB] [WARNING] player {player_tag} was not found in collection and couldn't set player name.")
+
+    except Exception as e:
+        print(f"[DB] [ERROR] during name setting for player: {player_tag}", e)
+        raise
+
 async def deactivate_tracked_player(conn: MongoConn, player_tag) -> int:
         """
         Deactivates a player that is being tracked into the players collection.

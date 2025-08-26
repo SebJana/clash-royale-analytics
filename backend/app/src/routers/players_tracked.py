@@ -9,8 +9,8 @@ router = APIRouter(prefix="/players", tags=["Tracked Players"])
 @router.get("")
 async def list_tracked_players(mongo_conn: DbConn):
     try:
-        tags = await get_tracked_players(mongo_conn)
-        return {"activePlayers": list(tags)}
+        players = await get_tracked_players(mongo_conn)
+        return {"activePlayers": players}
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch all tracked players")
     

@@ -26,7 +26,7 @@ async def insert_battles(conn: MongoConn, battle_logs):
         except BulkWriteError as bwe:
             # Check if it's a duplicate key error (E11000)
             if any(err.get("code") == 11000 for err in bwe.details.get("writeErrors", [])):
-                print("[DB] [INFO] Duplicate key error — some documents were already in the collection.")
+                print("[DB] [INFO] Duplicate — some battles were already in the collection.")
             else:
                 print(f"[DB] Bulk write error: {bwe.details}")
                 raise

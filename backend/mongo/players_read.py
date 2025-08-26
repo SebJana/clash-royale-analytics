@@ -31,9 +31,9 @@ async def check_player_tracked(conn: MongoConn, player_tag: str):
         print(f"[DB] [ERROR] trying to fetch the tracked players: {e}")
         raise
 
-async def get_tracked_players(conn: MongoConn):
+async def get_tracked_player_tags(conn: MongoConn):
     """
-    Retrieves a set of all players that are tracked.
+    Retrieves a set of all players tags that are tracked.
     
     Args:
         conn (MongoConn): Active connection to the mongo database
@@ -61,6 +61,40 @@ async def get_tracked_players(conn: MongoConn):
         async for doc in cursor:
             tags.add(doc["playerTag"])
         return tags
+
+    except Exception as e:
+        print(f"[DB] [ERROR] trying to fetch the tracked players tags: {e}")
+        raise
+    
+async def get_tracked_players(conn: MongoConn):
+    """
+    Retrieves a set of all players tags and names that are tracked.
+    
+    Args:
+        conn (MongoConn): Active connection to the mongo database
+    
+    Returns:
+        dict: Tags of the active players and their names
+        
+    Raises:
+        Exception: If fetching tracked players fails
+    """
+    
+    try:
+        await ensure_connected(conn)
+
+        cursor = conn.db.players.find(
+            # only active/tracked players
+            {"active": True},
+            # projection: only fetch player tags and names
+            {"_id": 0, "playerTag": 1, "playerName": 1}
+        ).sort("playerTag", 1) # sort ascending
+
+        # Return a dict
+        players = {}
+        async for doc in cursor:
+            players[doc["playerTag"]] = doc.get("playerName")
+        return players
 
     except Exception as e:
         print(f"[DB] [ERROR] trying to fetch the tracked players: {e}")

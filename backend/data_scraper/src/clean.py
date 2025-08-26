@@ -1,6 +1,6 @@
 from datetime import datetime
 
-def check_if_valid_logs(battle_logs):
+def check_valid_logs(battle_logs):
     """
     Validates the API response to ensure it contains valid battle log data.
     
@@ -232,3 +232,29 @@ def clean_battle(battle):
         remove_unnecessary_card_fields(player.get("supportCards"))
 
         player.pop("globalRank", None)
+
+
+def get_player_name(battles, player_tag):
+    """
+    Extracts the player's name from the most recent battle log entry.
+
+    Args:
+        battles (list[dict]): List of battle dictionaries (newest first) as returned by the Clash Royale API.
+        player_tag (str): The tag of the player whose name is being retrieved.
+
+    Returns:
+        str: The player's name if found, otherwise the given `player_tag`.
+    """
+    
+    # battles[0] is the newest/earliest battle, so chances are this is the actual current name.
+    # Easiest way to get the actual name would be to use the get_player_info of the clash_royale_api module,
+    # but extracting it from the battle log, which is already being fetched, saves one API-call per cycle per player
+    battle = battles[0] # Take first battle of battles in the list
+    
+    # Reference player is always found in team
+    for player in battle.get("team"):
+        # Check if it's the reference player 
+        if player.get("tag") == player_tag:
+            return player.get("name")
+    
+    return player_tag # Default to the tag if the name couldn't be found
