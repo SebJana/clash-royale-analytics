@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from typing import Optional, Iterable
 
-def match_tag_before_datetime_stage(player_tag: str, before_datetime):
+def match_tag_before_datetime_stage(player_tag: str, before_datetime: datetime):
     """
     Build a MongoDB $match stage that filters battles for a given player tag
     that happened before a given datetime
@@ -30,10 +31,10 @@ def match_tag_before_datetime_stage(player_tag: str, before_datetime):
     } 
 
 
-def match_tag_date_range_stage(player_tag: str, start_date, end_date):
+def match_tag_date_mode_range_stage(player_tag: str, start_date: date, end_date: date, game_modes: Optional[Iterable[str]] = None):
     """
     Build a MongoDB $match stage that filters battles for a given player tag
-    within a full-day date window.
+    within a full-day date window based on the given game modes.
 
     The window spans from `start_date` at 00:00:00 (inclusive) to
     `end_date + 1 day` at 00:00:00 (exclusive).
@@ -42,13 +43,17 @@ def match_tag_date_range_stage(player_tag: str, start_date, end_date):
         player_tag (str): Player tag (e.g., "#YYRJQY28") to match against `referencePlayerTag`.
         start_date (datetime.date): First day (inclusive).
         end_date (datetime.date): Last day (inclusive).
+        game_modes: Optional iterable of game mode names; if provided and non-empty,
+                    the match includes {"gameMode": {"$in": <game_modes>}}.
 
     Returns:
         dict: An aggregation stage of the form:
               {
                 "$match": {
                   "referencePlayerTag": <player_tag>,
-                  "battleTime": { "$gte": <start_dt>, "$lt": <end_dt_plus_1> }
+                  "battleTime": { "$gte": <start_dt>, "$lt": <end_dt_plus_1> },
+                  "gameMode": {"$in": <game_modes>} (if game modes isn't empty)
+                  
                 }
               }
 
@@ -58,13 +63,16 @@ def match_tag_date_range_stage(player_tag: str, start_date, end_date):
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt   = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
 
-    return {
-        # Match the relevant files for the player and the time frame
-        "$match": {
-            "referencePlayerTag": player_tag,
-            "battleTime": {"$gte": start_dt, "$lt": end_dt}
-        }
-    } 
+    match = {
+        "referencePlayerTag": player_tag,
+        "battleTime": {"$gte": start_dt, "$lt": end_dt},
+    }
+
+    # Only add the mode filter if provided and non-empty
+    if game_modes:
+        match["gameMode"] = {"$in": list(game_modes)} 
+
+    return {"$match": match}
 
 
 def extract_deck_cards_stage(player_tag: str):

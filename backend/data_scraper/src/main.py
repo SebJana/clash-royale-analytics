@@ -16,6 +16,7 @@ load_dotenv(find_dotenv())
 API_TOKEN = os.getenv("DATA_SCRAPER_API_KEY")
 
 # TODO move from init sleep to retry and cooldown startup logic
+# TODO switch to logger
 # TODO refactor and modularize
 
 async def main():
@@ -97,7 +98,7 @@ async def main():
             except httpx.HTTPStatusError as http_err:
                 code = http_err.response.status_code
                 # Sending too many requests
-                if code == 429: # TODO upon too many request, wait and retry fetching
+                if code == 429: # TODO upon too many request, wait and retry fetching, adding actual async fetching
                     print("[ERROR] Rate limit hit - consider increasing COOL_DOWN_SLEEP_TIME")
                     await asyncio.sleep(COOL_DOWN_SLEEP_DURATION * 10) # Extra delay for rate limiting
                 elif code == 403:

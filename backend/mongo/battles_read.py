@@ -1,7 +1,8 @@
 from .connection import MongoConn
 from .validation_utils import ensure_connected, check_valid_date_range
-from .query_utils import match_tag_before_datetime_stage, match_tag_date_range_stage, extract_deck_cards_stage
-from datetime import datetime
+from .query_utils import match_tag_before_datetime_stage, match_tag_date_mode_range_stage, extract_deck_cards_stage
+from datetime import datetime, date
+from typing import Optional, Iterable
 
 async def get_battles_count(conn: MongoConn):
     """
@@ -25,7 +26,7 @@ async def get_battles_count(conn: MongoConn):
         print(f"[DB] [ERROR] fetching document count: {e}")
         raise
 
-async def print_first_battles(conn: MongoConn, limit=5):
+async def print_first_battles(conn: MongoConn, limit: int = 5):
     """
     Prints collection count and previews a few documents.
     
@@ -43,7 +44,7 @@ async def print_first_battles(conn: MongoConn, limit=5):
     except Exception as e:
         print(f"[DB] [ERROR] fetching collection info: {e}")
 
-async def get_last_battles(conn: MongoConn, player_tag, before_datetime, limit = 20):
+async def get_last_battles(conn: MongoConn, player_tag: str, before_datetime: datetime, limit: int = 20):
     """
     Fetches all battles within the limited amount that the player had before a given date and time 
 
@@ -124,15 +125,16 @@ async def get_last_battles(conn: MongoConn, player_tag, before_datetime, limit =
         raise
 
 
-async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
+async def get_decks_win_percentage(conn: MongoConn, player_tag: str, start_date: date, end_date: date, game_modes: Optional[Iterable[str]] = None):
     """
     Fetches every unique deck that the player has played in the given time frame.
 
     Args:
         conn (MongoConn): Active connection to the MongoDB database.
         player_tag (str): The tag of the player whose unique decks are to be fetched.
-        start_date (str): Date after which the game happened.
-        end_date (str): Date before which the game happened.
+        start_date (date): Date after which the game happened.
+        end_date (date): Date before which the game happened.
+        game_modes (Optional[Iterable[str]]): If provided/non-empty, filter to these game modes in which the game happened.
 
     Returns:
         list: A list of dictionaries containing the players unique decks and their win-rates
@@ -146,7 +148,7 @@ async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_
 
         pipeline = [
             # Match the relevant files for the player and the time frame
-            match_tag_date_range_stage(player_tag, start_date, end_date),
+            match_tag_date_mode_range_stage(player_tag, start_date, end_date, game_modes),
             extract_deck_cards_stage(player_tag),
             # Sort the decks by card properties - evolution level first, then id
             {"$addFields": {
@@ -218,15 +220,16 @@ async def get_decks_win_percentage(conn: MongoConn, player_tag, start_date, end_
         print(f"[DB] [ERROR] fetching decks info: {e}")
         raise
 
-async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_date):
+async def get_cards_win_percentage(conn: MongoConn, player_tag: str, start_date: date, end_date: date, game_modes: Optional[Iterable[str]] = None):
     """
     Fetches a usage and win percentage for every used card for the player in the specified time range.
 
     Args:
         conn (MongoConn): Active connection to the MongoDB database.
-        player_tag (str): The tag of the player whose unique decks are to be fetched.
-        start_date (str): Date after which the game happened.
-        end_date (str): Date before which the game happened.
+        player_tag (date): The tag of the player whose unique decks are to be fetched.
+        start_date (date): Date after which the game happened.
+        end_date (date): Date before which the game happened.
+        game_modes (Optional[Iterable[str]]): If provided/non-empty, filter to these game modes in which the game happened.
 
     Returns:
         list: A list of dictionaries containing the card win-rate and usages
@@ -239,7 +242,7 @@ async def get_cards_win_percentage(conn: MongoConn, player_tag, start_date, end_
         check_valid_date_range(start_date, end_date)
 
         pipeline = [
-            match_tag_date_range_stage(player_tag, start_date, end_date),
+            match_tag_date_mode_range_stage(player_tag, start_date, end_date, game_modes),
             extract_deck_cards_stage(player_tag),
             {"$facet": {
                 "cards": [
