@@ -49,7 +49,7 @@ APP_API_KEY = ey41eas...
 - `BACKUP_RETENTION_DAYS`: Number of days to keep backup files (default: `7`)
 
 #### Redis credentials
-- `REDIS_PASSWORD`:= Secure password for the redis database
+- `REDIS_PASSWORD`: Secure password for the redis database
 
 #### Clash Royale API Keys
 - `DATA_SCRAPER_API_KEY`: API Key used to run the cyclic tracking and refreshing of selected player(s)
