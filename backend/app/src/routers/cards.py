@@ -12,7 +12,7 @@ router = APIRouter(prefix="/cards", tags=["Cards"])
 async def get_cards(cr_api: CrApi, redis_conn: RedConn):
     try:
         # Check cache
-        key = build_redis_key(service="cr_api", resource="all_cards")
+        key = await build_redis_key(conn=redis_conn, service="cr_api", resource="all_cards")
         cached_cards = await get_redis_json(redis_conn, key)
 
         if cached_cards is not None:

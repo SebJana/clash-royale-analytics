@@ -34,6 +34,25 @@ class RedisConn:
         )
         # Perform health check to confirm connection works
         await self.client.ping()  # fail if connection couldn't be established
+        
+        await self.client.setnx("global:version", 1) # Only init with '1' if key doesn't exist yet
+
+    async def get_version(self) -> int:
+        """
+        Fetches the current global key version from Redis.
+        """
+
+        val = await self.client.get("global:version")
+        return int(val) if val is not None else 1
+    
+    async def increment_version(self) -> int:
+        """
+        Globally invalidates all cache by incrementing the version in Redis.
+        Returns the new version number.
+        """
+        
+        new_val = await self.client.incr("global:version")
+        return new_val
 
     async def close(self):
         """
@@ -141,108 +160,39 @@ def _to_param_str(val) -> str:
         return "true" if val else "false"
     return str(val)
 
-def build_redis_key(service: str, resource: str, params: dict | None = None) -> str:
+async def build_redis_key(conn: RedisConn, service: str, resource: str, params: dict | None = None) -> str:
     """
-    Build a consistent Redis key string. URL proof all param names and param values (stripping "#", "_", ...)
+    Build a consistent Redis key string.
 
     Args:
+        conn (RedisConn): Wrapper around an async Redis connection, to access the version key.
         resource (str): The type of data or entity, e.g. "decks", "player", "leaked-elixir" ...
         service (str): The service or namespace prefix, e.g. "cr_api" or "mongo"
         params (dict): Additional key-value pairs describing this cache entry.
-                These will be sorted and appended as 'key=value' segments. 
-                If player_tag exists, it will be always at the first param slot in the key.
-                Additionally the leading '#' will be replaced by stripped. 
-                e.g. {"player_tag": "#YYRJQY28", "start_date": "2025-08-01", "end_date": 2025-08-01})
+                These will be sorted and appended as 'key=value' segments.
+                e.g. {"player_tag": "YYRJQY28", "start_date": "2025-08-01", "end_date": 2025-08-01})
     Returns:
-        str: A Redis key in the format 'service:resource:param1=val1:param2=val2'.
+        str: A Redis key in the format 'version:service:resource:param1=val1:param2=val2'.
     """
 
+    version = f"v{await conn.get_version()}"
+    
     # Sort params to keep key deterministic even if order changes
-    parts = [service, resource]
+    parts = [version, service, resource]
     
-    tag = None
-    other_params = []
-    if params:
-        # Extract playerTag if present
-        if "playerTag" in params:
-            tag = params["playerTag"]
-        # Collect all other params except playerTag
-        other_params = [(k, v) for k, v in params.items() if k != "playerTag"]
-
-    # Add playerTag segment first if it exists
-    if tag is not None:
-        # Clash Royale Tag without the leading '#' (safer for Redis key)
-        tag_stripped = str(tag).lstrip("#")
-        key_str = quote("playerTag", safe="")
-        val_str = quote(_to_param_str(tag_stripped), safe="")
-        parts.append(f"{key_str}={val_str}")
-
-    # Add remaining params sorted alphabetically
-    for key, val in sorted(other_params):
-        key_str = quote(str(key), safe="")
-        val_str = quote(_to_param_str(val), safe="")
-        parts.append(f"{key_str}={val_str}")
+    if params: # Only append params to key if they exist
+        for key, val in sorted(params.items()):
+            # Use quote to get rid of and encode delimiters like '_', ":", ...
+            val_stripped = str(val).lstrip("#") # Remove leading '#', if player tag is in params  
+            key_str = quote(str(key), safe="")
+            val_str = quote(_to_param_str(val_stripped), safe="")
+            parts.append(f"{key_str}={val_str}")
     
-    # Return key if the length is appropriate
-    key = ":".join(parts)
-    key_bytes = key.encode("utf-8")
-    if len(key_bytes) <= 512:
+    
+    key = ":".join(parts) # Build key string
+    # Check if the key is not too long (bytes)
+    if len(key.encode("utf-8")) < 512: 
         return key
     
-    
     # Uniquely hash key if it is too long
-    digest = hashlib.md5(key.encode()).hexdigest()
-    
-    tag = params.get("playerTag")
-    if tag:
-        # Clash Royale Tag without the leading '#' (safer for Redis key)
-        tag_stripped = str(tag).lstrip("#")
-        # Always keep player tag readable in key, if it exists in params
-        return ":".join([service, resource, f"player_tag={tag_stripped}", digest])
-
-    # Regular key 
-    return ":".join([service, resource, digest])
-
-async def delete_by_pattern(conn: RedisConn, pattern: str, scan_count: int = 2000, batch_size: int = 2000) -> int:
-    """
-    Delete all keys that match a given pattern. Works in batches and unlinks as alternative to blocking deletion.
-
-    Args:
-    conn (RedisConn): Wrapper around an async Redis connection.
-    pattern (str): Glob pattern, e.g. "player_cards:player_tag=%23YYRJQY28*"
-    scan_count (int): How many keys to scan per iteration.
-    batch_size (int): How many keys to delete per pipeline batch.
-
-    Returns:
-        (int) Amount of deleted keys
-    """
-    
-    cursor = 0
-    total_deleted = 0
-    buffer: list[str] = []
-
-    async def flush(chunk: list[str]):
-        nonlocal total_deleted
-        if not chunk:
-            return
-        await conn.client.unlink(*chunk)  # non-blocking delete
-        # Increment count by number of keys deleted
-        total_deleted += len(chunk)
-
-    while True:
-        # Scan for keys matching the given pattern
-        cursor, keys = await conn.client.scan(cursor=cursor, match=pattern, count=scan_count)
-        if keys:
-            buffer.extend(keys)
-            # If buffer reached the batch size, delete a chunk and remove from buffer
-            while len(buffer) >= batch_size:
-                chunk, buffer = buffer[:batch_size], buffer[batch_size:]
-                await flush(chunk)
-        if cursor == 0:
-            break
-    
-    # Delete any remaining keys left in the buffer        
-    if buffer:
-        await flush(buffer)
-
-    return total_deleted
+    return version + ":" + service + ":" + hashlib.md5(key.encode("utf-8")).hexdigest()

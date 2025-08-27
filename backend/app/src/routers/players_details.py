@@ -16,9 +16,9 @@ router = APIRouter(prefix="/players", tags=["Player Details"], dependencies=[Dep
 async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn):
     try:
         params = {"playerTag": player_tag}
-        key = build_redis_key(service="crApi", resource="playerProfile", params=params)
+        key = await build_redis_key(conn=redis_conn, service="crApi", resource="playerProfile", params=params)
         cached_stats = await get_redis_json(redis_conn, key)
-
+        
         if cached_stats is not None:
             return cached_stats
 
@@ -58,7 +58,7 @@ async def last_battles(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn,
         cutoff = req.before or datetime.now()
         
         params = {"playerTag": player_tag, "before": cutoff, "limit": req.limit}
-        key = build_redis_key(service="crApi", resource="playerBattles", params=params)
+        key = await build_redis_key(conn=redis_conn, service="crApi", resource="playerBattles", params=params)
         cached_battles = await get_redis_json(redis_conn, key)
         
         if cached_battles is not None:
@@ -82,7 +82,7 @@ async def last_battles(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn,
 async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, game_modes: Optional[List[str]] = Query(None), req: BetweenRequest = Depends()):
     try:
         params = {"playerTag": player_tag, "startDate": req.start_date, "endDate": req.end_date, "gameModes": game_modes}
-        key = build_redis_key(service="crApi", resource="playerDecks", params=params)
+        key = await build_redis_key(conn=redis_conn, service="crApi", resource="playerDecks", params=params)
         cached_decks = await get_redis_json(redis_conn, key)
         
         print("Key", key)
@@ -108,7 +108,7 @@ async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn:
 async def card_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, game_modes: Optional[List[str]] = Query(None), req: BetweenRequest = Depends()):
     try:        
         params = {"playerTag": player_tag, "startDate": req.start_date, "endDate": req.end_date, "gameModes": game_modes}
-        key = build_redis_key(service="crApi", resource="playerCards", params=params)
+        key = await build_redis_key(conn=redis_conn, service="crApi", resource="playerCards", params=params)
         cached_cards = await get_redis_json(redis_conn, key)
         
         if cached_cards is not None:

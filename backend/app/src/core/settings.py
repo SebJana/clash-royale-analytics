@@ -21,11 +21,16 @@ class Settings:
     MONGO_CLIENT_NAME: str = "cr-analytics-api"
     
     # Cache TTL (Time To Live) in seconds
-    CACHE_TTL_CARDS: int = 24 * 60 * 60  # 24 hours
+    # Cache is being invalidated in every data scraping cycle
+    # Cache data is always up to, or close to as fresh as the scraped data in the mongo
+    # Keep TTL still in the minutes to hours range as fallback 
+    # to not risk having outdated data upon synchronization errors or scraping errors
+    
+    CACHE_TTL_CARDS: int = 6 * 60 * 60  # 6 hours
     CACHE_TTL_PLAYER_STATS: int = 15 * 60  # 15 minutes
-    CACHE_TTL_BATTLES: int = 15 * 60  # 15 minutes
-    CACHE_TTL_DECK_STATS: int = 15 * 60  # 15 minutes
-    CACHE_TTL_CARD_STATS: int = 15 * 60  # 15 minutes
+    CACHE_TTL_BATTLES: int = 10 * 60  # 10 minutes
+    CACHE_TTL_DECK_STATS: int = 10 * 60  # 10 minutes
+    CACHE_TTL_CARD_STATS: int = 10 * 60  # 10 minutes
 
 # Global settings instance
 settings = Settings()

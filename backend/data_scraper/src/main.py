@@ -3,7 +3,7 @@ from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from mongo import MongoConn
 from mongo import insert_battles, set_player_name, get_battles_count, print_first_battles
 from mongo import get_tracked_player_tags
-from redis_service import RedisConn, delete_by_pattern
+from redis_service import RedisConn
 
 from dotenv import load_dotenv, find_dotenv
 import os
@@ -104,18 +104,6 @@ async def main():
                 battles_count = await get_battles_count(conn)
                 print(f"[INFO] There are now {battles_count} battles in the collection")
                 # await print_first_battles(conn)
-                
-                # Delete currently cached keys
-                service = "crApi"
-                resources_to_wipe = ["playerCards", "playerDecks", "playerBattles"]
-                
-                # TODO potentially move this logic to redis_service
-                for res in resources_to_wipe:
-                    # Remove leading '#', like its done in the redis keys
-                    player_tag_striped = str(player).lstrip("#")
-                    redis_key_pattern = f"{service}:{res}:playerTag={player_tag_striped}*"
-                    deleted_keys = await delete_by_pattern(redis_conn, pattern = redis_key_pattern)
-                    print(f"[CACHE] [INFO] {deleted_keys} entries from Redis ({res}) have been wiped for player {player}")
             
             # Check which type of error occurred
             # API response if there currently is a maintenance break
@@ -156,6 +144,11 @@ async def main():
 
             # Space out the API calls
             await asyncio.sleep(COOL_DOWN_SLEEP_DURATION) # Additional delay to runtime of code
+
+        # Increment redis key version, invalidate cache
+        new_version = await redis_conn.increment_version()
+        # Existing keys will be invalid; not looked up anymore, and be deleted via expiring ttl
+        print(f"[CACHE] [INFO] Redis version incremented to v{new_version}, cache invalidated.")
 
         await asyncio.sleep(REQUEST_CYCLE_DURATION)
 
