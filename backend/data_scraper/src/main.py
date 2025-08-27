@@ -4,6 +4,7 @@ from mongo import MongoConn
 from mongo import insert_battles, set_player_name, get_battles_count, print_first_battles
 from mongo import get_tracked_player_tags
 from redis_service import RedisConn, build_redis_key, set_redis_json
+from api_rate_limiter import ApiRateLimiter
 
 from dotenv import load_dotenv, find_dotenv
 import os
@@ -11,8 +12,8 @@ import httpx
 import asyncio
 
 INIT_SLEEP_DURATION = 60 # 60 seconds
-REQUEST_CYCLE_DURATION = 60 * 60 # 1 hour
-COOL_DOWN_SLEEP_DURATION = 30 # 30 seconds
+REQUESTS_PER_SECOND = 0.5
+REQUEST_CYCLE_DURATION = 15 * 60 # 15 minutes
 
 load_dotenv(find_dotenv())
 API_TOKEN = os.getenv("DATA_SCRAPER_API_KEY", "")
@@ -20,17 +21,23 @@ REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
 REDIS_HOST: str = "redis"
 REDIS_PORT: int = 6379
 
+MAX_RETRIES = 5
+BASE_BACKOFF = 1.0 # seconds
 
 # TODO move from init sleep to retry and cooldown startup logic
+# TODO settings file
 # TODO switch to logger
-# TODO refactor and modularize
 
-async def main():
-    """Main async function for the data scraper"""
+async def init():
+    """Initialize API, Redis, and MongoDB clients.
+
+    Returns:
+        tuple[ClashRoyaleAPI, RedisConn, MongoConn]: Initialized clients.
+
+    Raises:
+        SystemExit: If either Redis or MongoDB connection fails.
+    """
     
-    await asyncio.sleep(INIT_SLEEP_DURATION) # upon start sleep for database to settle in
-
-    # Init the CR API connection
     cr_api = ClashRoyaleAPI(api_key=API_TOKEN)
     
     # Init the redis connection
@@ -44,13 +51,161 @@ async def main():
     
 
     # Init the database connection
-    conn = MongoConn(app_name="cr-analytics-data-scraper")
+    mongo_conn = MongoConn(app_name="cr-analytics-data-scraper")
     try:
-        await conn.connect()
+        await mongo_conn.connect()
     except Exception as e:
         print(f"[ERROR] Failed to connect to database: {e}")
         print("[ERROR] Exiting data scraper")
         exit(1)
+    
+    # Upon successful connection, return all three
+    return cr_api, redis_conn, mongo_conn
+
+api_rl = ApiRateLimiter(per_second=REQUESTS_PER_SECOND)
+
+async def process_player(player_tag: str, cr_api: ClashRoyaleAPI, mongo_conn: MongoConn):
+    """Fetch, validate, clean, and persist the latest battles for a single player.
+
+    The API call is throttled by a global rate limiter (max REQUESTS_PER_SECOND).
+    Transient HTTP/network errors are retried with exponential backoff.
+    A maintenance error intentionally propagates to abort the entire cycle.
+
+    Args:
+        player_tag (str): Player tag (e.g., "#YYRJQY28").
+        cr_api (ClashRoyaleAPI): API client to fetch battle logs.
+        mongo_conn (MongoConn): Mongo connection used to write data.
+
+    Returns:
+        None: Returns early on any non-retriable error or on success.
+
+    Raises:
+        ClashRoyaleMaintenanceError: Propagated to stop the current cycle for all players.
+    """
+    
+    print(f"[INFO] Running data scraping cycle for Player {player_tag} ...")
+    attempt = 0
+    while True:
+        try:
+            async with api_rl:
+                # Try to fetch the last battles for each player
+                battle_logs = await cr_api.get_player_battle_logs(player_tag=player_tag)
+
+            # Check if we got any battle logs
+            if not battle_logs:
+                print(f"[WARNING] No battle logs returned for player {player_tag}")
+                return
+
+            # Check if the response has all the necessary fields
+            if not check_valid_logs(battle_logs):
+                print(f"[ERROR] Battle logs for Player {player_tag} couldn't be used")
+                return
+
+            # Prepare the data for storage
+            cleaned_battle_logs = clean_battle_log_list(battle_logs, player_tag=player_tag)
+            player_name = get_player_name(battle_logs, player_tag=player_tag)
+
+            # Insert battles into MongoDB
+            # If any error occurs here, the class handles the output for the logs 
+            await insert_battles(mongo_conn, cleaned_battle_logs)
+            
+            # Set the name of the player into MongoDB
+            # Update the name on every run of the scraping, because this name is basis for users
+            # being able to find people by name, which can be changed and therefore needs to be updated
+            await set_player_name(mongo_conn, player_tag=player_tag, player_name=player_name)
+        
+            return
+    
+        except ClashRoyaleMaintenanceError as e:
+            # Global stop, raise error
+            print(f"[WARNING] {getattr(e, 'detail', str(e))} ... Skipping the current cycle")
+            raise # Only raise this error
+
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code if e.response else 0
+            if code in (403, 404):
+                print(f"[ERROR] HTTP {code} for {player_tag} – not retrying")
+                return
+            if code in (429, 500, 502, 503, 504) and attempt < MAX_RETRIES:
+                backoff = BASE_BACKOFF * (2**attempt)
+                print(f"[WARNING] HTTP {code} for {player_tag} – retry in {backoff:.1f}s")
+                await asyncio.sleep(backoff)
+                continue
+            print(f"[ERROR] HTTP {code} for {player_tag}")
+            return
+
+        except httpx.RequestError as e:
+            if attempt < MAX_RETRIES:
+                backoff = BASE_BACKOFF * (2**attempt)
+                print(f"[WARN] Net error {e!r} – retry in {backoff:.1f}s")
+                await asyncio.sleep(backoff)
+                continue
+            print(f"[ERROR] Network error for {player_tag}: {e}")
+            return
+
+        except Exception as e:
+            print(f"[ERROR] Unknown error for {player_tag}: {e}")
+            return
+
+
+async def run_players_cycle(players: list[str], cr_api: ClashRoyaleAPI, mongo_conn: MongoConn):
+    """Run a concurrent fetch/clean/store cycle for all tracked players.
+
+    Uses an asyncio.TaskGroup so all player tasks start together. Any
+    ClashRoyaleMaintenanceError raised by an individual task cancels the group
+    and is handled here, effectively aborting the entire cycle.
+
+    Args:
+        players (list[str]): Collection of player tags to process.
+        cr_api (ClashRoyaleAPI): API client instance.
+        mongo_conn (MongoConn): MongoDB connection for writes.
+    """
+    
+    try:
+        async with asyncio.TaskGroup() as tg:
+            for p in players:
+                tg.create_task(process_player(p, cr_api, mongo_conn))
+    except* ClashRoyaleMaintenanceError:
+        print("[INFO] Maintenance detected – aborting cycle")
+        
+async def cache_cards(cr_api: ClashRoyaleAPI, redis_conn: RedisConn):
+    """Fetch all card metadata and write it to Redis using 'version-ahead'.
+
+    The card cache is set with a TTL and marked as one version ahead; after
+    the cycle, a version increment validates these entries. This
+    function does not retry, as on-demand API calls can retrieve cards if
+    this step fails.
+
+    Args:
+        cr_api (ClashRoyaleAPI): API client to fetch the cards.
+        redis_conn (RedisConn): Redis connection used to store the cache.
+    """
+    
+    try:
+        # Fetch cards and save them to the redis cache as one version AHEAD
+        cards = await cr_api.get_cards()
+        key = await build_redis_key(conn=redis_conn, service="crApi", resource="allCards", version_ahead=True)
+        await set_redis_json(conn=redis_conn, key=key, value=cards, ttl= 2 * REQUEST_CYCLE_DURATION)
+        print("[CACHE] [INFO] Cards successfully fetched and set in cache with version ahead")
+    except Exception as e:
+        print(f"[ERROR] Unknown error occurred for while trying to update the cache {e}")
+
+async def main():
+    """Start and run the continuous scraping loop.
+
+    - Waits for dependent services to be ready (`INIT_SLEEP_DURATION`).
+    - Initializes API, Redis, and Mongo connections.
+    - Every cycle:
+        * Loads tracked player tags from Mongo.
+        * Runs a concurrent player processing cycle (rate-limited fetch).
+        * Refreshes the card cache (version-ahead), then increments the Redis version
+          to invalidate old keys and validate the new ones.
+        * Sleeps `REQUEST_CYCLE_DURATION` before the next cycle.
+    """
+    
+    await asyncio.sleep(INIT_SLEEP_DURATION) # upon start sleep for database to settle in
+
+    cr_api, redis_conn, mongo_conn = await init()
 
     while True:
         print("[INFO] Starting new data scraping cycle...")
@@ -60,7 +215,7 @@ async def main():
         # Loop over every tracked player
         players = set()
         try:
-            players = await get_tracked_player_tags(conn)
+            players = await get_tracked_player_tags(mongo_conn)
             print(f"[INFO] Found {len(players)} tracked players: {players}")
         except Exception as e:
             continue
@@ -69,100 +224,21 @@ async def main():
             print("[WARNING] No players to track, sleeping until next cycle")
             await asyncio.sleep(REQUEST_CYCLE_DURATION)
             continue
+        
+        # Run fetching, cleaning and storing of data concurrently
+        await run_players_cycle(players=players, cr_api=cr_api, mongo_conn=mongo_conn)
+        
+        # Optional debug (uncomment to check first documents and document count)
+        battles_count = await get_battles_count(mongo_conn)
+        print(f"[INFO] There are now {battles_count} battles in the collection")
+        # await print_first_battles(mongo_conn)
 
-        for player in players:
-            print(f"[INFO] Running data scraping cycle for Player {player} ...")
-            # Try to fetch the last battles for each player
-            try:
-                battle_logs = await cr_api.get_player_battle_logs(player_tag=player)
-
-                # Check if we got any battle logs
-                if not battle_logs:
-                    print(f"[WARNING] No battle logs returned for player {player}")
-                    continue
-
-                # Check if the response has all the necessary fields
-                if not check_valid_logs(battle_logs):
-                    print(f"[ERROR] Battle logs for Player {player} couldn't be used")
-                    continue 
-
-                # Prepare the data for storage
-                cleaned_battle_logs = clean_battle_log_list(battle_logs, player_tag=player)
-                player_name = get_player_name(battle_logs, player_tag=player)
-
-                # Insert battles into MongoDB
-                # If any error occurs here, the class handles the output for the logs 
-                await insert_battles(conn, cleaned_battle_logs)
-                
-                # Set the name of the player into MongoDB
-                # Update the name on every run of the scraping, because this name is basis for users
-                # being able to find people by name, which can be changed and therefore needs to be updated
-                await set_player_name(conn, player_tag=player, player_name=player_name)
-
-                # Optional debug (uncomment to check first documents and document count)
-                battles_count = await get_battles_count(conn)
-                print(f"[INFO] There are now {battles_count} battles in the collection")
-                # await print_first_battles(conn)
-            
-            # Check which type of error occurred
-            # API response if there currently is a maintenance break
-            except ClashRoyaleMaintenanceError as e:
-                print(f"[WARNING] {e.detail} ... Skipping the current cycle")
-                break # Skip the cycle
-
-            except httpx.HTTPStatusError as http_err:
-                code = http_err.response.status_code
-                # Sending too many requests
-                if code == 429: # TODO upon too many request, wait and retry fetching, adding actual async fetching
-                    print("[ERROR] Rate limit hit - consider increasing COOL_DOWN_SLEEP_TIME")
-                    await asyncio.sleep(COOL_DOWN_SLEEP_DURATION * 10) # Extra delay for rate limiting
-                elif code == 403:
-                    print("[ERROR] API access forbidden - check your API token")
-                elif code == 404:
-                    print(f"[ERROR] Player {player} not found")
-                else:
-                    body = http_err.response.text[:200]
-                    reason = http_err.response.reason_phrase
-                    print(f"[ERROR] HTTP {code} {reason}: {body}")
-            
-            except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout) as net_err:
-                print(f"[ERROR] Network/timeout error: {net_err}")
-                # Small backoff to avoid tight loops
-                await asyncio.sleep(1)
-
-            except httpx.RequestError as req_err:
-                # Catch-all for other client-side errors (DNS, TLS, etc.)
-                print(f"[ERROR] Request error: {req_err}")
-
-            except ValueError as val_err:
-                # e.g., JSON decode issues if you do resp.json() on non-JSON
-                print(f"[ERROR] Data validation error: {val_err}")
-
-            except Exception as e:
-                print(f"[ERROR] Unknown error occurred for player {player}: {e}")
-
-            # Space out the API calls
-            await asyncio.sleep(COOL_DOWN_SLEEP_DURATION) # Additional delay to runtime of code
-
-        try:
-            # Fetch cards and save them to the redis cache as one version AHEAD
-            cards = await cr_api.get_cards()
-            key = await build_redis_key(conn=redis_conn, service="crApi", resource="allCards", version_ahead=True)
-            await set_redis_json(conn=redis_conn, key=key, value=cards, ttl= 2 * REQUEST_CYCLE_DURATION)
-            print("[CACHE] [INFO] Cards successfully fetched and set in cache with version ahead")
-            
-            # Increment redis key version, invalidate cache
-            new_version = await redis_conn.increment_version()
-            # Existing current version keys will be invalid; not looked up anymore, and be deleted via expiring ttl
-            # All cards will be set to valid with this increment
-            print(f"[CACHE] [INFO] Redis version incremented to v{new_version}, cache invalidated.")
-            
-            # Cards are already in cache and valid, therefore there's always the newest version of cards in cache
-            # and the app doesn't need to prompt the Clash Royale API for cards, but can always rely on the cache being
-            # up to date and valid
-            
-        except Exception as e: # TODO proper error handling
-            print(f"[ERROR] Unknown error occurred for while trying to update the cache {e}")
+        await cache_cards(cr_api=cr_api, redis_conn=redis_conn)
+        # Increment redis key version, invalidate cache
+        new_version = await redis_conn.increment_version()
+        # Existing current version keys will be invalid; not looked up anymore, and be deleted via expiring ttl
+        # All cards key, that was one version ahead, will be validated with this increment
+        print(f"[CACHE] [INFO] Redis version incremented to v{new_version}, cache invalidated.")
 
         await asyncio.sleep(REQUEST_CYCLE_DURATION)
 
