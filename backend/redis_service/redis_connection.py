@@ -141,7 +141,7 @@ def _to_param_str(val) -> str:
         return "true" if val else "false"
     return str(val)
 
-def build_redis_key(resource: str, service: str, params: dict | None = None) -> str:
+def build_redis_key(service: str, resource: str, params: dict | None = None) -> str:
     """
     Build a consistent Redis key string.
 
@@ -167,8 +167,63 @@ def build_redis_key(resource: str, service: str, params: dict | None = None) -> 
     
     key = ":".join(parts) # Build key string
     # Check if the key is not too long
-    if len(key) < 512:
+    key_bytes = key.encode("utf-8")
+    if len(key_bytes) <= 512:
         return key
     
-    # Uniquely hash key if it is too long
-    return service + ":" + hashlib.md5(key.encode()).hexdigest()
+    
+    # Uniquely hash key if it is too long, always keep player_tag readable, if it exists
+    digest = hashlib.md5(key.encode()).hexdigest()
+    
+    tag = params.get("playerTag")
+    if tag:
+        tag_norm = tag.upper().lstrip("#")
+        # Always keep player tag readable in key, if it exists in params
+        return ":".join([service, resource, f"player_tag={tag_norm}", digest])
+
+    # Regular key 
+    return ":".join([service, resource, digest])
+
+async def unlink_by_pattern(conn: RedisConn, pattern: str, scan_count: int = 2000, batch_size: int = 2000) -> int:
+    """
+    Delete all keys that match a given pattern. Works in batches and unlinks as alternative to blocking deletion.
+
+    Args:
+    conn (RedisConn): Wrapper around an async Redis connection.
+    pattern (str): Glob pattern, e.g. "player_cards:player_tag=#YYRJQY28*"
+    scan_count (int): How many keys to scan per iteration.
+    batch_size (int): How many keys to delete per pipeline batch.
+
+    Returns:
+        (int) Amount of deleted keys
+    """
+    
+    cursor = 0
+    total_deleted = 0
+    buffer: list[str] = []
+
+    async def flush(chunk: list[str]):
+        nonlocal total_deleted
+        if not chunk:
+            return
+        await conn.client.unlink(*chunk)  # non-blocking delete
+        # Increment count by number of keys deleted
+        total_deleted += len(chunk)
+
+    while True:
+        # Scan for keys matching the given pattern
+        cursor, keys = await conn.client.scan(cursor=cursor, match=pattern, count=scan_count)
+        if keys:
+            buffer.extend(keys)
+            # If buffer reached the batch size, delete a chunk and remove from buffer
+            while len(buffer) >= batch_size:
+                chunk, buffer = buffer[:batch_size], buffer[batch_size:]
+                await flush(chunk)
+        if cursor == 0:
+            break
+    
+    # Delete any remaining keys left in the buffer        
+    if buffer:
+        await flush(buffer)
+
+    return total_deleted

@@ -9,6 +9,8 @@ from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn
 from routers import cards
 
+# NOTE time response from Clash Royale/MongoDB is in UTC so frontend needs conversion logic
+# both for the query parameter time but also the times the user gets back, which needs to be displayed in their local time
 # TODO swap out sleep with retry and cool down connection logic
 # TODO (potentially) global error handling
 # TODO add internal logging and don't send error detail as HttpException
