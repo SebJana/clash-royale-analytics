@@ -160,7 +160,7 @@ def _to_param_str(val) -> str:
         return "true" if val else "false"
     return str(val)
 
-async def build_redis_key(conn: RedisConn, service: str, resource: str, params: dict | None = None) -> str:
+async def build_redis_key(conn: RedisConn, service: str, resource: str, params: dict | None = None, version_ahead: bool = False) -> str:
     """
     Build a consistent Redis key string.
 
@@ -171,14 +171,20 @@ async def build_redis_key(conn: RedisConn, service: str, resource: str, params: 
         params (dict): Additional key-value pairs describing this cache entry.
                 These will be sorted and appended as 'key=value' segments.
                 e.g. {"player_tag": "YYRJQY28", "start_date": "2025-08-01", "end_date": 2025-08-01})
+        version_ahead (bool): Flag deciding if the key is being built for the current version or the next one (default: False)
     Returns:
         str: A Redis key in the format 'version:service:resource:param1=val1:param2=val2'.
     """
 
-    version = f"v{await conn.get_version()}"
+    # Build a key for one version ahead of the current one
+    version = await conn.get_version()
+    if version_ahead:
+        version += 1 # One version ahead
+        
+    version_str = f"v{version}"
     
     # Sort params to keep key deterministic even if order changes
-    parts = [version, service, resource]
+    parts = [version_str, service, resource]
     
     if params: # Only append params to key if they exist
         for key, val in sorted(params.items()):
@@ -195,4 +201,4 @@ async def build_redis_key(conn: RedisConn, service: str, resource: str, params: 
         return key
     
     # Uniquely hash key if it is too long
-    return version + ":" + service + ":" + hashlib.md5(key.encode("utf-8")).hexdigest()
+    return version_str + ":" + service + ":" + hashlib.md5(key.encode("utf-8")).hexdigest()

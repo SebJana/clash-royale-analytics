@@ -3,7 +3,7 @@ from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from mongo import MongoConn
 from mongo import insert_battles, set_player_name, get_battles_count, print_first_battles
 from mongo import get_tracked_player_tags
-from redis_service import RedisConn
+from redis_service import RedisConn, build_redis_key, set_redis_json
 
 from dotenv import load_dotenv, find_dotenv
 import os
@@ -55,7 +55,6 @@ async def main():
     while True:
         print("[INFO] Starting new data scraping cycle...")
         
-        # TODO (potentially) request cards and cache them here in redis, overwriting the current ones
         # TODO upon hitting "Player doesn't exist" remove from tracked players, as player deleted their account? 
 
         # Loop over every tracked player
@@ -145,10 +144,25 @@ async def main():
             # Space out the API calls
             await asyncio.sleep(COOL_DOWN_SLEEP_DURATION) # Additional delay to runtime of code
 
-        # Increment redis key version, invalidate cache
-        new_version = await redis_conn.increment_version()
-        # Existing keys will be invalid; not looked up anymore, and be deleted via expiring ttl
-        print(f"[CACHE] [INFO] Redis version incremented to v{new_version}, cache invalidated.")
+        try:
+            # Fetch cards and save them to the redis cache as one version AHEAD
+            cards = await cr_api.get_cards()
+            key = await build_redis_key(conn=redis_conn, service="crApi", resource="allCards", version_ahead=True)
+            await set_redis_json(conn=redis_conn, key=key, value=cards, ttl= 2 * REQUEST_CYCLE_DURATION)
+            print("[CACHE] [INFO] Cards successfully fetched and set in cache with version ahead")
+            
+            # Increment redis key version, invalidate cache
+            new_version = await redis_conn.increment_version()
+            # Existing current version keys will be invalid; not looked up anymore, and be deleted via expiring ttl
+            # All cards will be set to valid with this increment
+            print(f"[CACHE] [INFO] Redis version incremented to v{new_version}, cache invalidated.")
+            
+            # Cards are already in cache and valid, therefore there's always the newest version of cards in cache
+            # and the app doesn't need to prompt the Clash Royale API for cards, but can always rely on the cache being
+            # up to date and valid
+            
+        except Exception as e: # TODO proper error handling
+            print(f"[ERROR] Unknown error occurred for while trying to update the cache {e}")
 
         await asyncio.sleep(REQUEST_CYCLE_DURATION)
 

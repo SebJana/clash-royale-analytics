@@ -12,7 +12,9 @@ router = APIRouter(prefix="/cards", tags=["Cards"])
 async def get_cards(cr_api: CrApi, redis_conn: RedConn):
     try:
         # Check cache
-        key = await build_redis_key(conn=redis_conn, service="cr_api", resource="all_cards")
+        # Data scraper re-news card cache on every run, so only request cards here as fallback
+        # if the cache happens to be empty upon some error or async issue
+        key = await build_redis_key(conn=redis_conn, service="crApi", resource="allCards")
         cached_cards = await get_redis_json(redis_conn, key)
 
         if cached_cards is not None:
