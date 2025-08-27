@@ -3,6 +3,8 @@ from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from mongo import MongoConn
 from mongo import insert_battles, set_player_name, get_battles_count, print_first_battles
 from mongo import get_tracked_player_tags
+from redis_service import RedisConn, delete_by_pattern
+
 from dotenv import load_dotenv, find_dotenv
 import os
 import httpx
@@ -13,7 +15,11 @@ REQUEST_CYCLE_DURATION = 60 * 60 # 1 hour
 COOL_DOWN_SLEEP_DURATION = 30 # 30 seconds
 
 load_dotenv(find_dotenv())
-API_TOKEN = os.getenv("DATA_SCRAPER_API_KEY")
+API_TOKEN = os.getenv("DATA_SCRAPER_API_KEY", "")
+REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
+REDIS_HOST: str = "redis"
+REDIS_PORT: int = 6379
+
 
 # TODO move from init sleep to retry and cooldown startup logic
 # TODO switch to logger
@@ -26,6 +32,16 @@ async def main():
 
     # Init the CR API connection
     cr_api = ClashRoyaleAPI(api_key=API_TOKEN)
+    
+    # Init the redis connection
+    redis_conn = RedisConn(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD)
+    try:
+        await redis_conn.connect()
+    except Exception as e:
+        print(f"[ERROR] Failed to connect to redis: {e}")
+        print("[ERROR] Exiting data scraper")
+        exit(1)
+    
 
     # Init the database connection
     conn = MongoConn(app_name="cr-analytics-data-scraper")
@@ -88,6 +104,18 @@ async def main():
                 battles_count = await get_battles_count(conn)
                 print(f"[INFO] There are now {battles_count} battles in the collection")
                 # await print_first_battles(conn)
+                
+                # Delete currently cached keys
+                service = "crApi"
+                resources_to_wipe = ["playerCards", "playerDecks", "playerBattles"]
+                
+                # TODO potentially move this logic to redis_service
+                for res in resources_to_wipe:
+                    # Remove leading '#', like its done in the redis keys
+                    player_tag_striped = str(player).lstrip("#")
+                    redis_key_pattern = f"{service}:{res}:playerTag={player_tag_striped}*"
+                    deleted_keys = await delete_by_pattern(redis_conn, pattern = redis_key_pattern)
+                    print(f"[CACHE] [INFO] {deleted_keys} entries from Redis ({res}) have been wiped for player {player}")
             
             # Check which type of error occurred
             # API response if there currently is a maintenance break

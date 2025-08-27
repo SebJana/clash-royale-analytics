@@ -1,3 +1,4 @@
 motor
 httpx
 python-dotenv
+redis

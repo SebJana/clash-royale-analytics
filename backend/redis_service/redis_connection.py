@@ -143,54 +143,73 @@ def _to_param_str(val) -> str:
 
 def build_redis_key(service: str, resource: str, params: dict | None = None) -> str:
     """
-    Build a consistent Redis key string.
+    Build a consistent Redis key string. URL proof all param names and param values (stripping "#", "_", ...)
 
     Args:
         resource (str): The type of data or entity, e.g. "decks", "player", "leaked-elixir" ...
         service (str): The service or namespace prefix, e.g. "cr_api" or "mongo"
         params (dict): Additional key-value pairs describing this cache entry.
-                These will be sorted and appended as 'key=value' segments.
-                e.g. {"player_tag": "YYRJQY28", "start_date": "2025-08-01", "end_date": 2025-08-01})
+                These will be sorted and appended as 'key=value' segments. 
+                If player_tag exists, it will be always at the first param slot in the key.
+                Additionally the leading '#' will be replaced by stripped. 
+                e.g. {"player_tag": "#YYRJQY28", "start_date": "2025-08-01", "end_date": 2025-08-01})
     Returns:
         str: A Redis key in the format 'service:resource:param1=val1:param2=val2'.
     """
 
     # Sort params to keep key deterministic even if order changes
     parts = [service, resource]
-    if params: # Only append params to key if they exist
-        for key, val in sorted(params.items()):
-            # Use quote to get rid of and encode delimiters like '#', ":", ...
-            key_str = quote(str(key), safe="")
-            val_str = quote(_to_param_str(val), safe="")
-            parts.append(f"{key_str}={val_str}")
     
+    tag = None
+    other_params = []
+    if params:
+        # Extract playerTag if present
+        if "playerTag" in params:
+            tag = params["playerTag"]
+        # Collect all other params except playerTag
+        other_params = [(k, v) for k, v in params.items() if k != "playerTag"]
+
+    # Add playerTag segment first if it exists
+    if tag is not None:
+        # Clash Royale Tag without the leading '#' (safer for Redis key)
+        tag_stripped = str(tag).lstrip("#")
+        key_str = quote("playerTag", safe="")
+        val_str = quote(_to_param_str(tag_stripped), safe="")
+        parts.append(f"{key_str}={val_str}")
+
+    # Add remaining params sorted alphabetically
+    for key, val in sorted(other_params):
+        key_str = quote(str(key), safe="")
+        val_str = quote(_to_param_str(val), safe="")
+        parts.append(f"{key_str}={val_str}")
     
-    key = ":".join(parts) # Build key string
-    # Check if the key is not too long
+    # Return key if the length is appropriate
+    key = ":".join(parts)
     key_bytes = key.encode("utf-8")
     if len(key_bytes) <= 512:
         return key
     
     
-    # Uniquely hash key if it is too long, always keep player_tag readable, if it exists
+    # Uniquely hash key if it is too long
     digest = hashlib.md5(key.encode()).hexdigest()
     
     tag = params.get("playerTag")
     if tag:
-        tag_norm = tag.upper().lstrip("#")
+        # Clash Royale Tag without the leading '#' (safer for Redis key)
+        tag_stripped = str(tag).lstrip("#")
         # Always keep player tag readable in key, if it exists in params
-        return ":".join([service, resource, f"player_tag={tag_norm}", digest])
+        return ":".join([service, resource, f"player_tag={tag_stripped}", digest])
 
     # Regular key 
     return ":".join([service, resource, digest])
 
-async def unlink_by_pattern(conn: RedisConn, pattern: str, scan_count: int = 2000, batch_size: int = 2000) -> int:
+async def delete_by_pattern(conn: RedisConn, pattern: str, scan_count: int = 2000, batch_size: int = 2000) -> int:
     """
     Delete all keys that match a given pattern. Works in batches and unlinks as alternative to blocking deletion.
 
     Args:
     conn (RedisConn): Wrapper around an async Redis connection.
-    pattern (str): Glob pattern, e.g. "player_cards:player_tag=#YYRJQY28*"
+    pattern (str): Glob pattern, e.g. "player_cards:player_tag=%23YYRJQY28*"
     scan_count (int): How many keys to scan per iteration.
     batch_size (int): How many keys to delete per pipeline batch.
 
