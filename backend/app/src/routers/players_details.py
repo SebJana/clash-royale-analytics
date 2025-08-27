@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import Annotated
+from typing import Optional, List
 from datetime import datetime
 import httpx
 
@@ -78,9 +78,8 @@ async def last_battles(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn,
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch battles for player {player_tag} {e}")
 
-# TODO make game_modes in query params optional
 @router.get("/{player_tag}/decks/stats")
-async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, game_modes: Annotated[list[str] | None, Query()], req: BetweenRequest = Depends()):
+async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, game_modes: Optional[List[str]] = Query(None), req: BetweenRequest = Depends()):
     try:
         params = {"playerTag": player_tag, "startDate": req.start_date, "endDate": req.end_date, "gameModes": game_modes}
         key = build_redis_key(service="crApi", resource="playerDecks", params=params)
@@ -106,7 +105,7 @@ async def deck_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn:
         raise HTTPException(status_code=500, detail=f"Failed to fetch deck statistics for player {player_tag}: {e}")
     
 @router.get("/{player_tag}/cards/stats")
-async def card_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, game_modes: Annotated[list[str] | None, Query()], req: BetweenRequest = Depends()):
+async def card_percentage_stats(player_tag: str, mongo_conn: DbConn, redis_conn: RedConn, game_modes: Optional[List[str]] = Query(None), req: BetweenRequest = Depends()):
     try:        
         params = {"playerTag": player_tag, "startDate": req.start_date, "endDate": req.end_date, "gameModes": game_modes}
         key = build_redis_key(service="crApi", resource="playerCards", params=params)
