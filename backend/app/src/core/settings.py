@@ -15,7 +15,8 @@ class Settings:
     REDIS_PORT: int = 6379
     
     # Application Configuration
-    INIT_SLEEP_DURATION: int = 60  # seconds
+    INIT_RETRIES: int = 3
+    INIT_RETRY_DELAY: float = 3
     
     # MongoDB Configuration
     MONGO_CLIENT_NAME: str = "cr-analytics-api"

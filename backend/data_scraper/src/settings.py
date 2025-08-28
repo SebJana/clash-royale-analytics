@@ -15,19 +15,18 @@ class Settings:
     REDIS_PORT: int = 6379
     
     # Application Configuration
-    INIT_SLEEP_DURATION: int = 60  # seconds
-    
-    INIT_SLEEP_DURATION = 60 # 60 seconds
+    INIT_RETRIES: int = 3
+    INIT_RETRY_DELAY: float = 3
     
     # Sleep time between the scraping cycles
-    REQUEST_CYCLE_DURATION = 15 * 60 # 15 minutes
+    REQUEST_CYCLE_DURATION: float = 15 * 60 # 15 minutes
 
     # Limitation to call the Clash Royale API
-    REQUESTS_PER_SECOND = 0.5
+    REQUESTS_PER_SECOND: float = 0.5
     
     # Upon unsuccessful API call
-    MAX_RETRIES = 5
-    BASE_BACKOFF = 1.0 # seconds
+    MAX_RETRIES: int = 5
+    BASE_BACKOFF: float = 1.0 # seconds
     
     
     # MongoDB Configuration

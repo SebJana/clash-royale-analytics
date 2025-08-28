@@ -138,6 +138,9 @@ class ClashRoyaleAPI:
 
         return resp.json()
     
+    async def check_connection(self):
+        await self.get_cards()
+    
     async def check_existing_player(self, player_tag: str):
         """
         Validates the tag syntax and verifies the a player with that tag exists

@@ -16,34 +16,59 @@ from routers import cards
 # TODO (potentially) global error handling
 # TODO add internal logging and don't send error detail as HttpException
 
+async def retry_async(func, name):
+    """
+    Retry an asynchronous connection or operation multiple times with delay.
+
+    This function attempts to execute the provided asynchronous `func` up to
+    `settings.INIT_RETRIES` times. If it fails, it waits for
+    `settings.INIT_RETRY_DELAY` seconds between attempts. On success, it
+    returns the result of `func`. If all retries fail, the process exits
+    with status code 1.
+
+    Args:
+        func (Callable[[], Awaitable]): An asynchronous function (e.g., `redis.connect`) that will be retried.
+        name (str): A readable identifier for logging (e.g., "Redis", "MongoDB").
+
+    Returns:
+        Any: The result of the successfully awaited `func`.
+
+    Raises:
+        SystemExit: If all retries are exhausted without success.
+    """
+    
+    retries = settings.INIT_RETRIES
+    delay = settings.INIT_RETRY_DELAY
+    
+    for attempt in range(1, settings.INIT_RETRIES + 1):
+        try:
+            return await func()
+        except Exception as e:
+            print(f"[ERROR] Failed to connect to {name} (attempt {attempt}/{retries}): {e}")
+            if attempt < retries:
+                await asyncio.sleep(delay)
+            else:
+                print(f"[ERROR] Exiting after {retries} failed attempts to connect to {name}")
+                exit(1)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await asyncio.sleep(settings.INIT_SLEEP_DURATION) # upon start sleep for database/redis to settle in
-
-    # Redis
-    redis_conn = RedisConn(host=settings.REDIS_HOST, port=settings.REDIS_PORT, password=settings.REDIS_PASSWORD)
-    try:
-        await redis_conn.connect()
-        app.state.redis = redis_conn
-    except Exception as e:
-        print(f"[ERROR] Failed to connect to redis: {e}")
-        print("[ERROR] Exiting api")
-        exit(1)
-
-    # Clash Royale API
+    # Retry Clash Royale API
     cr_api = ClashRoyaleAPI(api_key=settings.API_TOKEN)
+    await retry_async(cr_api.check_connection, name="Clash Royale API")
     app.state.cr_api = cr_api
 
-    # MongoDB
-    mongo_conn = MongoConn(settings.MONGO_CLIENT_NAME)
-    try:
-        await mongo_conn.connect()
-        app.state.mongo = mongo_conn
-    except Exception as e:
-        print(f"[ERROR] Failed to connect to database: {e}")
-        print("[ERROR] Exiting api")
-        exit(1)
+    # Retry Redis
+    redis_conn = RedisConn(host=settings.REDIS_HOST, port=settings.REDIS_PORT, password=settings.REDIS_PASSWORD)
+    await retry_async(redis_conn.connect, name="Redis")
+    app.state.redis = redis_conn
+
+    # Retry MongoDB
+    mongo_conn = MongoConn(app_name=settings.MONGO_CLIENT_NAME)
+    await retry_async(mongo_conn.connect, name="MongoDB")
+    app.state.mongo = mongo_conn
+
     yield
 
     # Shutdown
