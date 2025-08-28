@@ -5,27 +5,13 @@ from mongo import insert_battles, set_player_name, get_battles_count, print_firs
 from mongo import get_tracked_player_tags
 from redis_service import RedisConn, build_redis_key, set_redis_json
 from api_rate_limiter import ApiRateLimiter
+from settings import settings
 
-from dotenv import load_dotenv, find_dotenv
-import os
 import httpx
 import asyncio
 
-INIT_SLEEP_DURATION = 60 # 60 seconds
-REQUESTS_PER_SECOND = 0.5
-REQUEST_CYCLE_DURATION = 15 * 60 # 15 minutes
-
-load_dotenv(find_dotenv())
-API_TOKEN = os.getenv("DATA_SCRAPER_API_KEY", "")
-REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
-REDIS_HOST: str = "redis"
-REDIS_PORT: int = 6379
-
-MAX_RETRIES = 5
-BASE_BACKOFF = 1.0 # seconds
 
 # TODO move from init sleep to retry and cooldown startup logic
-# TODO settings file
 # TODO switch to logger
 
 async def init():
@@ -38,10 +24,11 @@ async def init():
         SystemExit: If either Redis or MongoDB connection fails.
     """
     
-    cr_api = ClashRoyaleAPI(api_key=API_TOKEN)
+    # TODO add connection test
+    cr_api = ClashRoyaleAPI(api_key=settings.API_TOKEN)
     
     # Init the redis connection
-    redis_conn = RedisConn(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD)
+    redis_conn = RedisConn(host=settings.REDIS_HOST, port=settings.REDIS_PORT, password=settings.REDIS_PASSWORD)
     try:
         await redis_conn.connect()
     except Exception as e:
@@ -51,7 +38,7 @@ async def init():
     
 
     # Init the database connection
-    mongo_conn = MongoConn(app_name="cr-analytics-data-scraper")
+    mongo_conn = MongoConn(app_name=settings.MONGO_CLIENT_NAME)
     try:
         await mongo_conn.connect()
     except Exception as e:
@@ -62,7 +49,7 @@ async def init():
     # Upon successful connection, return all three
     return cr_api, redis_conn, mongo_conn
 
-api_rl = ApiRateLimiter(per_second=REQUESTS_PER_SECOND)
+api_rl = ApiRateLimiter(per_second=settings.REQUESTS_PER_SECOND)
 
 async def process_player(player_tag: str, cr_api: ClashRoyaleAPI, mongo_conn: MongoConn):
     """Fetch, validate, clean, and persist the latest battles for a single player.
@@ -77,7 +64,7 @@ async def process_player(player_tag: str, cr_api: ClashRoyaleAPI, mongo_conn: Mo
         mongo_conn (MongoConn): Mongo connection used to write data.
 
     Returns:
-        None: Returns early on any non-retriable error or on success.
+        None: Returns early on any "non-retriable" error or on success.
 
     Raises:
         ClashRoyaleMaintenanceError: Propagated to stop the current cycle for all players.
@@ -126,8 +113,8 @@ async def process_player(player_tag: str, cr_api: ClashRoyaleAPI, mongo_conn: Mo
             if code in (403, 404):
                 print(f"[ERROR] HTTP {code} for {player_tag} – not retrying")
                 return
-            if code in (429, 500, 502, 503, 504) and attempt < MAX_RETRIES:
-                backoff = BASE_BACKOFF * (2**attempt)
+            if code in (429, 500, 502, 503, 504) and attempt < settings.MAX_RETRIES:
+                backoff = settings.BASE_BACKOFF * (2**attempt)
                 print(f"[WARNING] HTTP {code} for {player_tag} – retry in {backoff:.1f}s")
                 await asyncio.sleep(backoff)
                 continue
@@ -135,8 +122,8 @@ async def process_player(player_tag: str, cr_api: ClashRoyaleAPI, mongo_conn: Mo
             return
 
         except httpx.RequestError as e:
-            if attempt < MAX_RETRIES:
-                backoff = BASE_BACKOFF * (2**attempt)
+            if attempt < settings.MAX_RETRIES:
+                backoff = settings.BASE_BACKOFF * (2**attempt)
                 print(f"[WARN] Net error {e!r} – retry in {backoff:.1f}s")
                 await asyncio.sleep(backoff)
                 continue
@@ -185,7 +172,7 @@ async def cache_cards(cr_api: ClashRoyaleAPI, redis_conn: RedisConn):
         # Fetch cards and save them to the redis cache as one version AHEAD
         cards = await cr_api.get_cards()
         key = await build_redis_key(conn=redis_conn, service="crApi", resource="allCards", version_ahead=True)
-        await set_redis_json(conn=redis_conn, key=key, value=cards, ttl= 2 * REQUEST_CYCLE_DURATION)
+        await set_redis_json(conn=redis_conn, key=key, value=cards, ttl= 2 * settings.CACHE_TTL_CARDS)
         print("[CACHE] [INFO] Cards successfully fetched and set in cache with version ahead")
     except Exception as e:
         print(f"[ERROR] Unknown error occurred for while trying to update the cache {e}")
@@ -203,7 +190,7 @@ async def main():
         * Sleeps `REQUEST_CYCLE_DURATION` before the next cycle.
     """
     
-    await asyncio.sleep(INIT_SLEEP_DURATION) # upon start sleep for database to settle in
+    await asyncio.sleep(settings.INIT_SLEEP_DURATION) # upon start sleep for database to settle in
 
     cr_api, redis_conn, mongo_conn = await init()
 
@@ -217,12 +204,12 @@ async def main():
         try:
             players = await get_tracked_player_tags(mongo_conn)
             print(f"[INFO] Found {len(players)} tracked players: {players}")
-        except Exception as e:
+        except Exception:
             continue
 
         if not players:
             print("[WARNING] No players to track, sleeping until next cycle")
-            await asyncio.sleep(REQUEST_CYCLE_DURATION)
+            await asyncio.sleep(settings.REQUEST_CYCLE_DURATION)
             continue
         
         # Run fetching, cleaning and storing of data concurrently
@@ -240,7 +227,8 @@ async def main():
         # All cards key, that was one version ahead, will be validated with this increment
         print(f"[CACHE] [INFO] Redis version incremented to v{new_version}, cache invalidated.")
 
-        await asyncio.sleep(REQUEST_CYCLE_DURATION)
+        # TODO make the sleep be DURATION - time it took to run current cycle long
+        await asyncio.sleep(settings.REQUEST_CYCLE_DURATION)
 
 
 if __name__ == "__main__":
