@@ -1,8 +1,8 @@
 from datetime import datetime
 
-def check_valid_logs(battle_logs):
+def validate_battle_log_structure(battle_logs):
     """
-    Validates the API response to ensure it contains valid battle log data.
+    Validates the API response if it is in the correct form and syntax.
     
     Args:
         battle_logs: The response from the Clash Royale API
@@ -10,6 +10,7 @@ def check_valid_logs(battle_logs):
     Returns:
         bool: True if the response is valid, False otherwise
     """
+    
     # Check if battle_logs is None or empty
     if not battle_logs:
         return False
@@ -29,6 +30,22 @@ def check_valid_logs(battle_logs):
     if not isinstance(first_battle, dict):
         print(f"[VALIDATION] Expected battle to be dict, got {type(first_battle)}")
         return False
+    
+    return True
+
+def validate_battle_log_content(battle_logs):
+    """
+    Validates the API response to ensure it contains valid battle log data.
+    
+    Args:
+        battle_logs: The response from the Clash Royale API
+        
+    Returns:
+        bool: True if the response is valid, False otherwise
+    """
+    
+    # Validate first battle log content
+    first_battle = battle_logs[0]
     
     # Check for required fields
     required_fields = ['battleTime', 'team', 'opponent', 'arena', 'gameMode']

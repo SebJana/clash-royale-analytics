@@ -1,4 +1,4 @@
-from clean import clean_battle_log_list, check_valid_logs, get_player_name
+from clean import clean_battle_log_list, validate_battle_log_structure, validate_battle_log_content, get_player_name
 from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from mongo import MongoConn
 from mongo import insert_battles, set_player_name, get_battles_count, print_first_battles
@@ -12,7 +12,6 @@ import time
 import asyncio
 
 
-# TODO move from init sleep to retry and cooldown startup logic
 # TODO switch to logger
 
 async def init():
@@ -111,8 +110,8 @@ async def process_player(player_tag: str, cr_api: ClashRoyaleAPI, mongo_conn: Mo
                 print(f"[WARNING] No battle logs returned for player {player_tag}")
                 return
 
-            # Check if the response has all the necessary fields
-            if not check_valid_logs(battle_logs):
+            # Check if the response has all the necessary fields and correct content
+            if not validate_battle_log_structure(battle_logs) or not validate_battle_log_content(battle_logs):
                 print(f"[ERROR] Battle logs for Player {player_tag} couldn't be used")
                 return
 

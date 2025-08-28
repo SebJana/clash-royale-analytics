@@ -72,7 +72,7 @@ services:
       - .env
     networks:
       - cr-analytics
-    ports:
+    ports: # TODO remove port for prod
       - "8000:8000"
     restart: unless-stopped
 
