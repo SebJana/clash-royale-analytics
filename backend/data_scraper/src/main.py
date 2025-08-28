@@ -8,6 +8,7 @@ from api_rate_limiter import ApiRateLimiter
 from settings import settings
 
 import httpx
+import time
 import asyncio
 
 
@@ -197,6 +198,8 @@ async def main():
     while True:
         print("[INFO] Starting new data scraping cycle...")
         
+        start_time = time.time()
+        
         # TODO upon hitting "Player doesn't exist" remove from tracked players, as player deleted their account? 
 
         # Loop over every tracked player
@@ -220,6 +223,7 @@ async def main():
         print(f"[INFO] There are now {battles_count} battles in the collection")
         # await print_first_battles(mongo_conn)
 
+        # Save new cards as the version ahead
         await cache_cards(cr_api=cr_api, redis_conn=redis_conn)
         # Increment redis key version, invalidate cache
         new_version = await redis_conn.increment_version()
@@ -227,8 +231,18 @@ async def main():
         # All cards key, that was one version ahead, will be validated with this increment
         print(f"[CACHE] [INFO] Redis version incremented to v{new_version}, cache invalidated.")
 
-        # TODO make the sleep be DURATION - time it took to run current cycle long
-        await asyncio.sleep(settings.REQUEST_CYCLE_DURATION)
+        # Determine how long to sleep for to meet aimed at cycle time
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        sleep_time = settings.REQUEST_CYCLE_DURATION - elapsed_time
+        print(f"[INFO] Cycle took {elapsed_time:.2f}s for {len(players)} players")
+        
+        # Check if valid sleep time remains
+        if sleep_time <= 0:
+            print("[WARNING] Cycle duration is too low. Running without sleep")
+            sleep_time = 0 # Don't sleep at all
+        
+        await asyncio.sleep(sleep_time)
 
 
 if __name__ == "__main__":

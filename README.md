@@ -57,6 +57,9 @@ APP_API_KEY = ey41eas...
 
 It’s possible to use the same key for both parameters/roles, but for modulation purposes and to comply with the request limitations stated by Clash Royale, it’s advised to use separate keys. Get your API Keys from the official Clash Royale API website: https://developer.clashroyale.com
 
+// TODO (potentially) add the option to use multiple keys with a key rotation for the Clash Royale API calls
+Make it a shared module for both data scraping and the api 
+
 ### 2. Docker Setup
 
 Start all services by running:
