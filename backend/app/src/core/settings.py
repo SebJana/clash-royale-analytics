@@ -28,7 +28,8 @@ class Settings:
     # to not risk having outdated data upon synchronization errors or scraping errors
     
     CACHE_TTL_CARDS: int = 6 * 60 * 60  # 6 hours
-    CACHE_TTL_PLAYER_STATS: int = 15 * 60  # 15 minutes
+    CACHE_TTL_PLAYER_PROFILE: int = 15 * 60  # 15 minutes
+    CACHE_TTL_PLAYER_BATTLE_STATS: int = 10 * 60 # 10 minutes
     CACHE_TTL_BATTLES: int = 10 * 60  # 10 minutes
     CACHE_TTL_DECK_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_CARD_STATS: int = 10 * 60  # 10 minutes

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+# TODO !IMPORTANT CW_Duel_1v1 has rounds and needs to be treated differently
+
 def validate_battle_log_structure(battle_logs):
     """
     Validates the API response if it is in the correct form and syntax.

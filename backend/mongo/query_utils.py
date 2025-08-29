@@ -1,5 +1,7 @@
-from datetime import date, datetime, timedelta
+from datetime import datetime, date, time, timedelta, timezone as tz_utc
 from typing import Optional, Iterable
+from zoneinfo import ZoneInfo
+
 
 def match_tag_before_datetime_stage(player_tag: str, before_datetime: datetime):
     """
@@ -26,12 +28,18 @@ def match_tag_before_datetime_stage(player_tag: str, before_datetime: datetime):
         # Match the relevant files for the player and the time frame
         "$match": {
             "referencePlayerTag": player_tag,
-            "battleTime": {"$lt": before_datetime}
+            "battleTime": {"$lt": before_datetime},
         }
-    } 
+    }
 
 
-def match_tag_date_mode_range_stage(player_tag: str, start_date: date, end_date: date, game_modes: Optional[Iterable[str]] = None):
+def match_tag_date_mode_range_stage(
+    player_tag: str,
+    start_date: date,
+    end_date: date,
+    game_modes: Optional[Iterable[str]] = None,
+    timezone: str = "UTC",
+):
     """
     Build a MongoDB $match stage that filters battles for a given player tag
     within a full-day date window based on the given game modes.
@@ -45,6 +53,8 @@ def match_tag_date_mode_range_stage(player_tag: str, start_date: date, end_date:
         end_date (datetime.date): Last day (inclusive).
         game_modes: Optional iterable of game mode names; if provided and non-empty,
                     the match includes {"gameMode": {"$in": <game_modes>}}.
+        timezone: Timezone into which the start_date and end_date will be transformed (default: UTC)
+
 
     Returns:
         dict: An aggregation stage of the form:
@@ -53,24 +63,35 @@ def match_tag_date_mode_range_stage(player_tag: str, start_date: date, end_date:
                   "referencePlayerTag": <player_tag>,
                   "battleTime": { "$gte": <start_dt>, "$lt": <end_dt_plus_1> },
                   "gameMode": {"$in": <game_modes>} (if game modes isn't empty)
-                  
+
                 }
               }
 
     Notes: This function is a pure builder and does not execute any database operation
     """
-    
-    start_dt = datetime.combine(start_date, datetime.min.time())
-    end_dt   = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
+
+    # Check if the given timezone exists and is valid
+    try:
+        tz = ZoneInfo(timezone)
+    except Exception as e:
+        raise ValueError(f"Invalid timezone: {timezone}") from e
+
+    # Turn start/end date into requested timezone dates
+    start_local = datetime.combine(start_date, time(0, 0), tzinfo=tz)
+    end_local = datetime.combine(end_date + timedelta(days=1), time(0, 0), tzinfo=tz)
+
+    # Convert to UTC for lookup in database
+    start_utc = start_local.astimezone(tz_utc.utc)
+    end_utc = end_local.astimezone(tz_utc.utc)
 
     match = {
         "referencePlayerTag": player_tag,
-        "battleTime": {"$gte": start_dt, "$lt": end_dt},
+        "battleTime": {"$gte": start_utc, "$lt": end_utc},
     }
 
     # Only add the mode filter if provided and non-empty
     if game_modes:
-        match["gameMode"] = {"$in": list(game_modes)} 
+        match["gameMode"] = {"$in": list(game_modes)}
 
     return {"$match": match}
 
@@ -100,7 +121,7 @@ def extract_deck_cards_stage(player_tag: str):
 
     Notes: This function is a pure builder and does not execute any database operation
     """
-    
+
     # Extract the cards from the decks for the given player including evolution data
     return {
         "$addFields": {
@@ -108,19 +129,23 @@ def extract_deck_cards_stage(player_tag: str):
                 "$map": {
                     "input": {
                         "$ifNull": [
-                            {"$getField": {
-                                "field": "cards",
-                                "input": {
-                                    "$first": {
-                                        "$filter": {
-                                            "input": "$team",
-                                            "as": "m",
-                                            "cond": {"$eq": ["$$m.tag", player_tag]}
+                            {
+                                "$getField": {
+                                    "field": "cards",
+                                    "input": {
+                                        "$first": {
+                                            "$filter": {
+                                                "input": "$team",
+                                                "as": "m",
+                                                "cond": {
+                                                    "$eq": ["$$m.tag", player_tag]
+                                                },
+                                            }
                                         }
-                                    }
+                                    },
                                 }
-                            }},
-                            []
+                            },
+                            [],
                         ]
                     },
                     "as": "c",
@@ -128,8 +153,10 @@ def extract_deck_cards_stage(player_tag: str):
                         "id": "$$c.id",
                         "name": {"$ifNull": ["$$c.name", "UNKNOWN"]},
                         "level": {"$ifNull": ["$$c.level", 1]},
-                        "evolutionLevel": {"$toInt": {"$ifNull": ["$$c.evolutionLevel", 0]}},
-                    }
+                        "evolutionLevel": {
+                            "$toInt": {"$ifNull": ["$$c.evolutionLevel", 0]}
+                        },
+                    },
                 }
             }
         }
