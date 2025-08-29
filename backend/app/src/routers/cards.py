@@ -8,18 +8,21 @@ from redis_service import get_redis_json, set_redis_json, build_redis_key
 
 router = APIRouter(prefix="/cards", tags=["Cards"])
 
+
 @router.get("")
 async def get_cards(cr_api: CrApi, redis_conn: RedConn):
     try:
         # Check cache
         # Data scraper re-news card cache on every run, so only request cards here as fallback
         # if the cache happens to be empty upon some error or async issue
-        key = await build_redis_key(conn=redis_conn, service="crApi", resource="allCards")
+        key = await build_redis_key(
+            conn=redis_conn, service="crApi", resource="allCards"
+        )
         cached_cards = await get_redis_json(redis_conn, key)
 
         if cached_cards is not None:
             return cached_cards
-        
+
         # If not cached, fetch them from Clash Royale and cache them
         cards = await cr_api.get_cards()
         await set_redis_json(redis_conn, key, cards, ttl=settings.CACHE_TTL_CARDS)
@@ -32,12 +35,18 @@ async def get_cards(cr_api: CrApi, redis_conn: RedConn):
         status = http_err.response.status_code if http_err.response else 502
         # Common Clash Royale API errors
         if status == 403:
-            raise HTTPException(status_code=403, detail="Forbidden – check API token or IP whitelist")
+            raise HTTPException(
+                status_code=403, detail="Forbidden – check API token or IP whitelist"
+            )
         elif status == 429:
-            raise HTTPException(status_code=429, detail="Rate limit exceeded, try again later")
+            raise HTTPException(
+                status_code=429, detail="Rate limit exceeded, try again later"
+            )
         else:
             raise HTTPException(status_code=status, detail="Clash Royale API error")
 
     except Exception as e:
         # Network / timeout / DNS errors / Redis error
-        raise HTTPException(status_code=502, detail=f"Error trying to fetch the cards: {e}")
+        raise HTTPException(
+            status_code=502, detail=f"Error trying to fetch the cards: {e}"
+        )

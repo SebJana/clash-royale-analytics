@@ -287,7 +287,9 @@ async def daily_player_statistics(
                 status_code=404, detail=f"No battles found for {player_tag}"
             )
 
-        await set_redis_json(redis_conn, key, stats, ttl=settings.CACHE_TTL_PLAYER_BATTLE_STATS)
+        await set_redis_json(
+            redis_conn, key, stats, ttl=settings.CACHE_TTL_PLAYER_BATTLE_STATS
+        )
         return {
             "player_tag": player_tag,
             "game_modes": game_modes,

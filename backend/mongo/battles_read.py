@@ -406,23 +406,24 @@ async def get_daily_stats(
             match_tag_date_mode_range_stage(
                 player_tag, start_date, end_date, game_modes, timezone=timezone
             ),
-
-            #  derive local day, normalize tags, crowns, flags 
+            #  derive local day, normalize tags, crowns, flags
             {
                 "$addFields": {
                     "day": {
-                        "$dateTrunc": {"date": "$battleTime", "unit": "day", "timezone": timezone}
+                        "$dateTrunc": {
+                            "date": "$battleTime",
+                            "unit": "day",
+                            "timezone": timezone,
+                        }
                     },
-
                     # extract team tags
                     "teamTags": {
                         "$map": {
                             "input": {"$ifNull": ["$team", []]},
                             "as": "t",
-                            "in": "$$t.tag"
+                            "in": "$$t.tag",
                         }
                     },
-
                     # crowns per side: take MAX across players (avoids 2v2 double-count)
                     "crownsForSafe": {
                         "$reduce": {
@@ -430,11 +431,17 @@ async def get_daily_stats(
                                 "$map": {
                                     "input": {"$ifNull": ["$team", []]},
                                     "as": "t",
-                                    "in": {"$ifNull": ["$$t.crowns", 0]}
+                                    "in": {"$ifNull": ["$$t.crowns", 0]},
                                 }
                             },
                             "initialValue": 0,
-                            "in": {"$cond": [{"$gt": ["$$this", "$$value"]}, "$$this", "$$value"]}
+                            "in": {
+                                "$cond": [
+                                    {"$gt": ["$$this", "$$value"]},
+                                    "$$this",
+                                    "$$value",
+                                ]
+                            },
                         }
                     },
                     "crownsAgainstSafe": {
@@ -443,68 +450,79 @@ async def get_daily_stats(
                                 "$map": {
                                     "input": {"$ifNull": ["$opponent", []]},
                                     "as": "o",
-                                    "in": {"$ifNull": ["$$o.crowns", 0]}
+                                    "in": {"$ifNull": ["$$o.crowns", 0]},
                                 }
                             },
                             "initialValue": 0,
-                            "in": {"$cond": [{"$gt": ["$$this", "$$value"]}, "$$this", "$$value"]}
+                            "in": {
+                                "$cond": [
+                                    {"$gt": ["$$this", "$$value"]},
+                                    "$$this",
+                                    "$$value",
+                                ]
+                            },
                         }
                     },
-
-                    "isWin":  {"$cond": [{"$eq": ["$gameResult", "Victory"]}, 1, 0]},
+                    "isWin": {"$cond": [{"$eq": ["$gameResult", "Victory"]}, 1, 0]},
                     "isLoss": {"$cond": [{"$eq": ["$gameResult", "Defeat"]}, 1, 0]},
-                    "isDraw": {"$cond": [{"$eq": ["$gameResult", "Draw"]},   1, 0]},
+                    "isDraw": {"$cond": [{"$eq": ["$gameResult", "Draw"]}, 1, 0]},
                 }
             },
-
-            #  Stage B: compute index of reference player (now fields exist) 
+            #  Stage B: compute index of reference player (now fields exist)
             {
                 "$addFields": {
                     "refIdx": {"$indexOfArray": ["$teamTags", "$referencePlayerTag"]}
                 }
             },
-
-            #  Stage C: extract 'player' safely using refIdx 
+            #  Stage C: extract 'player' safely using refIdx
             {
                 "$addFields": {
                     "me": {
                         "$cond": [
                             {"$gte": ["$refIdx", 0]},
                             {"$arrayElemAt": [{"$ifNull": ["$team", []]}, "$refIdx"]},
-                            None
+                            None,
                         ]
                     }
                 }
             },
-
-            #  Stage D: cast leaked elixir (no $exists inside agg expr) 
+            #  Stage D: cast leaked elixir (no $exists inside agg expr)
             {
                 "$addFields": {
                     "elixirLeakedSafe": {
-                        "$convert": {"input": "$me.elixirLeaked", "to": "double", "onError": 0, "onNull": 0}
+                        "$convert": {
+                            "input": "$me.elixirLeaked",
+                            "to": "double",
+                            "onError": 0,
+                            "onNull": 0,
+                        }
                     }
                 }
             },
-
-            #  Group per local day 
+            #  Group per local day
             {
                 "$group": {
                     "_id": "$day",
-                    "battles":       {"$sum": 1},
-                    "victories":     {"$sum": "$isWin"},
-                    "defeats":       {"$sum": "$isLoss"},
-                    "draws":         {"$sum": "$isDraw"},
-                    "crownsFor":     {"$sum": "$crownsForSafe"},
+                    "battles": {"$sum": 1},
+                    "victories": {"$sum": "$isWin"},
+                    "defeats": {"$sum": "$isLoss"},
+                    "draws": {"$sum": "$isDraw"},
+                    "crownsFor": {"$sum": "$crownsForSafe"},
                     "crownsAgainst": {"$sum": "$crownsAgainstSafe"},
-                    "elixirLeaked":  {"$sum": "$elixirLeakedSafe"},
+                    "elixirLeaked": {"$sum": "$elixirLeakedSafe"},
                 }
             },
-
-            #  Shape output & winRate 
+            #  Shape output & winRate
             {
                 "$project": {
                     "_id": 0,
-                    "date": {"$dateToString": {"format": "%Y-%m-%d", "date": "$_id", "timezone": timezone}},
+                    "date": {
+                        "$dateToString": {
+                            "format": "%Y-%m-%d",
+                            "date": "$_id",
+                            "timezone": timezone,
+                        }
+                    },
                     "battles": 1,
                     "victories": 1,
                     "defeats": 1,
@@ -516,16 +534,27 @@ async def get_daily_stats(
                         "$cond": [
                             {"$eq": ["$battles", 0]},
                             0,
-                            {"$round": [{"$multiply": [{"$divide": ["$victories", "$battles"]}, 100]}, 2]}
+                            {
+                                "$round": [
+                                    {
+                                        "$multiply": [
+                                            {"$divide": ["$victories", "$battles"]},
+                                            100,
+                                        ]
+                                    },
+                                    2,
+                                ]
+                            },
                         ]
-                    }
+                    },
                 }
             },
-
             {"$sort": {"date": 1}},
         ]
 
-        result = await conn.db.battles.aggregate(pipeline, allowDiskUse=True).to_list(length=None)
+        result = await conn.db.battles.aggregate(pipeline, allowDiskUse=True).to_list(
+            length=None
+        )
         return {
             "daily": result,
             "totalBattles": sum(day["battles"] for day in result),

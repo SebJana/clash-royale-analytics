@@ -2,15 +2,18 @@ import os
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 
+
 def build_uri_from_parts():
     user = os.getenv("MONGO_APP_USER")
-    pwd  = os.getenv("MONGO_APP_PWD")
+    pwd = os.getenv("MONGO_APP_PWD")
     host = "mongo"
     port = "27017"
-    db   = os.getenv("MONGO_APP_DB")
+    db = os.getenv("MONGO_APP_DB")
 
     if not all([user, pwd, db]):
-        raise ValueError("MONGO_APP_USER, MONGO_APP_PWD, MONGO_APP_DB have to exist in .env file")
+        raise ValueError(
+            "MONGO_APP_USER, MONGO_APP_PWD, MONGO_APP_DB have to exist in .env file"
+        )
     return f"mongodb://{user}:{pwd}@{host}:{port}/{db}?authSource={db}"
 
 
@@ -19,6 +22,7 @@ class MongoConn:
     Async MongoDB connection manager using Motor for the Clash Royale analytics application.
     Fully async implementation for all backend services.
     """
+
     def __init__(self, app_name: str = "default"):
         self._uri = build_uri_from_parts()
         self._db_name = os.getenv("MONGO_APP_DB")

@@ -1,9 +1,11 @@
 import asyncio
 
+
 class ApiRateLimiter:
     """
     Limiter for Clash Royale Api calling: max N calls per second.
     """
+
     def __init__(self, per_second: float):
         self.interval = 1.0 / per_second
         self._lock = asyncio.Lock()

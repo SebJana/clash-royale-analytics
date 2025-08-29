@@ -15,6 +15,7 @@ from routers import cards
 # TODO (potentially) global error handling
 # TODO add internal logging and don't send error detail as HttpException
 
+
 async def retry_async(func, name):
     """
     Retry an asynchronous connection or operation multiple times with delay.
@@ -35,20 +36,25 @@ async def retry_async(func, name):
     Raises:
         SystemExit: If all retries are exhausted without success.
     """
-    
+
     retries = settings.INIT_RETRIES
     delay = settings.INIT_RETRY_DELAY
-    
+
     for attempt in range(1, settings.INIT_RETRIES + 1):
         try:
             return await func()
         except Exception as e:
-            print(f"[ERROR] Failed to connect to {name} (attempt {attempt}/{retries}): {e}")
+            print(
+                f"[ERROR] Failed to connect to {name} (attempt {attempt}/{retries}): {e}"
+            )
             if attempt < retries:
                 await asyncio.sleep(delay)
             else:
-                print(f"[ERROR] Exiting after {retries} failed attempts to connect to {name}")
+                print(
+                    f"[ERROR] Exiting after {retries} failed attempts to connect to {name}"
+                )
                 exit(1)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -59,7 +65,11 @@ async def lifespan(app: FastAPI):
     app.state.cr_api = cr_api
 
     # Retry Redis
-    redis_conn = RedisConn(host=settings.REDIS_HOST, port=settings.REDIS_PORT, password=settings.REDIS_PASSWORD)
+    redis_conn = RedisConn(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        password=settings.REDIS_PASSWORD,
+    )
     await retry_async(redis_conn.connect, name="Redis")
     app.state.redis = redis_conn
 
@@ -75,12 +85,14 @@ async def lifespan(app: FastAPI):
     mongo_conn.close()
     await redis_conn.close()
 
+
 app = FastAPI(lifespan=lifespan)
 
 # Include routers
 app.include_router(players_tracked.router, prefix="/api")
 app.include_router(players_details.router, prefix="/api")
 app.include_router(cards.router, prefix="/api")
+
 
 @app.get("/api/ping")
 async def ping():
