@@ -1,6 +1,5 @@
-from datetime import datetime
-
-# TODO !IMPORTANT CW_Duel_1v1 has rounds and needs to be treated differently
+from datetime import datetime, timedelta
+import copy
 
 
 def validate_battle_log_structure(battle_logs):
@@ -151,6 +150,7 @@ def remove_unnecessary_card_fields(cards):
         "starLevel",
         "elixirCost",
         "iconUrls",
+        "used",  # Only a stat for a card when it's a duel
     ]
 
     for card in cards:
@@ -202,7 +202,19 @@ def clean_battle_log_list(battle_logs, player_tag):
         list: List of cleaned and processed battle log dictionaries
     """
 
-    for battle in battle_logs:
+    i = 0
+    while i < len(battle_logs):
+        battle = battle_logs[i]
+
+        # Battle is a best of 3 duel, needs own extraction logic
+        if battle.get("team") and battle["team"][0].get("rounds"):
+            duel_battles = extract_duel_battles(battle)
+            battle_logs.pop(i)  # Remove the current un-extracted duel battle log
+            battle_logs[i:i] = (
+                duel_battles  # Insert the extracted duel battles, they will be cleaned after
+            )
+            continue  # move to the next battle, which is the first battle of the duel
+
         # Add a reference player tag to each battle
         # Tag combined with time is unique identifier for each battle
         battle["referencePlayerTag"] = player_tag
@@ -237,7 +249,83 @@ def clean_battle_log_list(battle_logs, player_tag):
         game_mode = battle.get("gameMode").get("name")
         battle["gameMode"] = game_mode
 
+        i += 1  # move to the next battle
+
     return battle_logs
+
+
+def extract_duel_battles(battle):
+    """
+    Extracts individual battles from a best-of-3 duel battle log.
+
+    Each duel in the Clash Royale API is represented as a single battle entry
+    containing multiple "rounds". This function expands that combined entry into
+    separate battle dictionaries, one per round, by copying the original structure,
+    replacing the per-round values (cards, crowns, towers, elixir), and adjusting
+    the battle timestamp to be unique for each round by a one second offset per round.
+
+    Args:
+        battle (dict): A raw duel battle log dictionary from the Clash Royale API.
+
+    Returns:
+        list: A list of battle dictionaries, one for each round of the duel.
+    """
+
+    extracted = []
+
+    team_list = battle.get("team") or []
+    opp_list = battle.get("opponent") or []
+
+    # handle empty/odd cases
+    team_player = team_list[0] if team_list else {}
+    opp_player = opp_list[0] if opp_list else {}
+
+    team_rounds = team_player.get("rounds") or []
+    opp_rounds = opp_player.get("rounds") or []
+
+    # iterate only over rounds that exist on both sides
+    # should always be same amount
+    for i in range(min(len(team_rounds), len(opp_rounds))):
+        team = team_rounds[i]
+        opp = opp_rounds[i]
+        current_battle = copy.deepcopy(battle)
+
+        # ensure lists exist and have at least one player
+        if not current_battle.get("team"):
+            current_battle["team"] = [{}]
+        if not current_battle.get("opponent"):
+            current_battle["opponent"] = [{}]
+
+        # write per-round values onto player #0
+        team0 = current_battle["team"][0]
+        opp0 = current_battle["opponent"][0]
+
+        # TEAM per-round
+        team0["cards"] = team.get("cards")
+        team0["crowns"] = team.get("crowns")
+        team0["kingTowerHitPoints"] = team.get("kingTowerHitPoints")
+        team0["princessTowersHitPoints"] = team.get("princessTowersHitPoints")
+        team0["elixirLeaked"] = team.get("elixirLeaked")
+        team0.pop("rounds")  # Remove the rounds list from the current battle
+
+        # OPPONENT per-round
+        opp0["cards"] = opp.get("cards")
+        opp0["crowns"] = opp.get("crowns")
+        opp0["kingTowerHitPoints"] = opp.get("kingTowerHitPoints")
+        opp0["princessTowersHitPoints"] = opp.get("princessTowersHitPoints")
+        opp0["elixirLeaked"] = opp.get("elixirLeaked")
+        opp0.pop("rounds")  # Remove the rounds list from the current battle
+
+        battle_time_str = current_battle.get("battleTime")
+        dt = datetime.strptime(battle_time_str, "%Y%m%dT%H%M%S.000Z")
+
+        # Shift by i seconds, so the position in the duel
+        dt_shifted = dt + timedelta(seconds=i)
+        current_battle["battleTime"] = dt_shifted.strftime("%Y%m%dT%H%M%S.000Z")
+
+        extracted.append(current_battle)
+
+    return extracted
 
 
 def clean_battle(battle):

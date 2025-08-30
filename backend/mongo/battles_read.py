@@ -209,6 +209,7 @@ async def get_decks_win_percentage(
                                         ]
                                     }
                                 },
+                                # TODO consider converting to timezone, or let user/client do it
                                 "firstSeen": {"$min": "$battleTime"},
                                 "lastSeen": {"$max": "$battleTime"},
                                 "modes": {"$addToSet": "$gameMode"},
