@@ -323,6 +323,8 @@ def extract_duel_battles(battle):
         dt_shifted = dt + timedelta(seconds=i)
         current_battle["battleTime"] = dt_shifted.strftime("%Y%m%dT%H%M%S.000Z")
 
+        # TODO (potentially) add unique match ID
+
         extracted.append(current_battle)
 
     return extracted

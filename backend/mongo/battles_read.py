@@ -81,24 +81,12 @@ async def get_last_battles(
 
         pipeline = [
             match_tag_before_datetime_stage(player_tag, before_datetime),
-            # Keep only what's needed in downstream stages
-            {
-                "$project": {
-                    "_id": 0,
-                    "battleTime": 1,
-                    "gameResult": 1,
-                    "gameMode": 1,
-                    "team": 1,
-                    "opponent": 1,
-                    "arena": 1,
-                }
-            },
+            # Last N matches before specified battleTime
+            {"$sort": {"battleTime": -1}},
+            {"$limit": limit},
             {
                 "$facet": {
                     "battles": [
-                        {"$sort": {"battleTime": -1}},  # newest first, stable
-                        {"$limit": limit},
-                        # Drop _id from the output
                         {
                             "$project": {
                                 "_id": 0,
@@ -109,7 +97,7 @@ async def get_last_battles(
                                 "opponent": 1,
                                 "arena": 1,
                             }
-                        },
+                        }
                     ],
                     "meta": [
                         {
@@ -122,13 +110,14 @@ async def get_last_battles(
                     ],
                 }
             },
-            # Flatten meta fields, handle empty input safely
             {
                 "$project": {
-                    "battles": 1,  # Include battles list
-                    "latestBattleTime": {"$ifNull": [{"$first": "$meta.latest"}, None]},
+                    "battles": 1,
+                    "latestBattleTime": {
+                        "$ifNull": [{"$arrayElemAt": ["$meta.latest", 0]}, None]
+                    },
                     "earliestBattleTime": {
-                        "$ifNull": [{"$first": "$meta.earliest"}, None]
+                        "$ifNull": [{"$arrayElemAt": ["$meta.earliest", 0]}, None]
                     },
                 }
             },
@@ -137,6 +126,7 @@ async def get_last_battles(
         res = await conn.db.battles.aggregate(pipeline, allowDiskUse=True).to_list(
             length=1
         )
+
         if not res:
             return {"battles": [], "latestBattleTime": None, "earliestBattleTime": None}
         return res[0]
