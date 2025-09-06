@@ -75,6 +75,17 @@ services:
     ports: # TODO remove port for prod
       - "8000:8000"
     restart: unless-stopped
+  
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    networks:
+      - cr-analytics
+    ports:
+      - "80:80"
+    depends_on:
+      - api
 
 volumes:
   # TODO: Uncomment when switching from bind mount to named volume
