@@ -1,21 +1,38 @@
 import { fetchAllCards } from "./services/cards";
+import { fetchAllTrackedPlayers } from "./services/players";
 import { useFetch } from "./hooks/useFetch";
 import type { Card } from "./types/cards";
-import './App.css'
+import type { Players } from "./types/players";
+import { PlayerSearch } from "./components/playerSearch/playerSearch";
+import "./App.css";
 
 function App() {
-  const { data: cards, loading, error } = useFetch<Card[]>(fetchAllCards, []);
+  const { data: cards, loading: cardsLoading, error: cardsError } =
+    useFetch<Card[]>(fetchAllCards, []);
+  const { data: players, loading: playersLoading, error: playersError } =
+    useFetch<Players>(fetchAllTrackedPlayers, []);
 
-  if (loading) return <p>Loading…</p>;
-  if (error) return <p>Error loading cards</p>;
+  if (cardsLoading || playersLoading) return <p>Loading…</p>;
+  if (cardsError || playersError) return <p>Error loading</p>;
 
+  const playerList = players
+    ? Object.entries(players.activePlayers).map(([tag, name]) => ({
+        tag,
+        name,
+      }))
+    : [];
+
+  cards?.forEach((c) => {
+    console.log(`${c.name} (${c.elixirCost} elixir)`);
+  });
+
+  
   return (
-    <ul>
-      {cards?.map((c) => (
-        <li key={c.id}>{c.name} ({c.elixirCost} elixir)</li>
-      ))}
-    </ul>
+      <section>
+        <h2>Select a player</h2>
+        <PlayerSearch players={playerList} />
+      </section>
   );
 }
 
-export default App
+export default App;
