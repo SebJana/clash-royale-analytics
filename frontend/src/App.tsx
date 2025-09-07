@@ -1,35 +1,17 @@
-import { fetchAllTrackedPlayers } from "./services/api/players";
-import { useFetch } from "./hooks/useFetch";
-import { useCards } from "./hooks/useCards";
-import type { Players } from "./types/players";
-import { PlayerSearch } from "./components/playerSearch/playerSearch";
+import { Routes, Route } from 'react-router-dom'
+import HomePage from "./pages/home/home";
+import PlayerHomePage from './pages/player/home/home';
 import "./App.css";
 
 function App() {
-  const { data: cards, isLoading: cardsLoading, isError: cardsError } = useCards();
-  const { data: players, loading: playersLoading, error: playersError } =
-    useFetch<Players>(fetchAllTrackedPlayers, []);
 
-  if (cardsLoading || playersLoading) return <p>Loading…</p>;
-  if (cardsError || playersError) return <p>Error loading</p>;
-
-  const playerList = players
-    ? Object.entries(players.activePlayers).map(([tag, name]) => ({
-        tag,
-        name,
-      }))
-    : [];
-
-  cards?.forEach((c) => {
-    console.log(`${c.name} (${c.elixirCost} elixir)`);
-  });
-
-  
   return (
-      <section>
-        <h2>Select a player</h2>
-        <PlayerSearch players={playerList} />
-      </section>
+    <main className="main-container">
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/player/:playerTag" element={<PlayerHomePage />} />
+      </Routes>
+    </main>
   );
 }
 
