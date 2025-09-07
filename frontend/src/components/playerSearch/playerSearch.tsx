@@ -11,6 +11,8 @@ export function PlayerSearch({ players }: Readonly<{ players: Player[] }>) {
   // Search client-sided and fetch the complete dict of every tracked player for the client 
   // If tracked players count exceeds 1k+ the search should be moved and filtered 
   // server-sided using the indexed player collection in mongo
+
+  // TODO show first N options of the current search, don't make it a scrollable list
   return (
     <Autocomplete
       options={options}

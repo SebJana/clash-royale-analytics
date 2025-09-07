@@ -1,14 +1,12 @@
-import { fetchAllCards } from "./services/cards";
-import { fetchAllTrackedPlayers } from "./services/players";
+import { fetchAllTrackedPlayers } from "./services/api/players";
 import { useFetch } from "./hooks/useFetch";
-import type { Card } from "./types/cards";
+import { useCards } from "./hooks/useCards";
 import type { Players } from "./types/players";
 import { PlayerSearch } from "./components/playerSearch/playerSearch";
 import "./App.css";
 
 function App() {
-  const { data: cards, loading: cardsLoading, error: cardsError } =
-    useFetch<Card[]>(fetchAllCards, []);
+  const { data: cards, isLoading: cardsLoading, isError: cardsError } = useCards();
   const { data: players, loading: playersLoading, error: playersError } =
     useFetch<Players>(fetchAllTrackedPlayers, []);
 

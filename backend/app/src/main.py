@@ -15,6 +15,9 @@ from routers import cards
 # TODO (potentially) global error handling
 # TODO add internal logging and don't send error detail as HttpException
 
+# TODO supply list of available game modes, query over all battles in the given time frame and get unique?
+# TODO check game modes that are passed as query param
+
 
 async def retry_async(func, name):
     """

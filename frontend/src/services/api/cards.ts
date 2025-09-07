@@ -1,5 +1,5 @@
 import api from './axios';
-import type { Card, CardsResponse } from '../types/cards'
+import type { Card, CardsResponse } from '../../types/cards'
 
 
 export async function fetchAllCards(): Promise<Card[]> {
