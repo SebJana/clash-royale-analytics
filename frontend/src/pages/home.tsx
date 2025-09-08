@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { fetchAllTrackedPlayers } from "../../services/api/trackedPlayers";
-import { validatePlayerTagSyntax } from "../../utils/playerTag";
-import { useFetch } from "../../hooks/useFetch";
-import type { Players } from "../../types/players";
-import { PlayerSearch } from "../../components/playerSearch/playerSearch";
+import { fetchAllTrackedPlayers } from "../services/api/trackedPlayers";
+import { validatePlayerTagSyntax } from "../utils/playerTag";
+import { useFetch } from "../hooks/useFetch";
+import type { Players } from "../types/players";
+import { PlayerSearch } from "../components/playerSearch/playerSearch";
 
 function HomePage() {
   const {

@@ -1,8 +1,8 @@
 import { Routes, Route } from "react-router-dom";
-import HomePage from "./pages/home/home";
-import PlayerLayout from "./pages/player/layout/home";
-import PlayerDecks from "./pages/player/decks/decks";
-import PlayerBattles from "./pages/player/battles/battles";
+import HomePage from "./pages/home";
+import PlayerLayout from "./pages/player/home";
+import PlayerDecks from "./pages/player/decks";
+import PlayerBattles from "./pages/player/battles";
 import "./App.css";
 
 function App() {

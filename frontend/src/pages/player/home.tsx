@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useParams } from "react-router-dom";
 import { useEffect } from "react";
-import { useCards } from "../../../hooks/useCards";
-import { usePlayerProfile } from "../../../hooks/usePlayerProfile";
+import { useCards } from "../../hooks/useCards";
+import { usePlayerProfile } from "../../hooks/usePlayerProfile";
 
 export default function PlayerLayout() {
   const { playerTag } = useParams();
