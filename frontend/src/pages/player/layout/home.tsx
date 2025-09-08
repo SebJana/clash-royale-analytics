@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useParams } from "react-router-dom";
 import { useEffect } from "react";
 import { useCards } from "../../../hooks/useCards";
+import { usePlayerProfile } from "../../../hooks/usePlayerProfile";
 
 export default function PlayerLayout() {
   const { playerTag } = useParams();
@@ -9,21 +10,31 @@ export default function PlayerLayout() {
   const {
     data: cards,
     isLoading: cardsLoading,
-    isError: cardsError,
+    isError: isCardsError,
+    error: cardsError,
   } = useCards();
+
+  const {
+    data: player,
+    isLoading: playerLoading,
+    isError: isPlayerError,
+    error: playerError,
+  } = usePlayerProfile(playerTag ?? "");
 
   // Temporary cards debug
   useEffect(() => {
     cards?.forEach((c) => console.log(`${c.name} (${c.elixirCost} elixir)`));
   }, [cards]);
 
-  if (cardsLoading) return <p>Loading…</p>;
-  if (cardsError) return <p>Error loading</p>;
+  if (cardsLoading || playerLoading) return <p>Loading…</p>;
+  if (isCardsError) return <p>Error loading cards: {cardsError.message}</p>;
+  if (isPlayerError)
+    return <p>Error loading player profile: {playerError.message}</p>;
 
   return (
     <div>
       <header>
-        <h2>Player {playerTag}</h2>
+        <h2>Player {player?.name}</h2>
       </header>
       <nav style={{ display: "flex", gap: "1rem" }}>
         <NavLink to={`/player/${encodedTag}/battles`}>Battles</NavLink>
