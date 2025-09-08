@@ -3,16 +3,10 @@ import { useNavigate } from "react-router";
 import { fetchAllTrackedPlayers } from "../../services/api/trackedPlayers";
 import { validatePlayerTagSyntax } from "../../utils/playerTag";
 import { useFetch } from "../../hooks/useFetch";
-import { useCards } from "../../hooks/useCards";
 import type { Players } from "../../types/players";
 import { PlayerSearch } from "../../components/playerSearch/playerSearch";
 
 function HomePage() {
-  const {
-    data: cards,
-    isLoading: cardsLoading,
-    isError: cardsError,
-  } = useCards();
   const {
     data: players,
     loading: playersLoading,
@@ -21,8 +15,8 @@ function HomePage() {
   const [selectedPlayerTag, setSelectedPlayerTag] = useState("");
   const navigate = useNavigate();
 
-  if (cardsLoading || playersLoading) return <p>Loading…</p>;
-  if (cardsError || playersError) return <p>Error loading</p>;
+  if (playersLoading) return <p>Loading…</p>;
+  if (playersError) return <p>Error loading</p>;
 
   const playerList = players
     ? Object.entries(players.activePlayers).map(([tag, name]) => ({
@@ -30,11 +24,6 @@ function HomePage() {
         name,
       }))
     : [];
-
-  // Temporary cards for debug on homepage
-  cards?.forEach((c) => {
-    console.log(`${c.name} (${c.elixirCost} elixir)`);
-  });
 
   function canEnableViewButton() {
     /**
@@ -51,7 +40,8 @@ function HomePage() {
 
   const handleViewClick = () => {
     if (selectedPlayerTag) {
-      navigate(`/player/${encodeURIComponent(selectedPlayerTag)}`);
+      // Navigate user to the default player profile page
+      navigate(`/player/${encodeURIComponent(selectedPlayerTag)}/battles`);
     }
   };
 
