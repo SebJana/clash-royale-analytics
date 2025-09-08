@@ -4,7 +4,7 @@ import { useCards } from "../../hooks/useCards";
 import { usePlayerProfile } from "../../hooks/usePlayerProfile";
 
 export default function PlayerLayout() {
-  const { playerTag } = useParams();
+  const { playerTag = "" } = useParams();
   const encodedTag = encodeURIComponent(playerTag ?? "");
 
   const {
@@ -34,13 +34,13 @@ export default function PlayerLayout() {
   return (
     <div>
       <header>
-        <h2>Player {player?.name}</h2>
+        <h2>{player?.name}</h2>
       </header>
       <nav style={{ display: "flex", gap: "1rem" }}>
         <NavLink to={`/player/${encodedTag}/battles`}>Battles</NavLink>
         <NavLink to={`/player/${encodedTag}/decks`}>Decks</NavLink>
       </nav>
-      <Outlet context={{ playerTag, cards }} /> {/* displays active subpage */}
+      <Outlet /> {/* displays active subpage */}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import HomePage from "./pages/home";
-import PlayerLayout from "./pages/player/home";
+import PlayerLayout from "./pages/player/layout";
 import PlayerDecks from "./pages/player/decks";
 import PlayerBattles from "./pages/player/battles";
 import "./App.css";
