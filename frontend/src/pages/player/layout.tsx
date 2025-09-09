@@ -20,6 +20,13 @@ export default function PlayerLayout() {
     <div>
       <header>
         <h2>{player?.name}</h2>
+        <h3>
+          {" "}
+          Account Age:{" "}
+          {player?.badges?.find((b) => b.name === "YearsPlayed")?.progress ??
+            "--"}
+          {" Days"}
+        </h3>
       </header>
       <nav style={{ display: "flex", gap: "1rem" }}>
         <NavLink to={`/player/${encodedTag}/battles`}>Battles</NavLink>
