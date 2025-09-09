@@ -48,7 +48,7 @@ export function CardComponent({
         />
       </Tooltip>
 
-      <p className="card-component-levelLabel">Level {card.level}</p>
+      <p className="card-component-level-label">Level {card.level}</p>
     </div>
   );
 }

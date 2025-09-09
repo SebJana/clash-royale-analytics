@@ -1,0 +1,38 @@
+.battle-component-container {
+  background-color: rgb(55, 55, 55);
+  border-radius: 12px;
+}
+
+.battle-component-decks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.battle-component-col {
+  display: grid;
+  grid-auto-rows: min-content;
+  gap: 12px;
+}
+
+.battle-component-heading {
+  margin: 0;
+  font-weight: 600;
+}
+
+.battle-component-player-block {
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.battle-component-player-name {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .battle-component-decks {
+    grid-template-columns: 1fr; /* stack on mobile */
+  }
+}

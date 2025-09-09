@@ -15,7 +15,7 @@ export function DeckComponent({
   for (let i = 0; i < deck.length; i += cardsPerRow) {
     const group = deck.slice(i, i + cardsPerRow); // put the cards into one row of display
     rows.push(
-      <div key={`row-${i}`} className="deck-component-deckRow">
+      <div key={`row-${i}`} className="deck-component-deck-row">
         {group.map((card) => (
           <CardComponent key={card.id} card={card} cards={cards} />
         ))}
