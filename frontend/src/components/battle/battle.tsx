@@ -1,6 +1,7 @@
 import { DeckComponent } from "../deck/deck";
 import type { Battle } from "../../types/lastBattles";
 import type { CardMeta } from "../../types/cards";
+import { datetimeToLocale } from "../../utils/datetimeToLocale";
 
 export function BattleComponent({
   battle,
@@ -12,7 +13,7 @@ export function BattleComponent({
   return (
     <>
       <h2>
-        {battle.gameMode} — {new Date(battle.battleTime).toLocaleString()} —{" "}
+        {battle.gameMode} — {datetimeToLocale(battle.battleTime)} —{" "}
         {battle.gameResult}
       </h2>
       <div>
