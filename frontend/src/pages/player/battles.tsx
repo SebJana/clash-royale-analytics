@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useCards } from "../../hooks/useCards";
 import { usePlayerBattlesInfinite } from "../../hooks/useLastBattles";
-import { Battle } from "../../components/battle/battle";
+import { BattleComponent } from "../../components/battle/battle";
 
 export default function PlayerBattles() {
   const { playerTag = "" } = useParams();
@@ -33,7 +33,7 @@ export default function PlayerBattles() {
   return (
     <div>
       {battlesList.map((b, i) => (
-        <Battle
+        <BattleComponent
           key={`${i}-${playerTag}-${b.battleTime}`} // unique ID for each battle
           battle={b}
           cards={cards ?? []} // fall back to empty list, if cards don't exist
