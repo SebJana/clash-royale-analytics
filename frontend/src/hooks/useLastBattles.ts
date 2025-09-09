@@ -25,6 +25,7 @@ export function usePlayerBattlesInfinite(
       return nextBefore || undefined;
     },
     staleTime: 5 * min,
+    gcTime: 15 * min,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

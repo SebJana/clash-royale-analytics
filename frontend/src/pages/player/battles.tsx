@@ -21,7 +21,7 @@ export default function PlayerBattles() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = usePlayerBattlesInfinite(playerTag, 5, true);
+  } = usePlayerBattlesInfinite(playerTag, 3, true);
 
   const battlesList =
     battles?.pages.flatMap((p) => p.last_battles.battles) ?? [];

@@ -9,6 +9,7 @@ export function useCards() {
     queryKey: ["cards"],
     queryFn: fetchAllCards,
     staleTime: 15 * min, // Cache duration, how long cards are considered fresh and aren't re-fetched from the backend
+    gcTime: 30 * min,
     refetchOnWindowFocus: false,
   });
 }
