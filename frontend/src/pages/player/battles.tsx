@@ -1,33 +1,44 @@
 import { useParams } from "react-router-dom";
+import { useCards } from "../../hooks/useCards";
 import { usePlayerBattlesInfinite } from "../../hooks/useLastBattles";
+import { Battle } from "../../components/battle/battle";
 
 export default function PlayerBattles() {
   const { playerTag = "" } = useParams();
+
   const {
-    data,
-    isLoading,
-    isError,
-    error,
+    data: cards,
+    isLoading: cardsLoading,
+    isError: isCardsError,
+    error: cardsError,
+  } = useCards();
+
+  const {
+    data: battles,
+    isLoading: battlesLoading,
+    isError: isBattlesError,
+    error: battlesError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
   } = usePlayerBattlesInfinite(playerTag, 5, true);
 
-  const battles = data?.pages.flatMap((p) => p.last_battles.battles) ?? [];
+  const battlesList =
+    battles?.pages.flatMap((p) => p.last_battles.battles) ?? [];
 
-  if (isLoading) return <div>Loading...</div>;
-  if (isError) return <div>Error: {error.message}</div>;
+  if (battlesLoading || cardsLoading) return <div>Loading...</div>;
+  if (isCardsError) return <div>Error: {cardsError.message}</div>;
+  if (isBattlesError) return <div>Error: {battlesError.message}</div>;
 
   return (
     <div>
-      <ul>
-        {battles.map((b) => (
-          <li key={`${b.battleTime}-${b.gameMode}`}>
-            {b.gameMode} — {new Date(b.battleTime).toLocaleString()} —{" "}
-            {b.gameResult}
-          </li>
-        ))}
-      </ul>
+      {battlesList.map((b, i) => (
+        <Battle
+          key={`${i}-${playerTag}-${b.battleTime}`} // unique ID for each battle
+          battle={b}
+          cards={cards ?? []} // fall back to empty list, if cards don't exist
+        />
+      ))}
 
       {hasNextPage ? (
         <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>

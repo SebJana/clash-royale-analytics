@@ -1,4 +1,4 @@
-export type Card = {
+export type CardMeta = {
   name: string;
   id: number;
   maxLevel: number;
@@ -12,5 +12,5 @@ export type Card = {
 };
 
 export type CardsResponse = {
-  items: Card[];
+  items: CardMeta[];
 };
