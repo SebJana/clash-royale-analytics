@@ -1,3 +1,4 @@
+import Tooltip from "@mui/material/Tooltip";
 import type { Card } from "../../types/lastBattles";
 import type { CardMeta } from "../../types/cards";
 import {
@@ -6,6 +7,7 @@ import {
   getCardRarity,
   getCardIcon,
 } from "../../utils/getCardMetaFields";
+import "./card.css";
 
 export function CardComponent({
   card,
@@ -14,18 +16,39 @@ export function CardComponent({
   card: Card;
   cards: CardMeta[];
 }>) {
+  const name = getCardName(card.id, cards);
+  const elixir = getCardElixirCost(card.id, cards);
+  const rarity = getCardRarity(card.id, cards);
+  // Uppercase the first letter of the rarity
+  const rarityLabel = rarity
+    ? rarity.charAt(0).toUpperCase() + rarity.slice(1)
+    : "";
+  const evoLvl = card.evolutionLevel ?? 0; // If it's not an evolution, the evolutionLevel field is missing
+  const isEvo = evoLvl > 0;
+  const icon = getCardIcon(card.id, isEvo, cards);
+
   return (
-    <div>
-      <img
-        // Display the evolution card icon
-        src={getCardIcon(card.id, (card.evolutionLevel ?? 0) > 0, cards)}
-        alt={getCardName(card.id, cards)}
-        loading="lazy"
-      />
-      <p>
-        {getCardName(card.id, cards)} — {card.level} —{" "}
-        {getCardElixirCost(card.id, cards)} — {getCardRarity(card.id, cards)}
-      </p>
+    <div className="card-component-card">
+      <Tooltip
+        arrow
+        placement="auto"
+        title={
+          <div className="card-component-tooltip">
+            <strong>{name}</strong>
+            <span>{elixir} Elixir</span>
+            <span>{rarityLabel}</span>
+          </div>
+        }
+      >
+        <img
+          src={icon}
+          alt={name}
+          loading="lazy"
+          className="card-component-icon"
+        />
+      </Tooltip>
+
+      <p className="card-component-levelLabel">Level {card.level}</p>
     </div>
   );
 }

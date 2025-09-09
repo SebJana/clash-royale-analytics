@@ -1,0 +1,20 @@
+.card-component-card {
+  text-align: center;
+}
+
+.card-component-tooltip {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.card-component-icon {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.card-component-levelLabel {
+  margin-top: 2px;
+}

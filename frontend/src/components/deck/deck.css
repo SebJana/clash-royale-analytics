@@ -1,0 +1,5 @@
+.deck-component-deckRow {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
