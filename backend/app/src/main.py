@@ -12,7 +12,8 @@ from mongo import MongoConn
 # both for the query parameter time but also the times the user gets back, which needs to be displayed in their local time
 # TODO set headers for cache-duration for http clients
 # TODO (potentially) global error handling
-# TODO add internal logging and don't send error detail as HttpException
+# TODO add internal for whole backedn via logger and don't send full error detail as HttpException
+# TODO timestamp based logging
 
 # TODO (potentially) add optional query param to tracked players
 # so that user can search the players with a name/tag or a substring of them

@@ -36,6 +36,10 @@ createRoot(document.getElementById("root")!).render(
           persister,
           maxAge: day,
           buster: "v1",
+          // Decide wether or not to keep the query progress
+          dehydrateOptions: {
+            shouldDehydrateQuery: (q) => q.meta?.persist !== false, // skip those with persist:false
+          },
         }}
       >
         <App />
