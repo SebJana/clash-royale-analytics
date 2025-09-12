@@ -19,6 +19,7 @@ from routers import cards
 # so that user can search the players with a name/tag or a substring of them
 
 # TODO supply list of available game modes, query over all battles in the given time frame and get unique?
+# TODO keep a unique collection gameModes with lastSeen, firstSeen and name that gets updated on every data scraping run?
 # TODO check game modes that are passed as query param
 
 

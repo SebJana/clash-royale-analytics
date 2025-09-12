@@ -4,11 +4,13 @@ from clean import (
     validate_battle_log_content,
     get_player_name,
 )
+from game_modes import UniqueGameModes
 from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from mongo import MongoConn
 from mongo import (
     insert_battles,
     set_player_name,
+    insert_game_modes,
     get_battles_count,
     print_first_battles,
 )
@@ -100,7 +102,10 @@ api_rl = ApiRateLimiter(per_second=settings.REQUESTS_PER_SECOND)
 
 
 async def process_player(
-    player_tag: str, cr_api: ClashRoyaleAPI, mongo_conn: MongoConn
+    player_tag: str,
+    mode_store: UniqueGameModes,
+    cr_api: ClashRoyaleAPI,
+    mongo_conn: MongoConn,
 ):
     """Fetch, validate, clean, and persist the latest battles for a single player.
 
@@ -110,6 +115,7 @@ async def process_player(
 
     Args:
         player_tag (str): Player tag (e.g., "#YYRJQY28").
+        mode_store (UniqueGameModes): Thread safe store for the found game modes in the battle logs.
         cr_api (ClashRoyaleAPI): API client to fetch battle logs.
         mongo_conn (MongoConn): Mongo connection used to write data.
 
@@ -144,7 +150,9 @@ async def process_player(
             cleaned_battle_logs = clean_battle_log_list(
                 battle_logs, player_tag=player_tag
             )
+
             player_name = get_player_name(battle_logs, player_tag=player_tag)
+            extract_game_modes(battle_logs=battle_logs, mode_store=mode_store)
 
             # Insert battles into MongoDB
             # If any error occurs here, the class handles the output for the logs
@@ -196,7 +204,10 @@ async def process_player(
 
 
 async def run_players_cycle(
-    players: list[str], cr_api: ClashRoyaleAPI, mongo_conn: MongoConn
+    players: list[str],
+    mode_store: UniqueGameModes,
+    cr_api: ClashRoyaleAPI,
+    mongo_conn: MongoConn,
 ):
     """Run a concurrent fetch/clean/store cycle for all tracked players.
 
@@ -206,6 +217,7 @@ async def run_players_cycle(
 
     Args:
         players (list[str]): Collection of player tags to process.
+        mode_store (UniqueGameModes): Thread safe store for the found game modes in the battle logs.
         cr_api (ClashRoyaleAPI): API client instance.
         mongo_conn (MongoConn): MongoDB connection for writes.
     """
@@ -213,9 +225,31 @@ async def run_players_cycle(
     try:
         async with asyncio.TaskGroup() as tg:
             for p in players:
-                tg.create_task(process_player(p, cr_api, mongo_conn))
+                tg.create_task(
+                    process_player(
+                        player_tag=p,
+                        mode_store=mode_store,
+                        cr_api=cr_api,
+                        mongo_conn=mongo_conn,
+                    )
+                )
     except* ClashRoyaleMaintenanceError:
         print("[INFO] Maintenance detected – aborting cycle")
+
+
+def extract_game_modes(battle_logs: list[dict], mode_store: UniqueGameModes):
+    """
+    Extract unique game modes from battle logs and insert them into a thread-safe store.
+
+    Args:
+        battles (list[dict]): List of battle dictionaries (newest first) as returned by the Clash Royale API.
+        mode_store (UniqueGameModes): Thread safe store for the found game modes in the battle logs.
+    """
+    for battle in battle_logs:
+        game_mode = battle.get("gameMode")
+
+        if game_mode:
+            mode_store.add(game_mode)
 
 
 async def cache_cards(cr_api: ClashRoyaleAPI, redis_conn: RedisConn):
@@ -257,6 +291,7 @@ async def main():
     - Every cycle:
         * Loads tracked player tags from Mongo.
         * Runs a concurrent player processing cycle (rate-limited fetch).
+        * Saves newly found game modes to Mongo.
         * Refreshes the card cache (version-ahead), then increments the Redis version
           to invalidate old keys and validate the new ones.
         * Sleeps `REQUEST_CYCLE_DURATION` before the next cycle.
@@ -284,8 +319,20 @@ async def main():
             await asyncio.sleep(settings.REQUEST_CYCLE_DURATION)
             continue
 
+        mode_store = UniqueGameModes()
+
         # Run fetching, cleaning and storing of data concurrently
-        await run_players_cycle(players=players, cr_api=cr_api, mongo_conn=mongo_conn)
+        await run_players_cycle(
+            players=players, mode_store=mode_store, cr_api=cr_api, mongo_conn=mongo_conn
+        )
+
+        # Get a list of all unique game modes in this iteration of battle logs
+        game_modes = mode_store.get_values()
+        modes_result = await insert_game_modes(mongo_conn, game_modes)
+        print(
+            f"[INFO] {modes_result.get('inserted')} game modes inserted, "
+            f"{modes_result.get('modified')} modified"
+        )
 
         # Optional debug (uncomment to check first documents and document count)
         battles_count = await get_battles_count(mongo_conn)

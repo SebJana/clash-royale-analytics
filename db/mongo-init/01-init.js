@@ -1,25 +1,25 @@
 const appDb = process.env.MONGO_INITDB_DATABASE;
 const appUser = process.env.MONGO_APP_USER;
-const appPwd  = process.env.MONGO_APP_PWD;
+const appPwd = process.env.MONGO_APP_PWD;
 
 print(`[init] creating app user '${appUser}' on db '${appDb}'`);
 
 db = db.getSiblingDB(appDb);
 db.createUser({
   user: appUser,
-  pwd:  appPwd,
-  roles: [{ role: "readWrite", db: appDb }]
+  pwd: appPwd,
+  roles: [{ role: "readWrite", db: appDb }],
 });
 
-
 print(`[init] creating index on 'player' collection for unique 'playerTag'`);
-db.players.createIndex(
-  { playerTag: 1 },
-  { unique: true, name: "tag_unique" }
-)
+db.players.createIndex({ playerTag: 1 }, { unique: true, name: "tag_unique" });
 
+print(`[init] creating index on 'game_modes' collection for unique 'name'`);
+db.players.createIndex({ name: 1 }, { unique: true, name: "name_unique" });
 
-print(`[init] creating index on 'battles' collection for 'battleTime' and 'referencePlayerTag'`);
+print(
+  `[init] creating index on 'battles' collection for 'battleTime' and 'referencePlayerTag'`
+);
 
 db.battles.createIndex(
   { referencePlayerTag: 1, battleTime: -1 },
