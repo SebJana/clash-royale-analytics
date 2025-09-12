@@ -21,6 +21,7 @@ from .players_write import (
 )
 
 from .game_modes_write import insert_game_modes
+from .game_modes_read import get_game_modes
 
 __all__ = [
     "MongoConn",
@@ -44,6 +45,8 @@ __all__ = [
     "set_player_name",
     "deactivate_tracked_player",
     # game_modes
+    ## read
+    "get_game_modes",
     ## write
     "insert_game_modes",
 ]

@@ -2,12 +2,11 @@ from fastapi import FastAPI
 import asyncio
 from contextlib import asynccontextmanager
 
-from routers import players_details, players_tracked
+from routers import players_details, players_tracked, cards, game_modes
 from core.settings import settings
 from redis_service import RedisConn
 from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn
-from routers import cards
 
 # NOTE time response from Clash Royale/MongoDB is in UTC so frontend needs conversion logic
 # both for the query parameter time but also the times the user gets back, which needs to be displayed in their local time
@@ -18,9 +17,7 @@ from routers import cards
 # TODO (potentially) add optional query param to tracked players
 # so that user can search the players with a name/tag or a substring of them
 
-# TODO supply list of available game modes, query over all battles in the given time frame and get unique?
-# TODO keep a unique collection gameModes with lastSeen, firstSeen and name that gets updated on every data scraping run?
-# TODO check game modes that are passed as query param
+# TODO check game modes that are passed as query param, if they exist in mongo
 
 
 async def retry_async(func, name):
@@ -99,6 +96,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(players_tracked.router, prefix="/api")
 app.include_router(players_details.router, prefix="/api")
 app.include_router(cards.router, prefix="/api")
+app.include_router(game_modes.router, prefix="/api")
 
 
 @app.get("/api/ping")
