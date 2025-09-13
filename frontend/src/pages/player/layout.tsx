@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useParams } from "react-router-dom";
 import { usePlayerProfile } from "../../hooks/usePlayerProfile";
+import { PlayerInfo } from "../../components/playerInfo/playerInfo";
 
 export default function PlayerLayout() {
   const { playerTag = "" } = useParams();
@@ -19,14 +20,8 @@ export default function PlayerLayout() {
   return (
     <div>
       <header>
-        <h2>{player?.name}</h2>
-        <h3>
-          {" "}
-          Account Age:{" "}
-          {player?.badges?.find((b) => b.name === "YearsPlayed")?.progress ??
-            "--"}
-          {" Days"}
-        </h3>
+        {/* Only render player info if there is a valid player fetched */}
+        {player && <PlayerInfo player={player} />}
       </header>
       <nav style={{ display: "flex", gap: "1rem" }}>
         <NavLink to={`/player/${encodedTag}/battles`}>Battles</NavLink>
