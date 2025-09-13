@@ -29,5 +29,7 @@ export function usePlayerBattlesInfinite(
     gcTime: 15 * min,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    retry: 2, // Limit retries
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff for every retry
   });
 }

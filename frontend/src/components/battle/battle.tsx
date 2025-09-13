@@ -1,10 +1,11 @@
+import { memo } from "react";
 import { DeckComponent } from "../deck/deck";
 import type { Battle } from "../../types/lastBattles";
 import type { CardMeta } from "../../types/cards";
 import { datetimeToLocale } from "../../utils/datetimeToLocale";
 import "./battle.css";
 
-export function BattleComponent({
+export const BattleComponent = memo(function BattleComponent({
   battle,
   cards,
 }: Readonly<{
@@ -50,4 +51,4 @@ export function BattleComponent({
       </div>
     </div>
   );
-}
+});

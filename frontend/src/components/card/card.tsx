@@ -1,3 +1,4 @@
+import { memo } from "react";
 import Tooltip from "@mui/material/Tooltip";
 import type { Card } from "../../types/lastBattles";
 import type { CardMeta } from "../../types/cards";
@@ -9,7 +10,7 @@ import {
 } from "../../utils/getCardMetaFields";
 import "./card.css";
 
-export function CardComponent({
+export const CardComponent = memo(function CardComponent({
   card,
   cards,
 }: Readonly<{
@@ -51,4 +52,4 @@ export function CardComponent({
       <p className="card-component-level-label">Level {card.level}</p>
     </div>
   );
-}
+});

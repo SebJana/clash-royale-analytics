@@ -16,6 +16,11 @@ const queryClient = new QueryClient({
       gcTime: day,
       staleTime: min,
       refetchOnWindowFocus: false,
+      retry: 1, // Reduce retries to prevent long operations
+      retryDelay: 1000, // Short retry delay
+    },
+    mutations: {
+      retry: 1,
     },
   },
 });
@@ -24,7 +29,7 @@ const queryClient = new QueryClient({
 const persister = createAsyncStoragePersister({
   storage: typeof window !== "undefined" ? window.localStorage : undefined,
   key: "rq-cache-v1",
-  throttleTime: 1000,
+  throttleTime: 2000, // throttle time to reduce frequent saves
 });
 
 createRoot(document.getElementById("root")!).render(

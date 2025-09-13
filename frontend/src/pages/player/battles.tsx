@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom";
+import { useMemo } from "react";
 import { useCards } from "../../hooks/useCards";
 import { usePlayerBattlesInfinite } from "../../hooks/useLastBattles";
 import { BattleComponent } from "../../components/battle/battle";
@@ -23,8 +24,10 @@ export default function PlayerBattles() {
     isFetchingNextPage,
   } = usePlayerBattlesInfinite(playerTag, 3, true);
 
-  const battlesList =
-    battles?.pages.flatMap((p) => p.last_battles.battles) ?? [];
+  const battlesList = useMemo(
+    () => battles?.pages.flatMap((p) => p.last_battles.battles) ?? [],
+    [battles]
+  );
 
   if (battlesLoading || cardsLoading) return <div>Loading...</div>;
   if (isCardsError) return <div>Error: {cardsError.message}</div>;
@@ -34,7 +37,7 @@ export default function PlayerBattles() {
     <div>
       {battlesList.map((b, i) => (
         <BattleComponent
-          key={`${i}-${playerTag}-${b.battleTime}`} // unique ID for each battle
+          key={`${b.battleTime}-${playerTag}-${i}`} // More stable unique ID
           battle={b}
           cards={cards ?? []} // fall back to empty list, if cards don't exist
         />
