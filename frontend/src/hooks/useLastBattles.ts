@@ -11,7 +11,6 @@ export function usePlayerBattlesInfinite(
   enabled = true
 ) {
   return useInfiniteQuery<LastBattles, Error>({
-    meta: { persist: false }, // Don't persist query progress, always start with 'limit' amount after cache was cleared
     queryKey: ["playerBattles", playerTag, limit],
     enabled: enabled && !!playerTag && validatePlayerTagSyntax(playerTag), // Check if given tag is valid
     initialPageParam: undefined as string | undefined, // first battles have no before time
