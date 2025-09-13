@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -92,6 +93,20 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Add CORS middleware for local development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",  # React default dev server
+        "http://localhost:5173",  # Vite default dev server
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include routers
 app.include_router(players_tracked.router, prefix="/api")
