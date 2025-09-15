@@ -1,13 +1,6 @@
 import type { Player } from "../../types/player";
+import { round } from "../../utils/round";
 import "./playerInfo.css";
-
-/**
- * Round a number to specified decimal places.
- */
-function round(num: number, decimalPlaces: number): number {
-  const factor = Math.pow(10, decimalPlaces);
-  return Math.round(num * factor) / factor;
-}
 
 /**
  * Get the account creation date given an account age in days.

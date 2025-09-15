@@ -5,6 +5,7 @@ import { fetchLastBattles } from "../services/api/lastBattles";
 
 const min = 60_000;
 
+// TODO fix infinite query to reset correctly but also cache properly
 export function usePlayerBattlesInfinite(
   playerTag: string,
   limit = 10,

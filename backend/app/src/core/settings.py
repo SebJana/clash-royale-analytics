@@ -24,7 +24,7 @@ class Settings:
 
     # Cache TTL (Time To Live) in seconds
     # Cache is being invalidated in every data scraping cycle
-    # Cache data is always up to, or close to as fresh as the scraped data in the mongo
+    # Cache data is always as up-to-date as the most recently scraped data from MongoDB
     # Keep TTL still in the minutes to hours range as fallback
     # to not risk having outdated data upon synchronization errors or scraping errors
 
