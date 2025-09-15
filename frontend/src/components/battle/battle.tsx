@@ -58,9 +58,14 @@ export const BattleComponent = memo(function BattleComponent({
               key={`${battle.battleTime}-team-${t.tag ?? i}`}
               className="battle-component-player-block"
             >
-              <h3 className="battle-component-player-name">
-                {t.name ?? `Player ${i + 1}`}
-              </h3>
+              <div className="battle-component-player-info battle-component-player-info-left">
+                <h3 className="battle-component-player-name">
+                  {t.name ?? `Player ${i + 1}`}
+                </h3>
+                {t.tag && (
+                  <span className="battle-component-player-tag">{t.tag}</span>
+                )}
+              </div>
               <DeckComponent deck={t.cards ?? []} cards={cards ?? []} />
             </section>
           ))}
@@ -72,9 +77,14 @@ export const BattleComponent = memo(function BattleComponent({
               key={`${battle.battleTime}-opp-${o.tag ?? i}`}
               className="battle-component-player-block"
             >
-              <h3 className="battle-component-player-name">
-                {o.name ?? `Player ${i + 1}`}
-              </h3>
+              <div className="battle-component-player-info battle-component-player-info-right">
+                <h3 className="battle-component-player-name">
+                  {o.name ?? `Player ${i + 1}`}
+                </h3>
+                {o.tag && (
+                  <span className="battle-component-player-tag">{o.tag}</span>
+                )}
+              </div>
               <DeckComponent deck={o.cards ?? []} cards={cards ?? []} />
             </section>
           ))}

@@ -30,7 +30,7 @@
 
 .battle-component-battle-time {
   color: #bdc3c7;
-  font-size: 14px;
+  font-size: 1rem;
   font-weight: 500;
 }
 
@@ -106,12 +106,33 @@
 
 .battle-component-player-block {
   border-radius: 12px;
-  padding: 8px;
+  padding: 12px;
+}
+
+.battle-component-player-info {
+  margin-bottom: 12px;
+}
+
+.battle-component-player-info-left {
+  margin-left: 5px;
+  text-align: left;
+}
+
+.battle-component-player-info-right {
+  margin-right: 5px;
+  text-align: right;
 }
 
 .battle-component-player-name {
-  margin: 0 0 8px;
+  margin: 0 0 6px 0;
   font-weight: 600;
+  font-size: 1.5rem;
+}
+
+.battle-component-player-tag {
+  color: #bdc3c7;
+  font-size: 1rem;
+  font-weight: 500;
 }
 
 @media (max-width: 768px) {
