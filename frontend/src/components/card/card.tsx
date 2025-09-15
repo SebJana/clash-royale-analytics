@@ -2,7 +2,6 @@ import { memo } from "react";
 import Tooltip from "@mui/material/Tooltip";
 import type { Card } from "../../types/lastBattles";
 import type { CardMeta } from "../../types/cards";
-import { determineRarityOutlineColor } from "../../utils/color";
 import {
   getCardName,
   getCardElixirCost,
@@ -28,7 +27,6 @@ export const CardComponent = memo(function CardComponent({
   const evoLvl = card.evolutionLevel ?? 0; // If it's not an evolution, the evolutionLevel field is missing
   const isEvo = evoLvl > 0;
   const icon = getCardIcon(card.id, isEvo, cards);
-  const outlineColor = determineRarityOutlineColor(rarity, isEvo);
 
   return (
     <div className="card-component-card">
@@ -48,17 +46,6 @@ export const CardComponent = memo(function CardComponent({
           alt={name}
           loading="lazy"
           className="card-component-icon"
-          style={{
-            // Create full outline around PNG shape by using layered drop shadows
-            filter: `drop-shadow(1px 0 0 ${outlineColor})
-             drop-shadow(-1px 0 0 ${outlineColor})
-             drop-shadow(0 1px 0 ${outlineColor})
-             drop-shadow(0 -1px 0 ${outlineColor})
-             drop-shadow(1px 1px 0 ${outlineColor})
-             drop-shadow(-1px -1px 0 ${outlineColor})
-             drop-shadow(1px -1px 0 ${outlineColor})
-             drop-shadow(-1px 1px 0 ${outlineColor})`,
-          }}
         />
       </Tooltip>
 

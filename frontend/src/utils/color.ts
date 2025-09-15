@@ -9,7 +9,7 @@
  * @param evolution - Whether the card is an evolution; if true, no outline color is returned.
  * @returns A hex color string for the outline, or `null` if no colored outline should be used.
  */
-export function determineRarityOutlineColor(
+export function determineRarityColor(
   rarity: string,
   evolution: boolean
 ): string | null {
