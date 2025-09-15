@@ -88,9 +88,11 @@ function generateCopyLink(deck: Card[]): string {
 export const DeckComponent = memo(function DeckComponent({
   deck,
   cards,
+  elixirLeaked,
 }: Readonly<{
   deck: Card[];
   cards: CardMeta[];
+  elixirLeaked?: number; // Optional parameter, so that it can be used in battle display but also for deck statistics
 }>) {
   const cardsPerRow = 4;
   const rows: React.ReactElement[] = [];
@@ -132,6 +134,13 @@ export const DeckComponent = memo(function DeckComponent({
             <p className="deck-component-stat-value">{roundedFourCardCycle}</p>
             <p className="deck-component-stat-label">4-Card Cycle</p>
           </div>
+          {/* Only display leaked elixir if it was passed into the component*/}
+          {elixirLeaked != null && (
+            <div className="deck-component-stat-item">
+              <p className="deck-component-stat-value">{elixirLeaked}</p>
+              <p className="deck-component-stat-label">Leaked Elixir</p>
+            </div>
+          )}
         </div>
         <Copy className="deck-component-copy-button" onClick={handleCopy} />
       </div>

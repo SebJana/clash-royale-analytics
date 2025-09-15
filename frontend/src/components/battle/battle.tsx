@@ -66,7 +66,11 @@ export const BattleComponent = memo(function BattleComponent({
                   <span className="battle-component-player-tag">{t.tag}</span>
                 )}
               </div>
-              <DeckComponent deck={t.cards ?? []} cards={cards ?? []} />
+              <DeckComponent
+                deck={t.cards ?? []}
+                cards={cards ?? []}
+                elixirLeaked={t.elixirLeaked}
+              />
             </section>
           ))}
         </div>
@@ -85,7 +89,11 @@ export const BattleComponent = memo(function BattleComponent({
                   <span className="battle-component-player-tag">{o.tag}</span>
                 )}
               </div>
-              <DeckComponent deck={o.cards ?? []} cards={cards ?? []} />
+              <DeckComponent
+                deck={o.cards ?? []}
+                cards={cards ?? []}
+                elixirLeaked={o.elixirLeaked}
+              />
             </section>
           ))}
         </div>
