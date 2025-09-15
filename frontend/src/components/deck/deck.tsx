@@ -4,9 +4,18 @@ import { getCardElixirCost } from "../../utils/getCardMetaFields";
 import type { Card } from "../../types/lastBattles";
 import type { CardMeta } from "../../types/cards";
 import { round } from "../../utils/round";
+import { Copy } from "lucide-react";
 import "./deck.css";
 
-function calcAverageElixirCost(deck: Card[], cards: CardMeta[]) {
+/**
+ * Calculates the average elixir cost of a given deck.
+ *
+ * @param deck - The list of cards in the deck (each card has an `id`).
+ * @param cards - Metadata containing card details including elixir costs.
+ * @returns The average elixir cost of the deck, or 0 if the deck is empty.
+ *
+ */
+function calcAverageElixirCost(deck: Card[], cards: CardMeta[]): number {
   let elixirSum = 0;
   const numberOfCards = deck.length;
 
@@ -17,8 +26,33 @@ function calcAverageElixirCost(deck: Card[], cards: CardMeta[]) {
   for (const card of deck) {
     elixirSum += getCardElixirCost(card.id, cards);
   }
-  const avgElixr = elixirSum / numberOfCards;
-  return avgElixr;
+  const avgElixir = elixirSum / numberOfCards;
+  return avgElixir;
+}
+
+/**
+ * Builds a Clash Royale deck share link.
+ *
+ * @param deck - The list of cards in the deck (each card has an `id`).
+ * @returns Deck copy link with card IDs and required query params.
+ *
+ */
+function generateCopyLink(deck: Card[]): string {
+  const baseURL =
+    "https://link.clashroyale.com/en/?clashroyale://copyDeck?deck=";
+  let queryParam = baseURL;
+  for (const card of deck) {
+    queryParam += card.id; // Append the card id for every card in the deck
+    queryParam += ";";
+  }
+  // Remove the trailing ";" for the last card id
+  queryParam = queryParam.slice(0, -1);
+  // Add necessary fields for the link
+  const context = "&l=Royals";
+  const timeToken = "&tt=159000000";
+  const fullQueryParam = queryParam + context + timeToken;
+
+  return fullQueryParam;
 }
 
 export const DeckComponent = memo(function DeckComponent({
@@ -43,13 +77,22 @@ export const DeckComponent = memo(function DeckComponent({
 
   const averageElixir = calcAverageElixirCost(deck, cards);
   const roundedAvgElixir = round(averageElixir, 2);
-  // TODO add copy deck option that displays a qr code (desktop) and a direct link (mobile)
-  // clashroyale://copyDeck?deck=26000063;27000010;26000067;26000068;26000025;28000001;28000012;26000084&tt=159000000&l=Royals
-  // IDs of the cards plus optional tt (timestamp?) and l (label) tag
+
+  const copyLink = generateCopyLink(deck);
+
+  // Works for both mobile and desktop because the Clash Royale Website handles
+  // showing a qr code (desktop) and a copy link (mobile)
+  const handleCopy = () => {
+    window.open(copyLink, "_blank");
+  };
+
   return (
     <>
       <div>{rows}</div>
-      <p>{roundedAvgElixir}</p>
+      <div className="deck-component-footer">
+        <p>{roundedAvgElixir}</p>
+        <Copy className="deck-component-copy-button" onClick={handleCopy} />
+      </div>
     </>
   );
 });

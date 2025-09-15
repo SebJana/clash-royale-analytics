@@ -3,3 +3,7 @@
   flex-wrap: nowrap;
   gap: 8px;
 }
+
+.deck-component-copy-button {
+  cursor: pointer;
+}
