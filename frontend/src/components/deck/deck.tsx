@@ -31,6 +31,36 @@ function calcAverageElixirCost(deck: Card[], cards: CardMeta[]): number {
 }
 
 /**
+ * Calculates the 4 card cycle elixir cost of a given deck.
+ * Effectively sums the elixir cost of the cheapest 4 cards in the deck, meaning
+ * the fastest way to get a certain card back into rotation.
+ *
+ * @param deck - The list of cards in the deck (each card has an `id`).
+ * @param cards - Metadata containing card details including elixir costs.
+ * @returns The average elixir cost of the deck, or 0 if the deck is NOT 8 cards long.
+ *
+ */
+function calculateFourCardCycle(deck: Card[], cards: CardMeta[]): number {
+  const numberOfCards = deck.length;
+  // Only calculate 4 Card Cycle for "regular" 8-card decks
+  if (numberOfCards !== 8) {
+    return 0;
+  }
+  const elixirAmount = [];
+  for (const card of deck) {
+    elixirAmount.push(getCardElixirCost(card.id, cards));
+  }
+  elixirAmount.sort((a, b) => a - b); // Sort elixir amounts ascending
+
+  let fourCardCycle = 0;
+  for (let i = 0; i < 4; i++) {
+    fourCardCycle += elixirAmount[i]; // Sum the elixir of the cheapest four cards
+  }
+
+  return fourCardCycle;
+}
+
+/**
  * Builds a Clash Royale deck share link.
  *
  * @param deck - The list of cards in the deck (each card has an `id`).
@@ -76,7 +106,10 @@ export const DeckComponent = memo(function DeckComponent({
   }
 
   const averageElixir = calcAverageElixirCost(deck, cards);
-  const roundedAvgElixir = round(averageElixir, 2);
+  const roundedAvgElixir = round(averageElixir, 1);
+
+  const fourCardCycle = calculateFourCardCycle(deck, cards);
+  const roundedFourCardCycle = round(fourCardCycle, 2);
 
   const copyLink = generateCopyLink(deck);
 
@@ -91,6 +124,7 @@ export const DeckComponent = memo(function DeckComponent({
       <div>{rows}</div>
       <div className="deck-component-footer">
         <p>{roundedAvgElixir}</p>
+        <p>{roundedFourCardCycle}</p>
         <Copy className="deck-component-copy-button" onClick={handleCopy} />
       </div>
     </>
