@@ -6,4 +6,49 @@
 
 .deck-component-copy-button {
   cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px;
+  transition: all 0.3s ease;
+  color: #ecf0f1;
+}
+
+.deck-component-copy-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.deck-component-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-top: 16px;
+}
+
+.deck-component-stats {
+  display: flex;
+  gap: 24px;
+}
+
+.deck-component-stat-item {
+  text-align: center;
+}
+
+.deck-component-stat-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #ecf0f1;
+  margin: 0;
+}
+
+.deck-component-stat-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #bdc3c7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 4px 0 0 0;
 }

@@ -123,8 +123,16 @@ export const DeckComponent = memo(function DeckComponent({
     <>
       <div>{rows}</div>
       <div className="deck-component-footer">
-        <p>{roundedAvgElixir}</p>
-        <p>{roundedFourCardCycle}</p>
+        <div className="deck-component-stats">
+          <div className="deck-component-stat-item">
+            <p className="deck-component-stat-value">{roundedAvgElixir}</p>
+            <p className="deck-component-stat-label">Avg Elixir</p>
+          </div>
+          <div className="deck-component-stat-item">
+            <p className="deck-component-stat-value">{roundedFourCardCycle}</p>
+            <p className="deck-component-stat-label">4-Card Cycle</p>
+          </div>
+        </div>
         <Copy className="deck-component-copy-button" onClick={handleCopy} />
       </div>
     </>
