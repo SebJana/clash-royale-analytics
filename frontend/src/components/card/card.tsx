@@ -8,6 +8,7 @@ import {
   getCardRarity,
   getCardIcon,
 } from "../../utils/getCardMetaFields";
+import { getCardOutline } from "../../utils/color";
 import "./card.css";
 
 export const CardComponent = memo(function CardComponent({
@@ -28,6 +29,8 @@ export const CardComponent = memo(function CardComponent({
   const isEvo = evoLvl > 0;
   const icon = getCardIcon(card.id, isEvo, cards);
 
+  const outlineImg = getCardOutline(rarity);
+
   return (
     <div className="card-component-card">
       <Tooltip
@@ -41,12 +44,21 @@ export const CardComponent = memo(function CardComponent({
           </div>
         }
       >
-        <img
-          src={icon}
-          alt={name}
-          loading="lazy"
-          className="card-component-icon"
-        />
+        {/* Card outline implemented using overlaid PNG images */}
+        <div className="card-component-wrap">
+          <img
+            src={outlineImg}
+            alt={`outline`}
+            loading="lazy"
+            className="card-component-outline"
+          />
+          <img
+            src={icon}
+            alt={name}
+            loading="lazy"
+            className="card-component-icon"
+          />
+        </div>
       </Tooltip>
 
       <p className="card-component-level-label">Level {card.level}</p>

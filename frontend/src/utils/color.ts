@@ -1,3 +1,9 @@
+import noOutlineImg from "../assets/cards/noOutline.png";
+import rareOutlineImg from "../assets/cards/rareOutline.png";
+import epicOutlineImg from "../assets/cards/epicOutline.png";
+import legendaryOutlineImg from "../assets/cards/legendaryOutline.png";
+import championOutlineImg from "../assets/cards/championOutline.png";
+
 /**
  * Determines the outline color for a card based on its rarity.
  *
@@ -22,7 +28,7 @@ export function determineRarityColor(
     case "common":
       return null;
     case "rare":
-      return "#fca46b";
+      return "#ff6c08";
     case "epic":
       return "#a149de";
     case "legendary":
@@ -31,5 +37,30 @@ export function determineRarityColor(
       return "#fed328";
     default:
       return null;
+  }
+}
+
+/**
+ * Returns the outline image path for a given card rarity.
+ *
+ * @param rarity - The rarity of the card (e.g. "common", "rare", "epic", "legendary", "champion").
+ * @returns The image path (string) of the corresponding outline PNG.
+ *          Defaults to a blank image path if the rarity has no outline.
+ */
+export function getCardOutline(rarity: string): string {
+  const r = rarity.toLowerCase();
+  switch (r) {
+    case "common":
+      return noOutlineImg;
+    case "rare":
+      return rareOutlineImg;
+    case "epic":
+      return epicOutlineImg;
+    case "legendary":
+      return legendaryOutlineImg;
+    case "champion":
+      return championOutlineImg;
+    default:
+      return noOutlineImg;
   }
 }

@@ -4,6 +4,10 @@
   gap: 8px;
 }
 
+.deck-component-deck-row .card-component-card {
+  flex: 1; /* Each card takes equal share of available width */
+}
+
 .deck-component-copy-button {
   cursor: pointer;
   background: rgba(255, 255, 255, 0.08);

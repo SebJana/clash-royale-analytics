@@ -8,11 +8,34 @@
   text-align: center;
 }
 
-.card-component-icon {
+.card-component-wrap {
   position: relative;
-  display: inline-block;
+  display: block;
   width: 100%;
-  height: auto;
+}
+
+.card-component-outline,
+.card-component-icon {
+  position: relative; /* Change from absolute to let images set container size */
+  width: 100%;
+  height: auto; /* Let height be determined by aspect ratio */
+  object-fit: contain; /* Maintain aspect ratio */
+  display: block;
+  pointer-events: none;
+}
+
+.card-component-outline {
+  opacity: 0.8; /* Make outline less bold */
+  z-index: 0;
+}
+
+.card-component-icon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%; /* Match the outline's size */
   object-fit: contain;
 }
 
