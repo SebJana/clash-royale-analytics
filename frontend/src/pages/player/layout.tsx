@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useParams } from "react-router-dom";
 import { usePlayerProfile } from "../../hooks/usePlayerProfile";
 import { PlayerInfo } from "../../components/playerInfo/playerInfo";
+import CircularProgress from "@mui/material/CircularProgress";
 import "./layout.css";
 
 export default function PlayerLayout() {
@@ -14,7 +15,8 @@ export default function PlayerLayout() {
     error: playerError,
   } = usePlayerProfile(playerTag ?? "");
 
-  if (playerLoading) return <p>Loading…</p>;
+  if (playerLoading)
+    return <CircularProgress className="layout-loading-spinner" />;
   if (isPlayerError)
     return <p>Error loading player profile: {playerError.message}</p>;
 

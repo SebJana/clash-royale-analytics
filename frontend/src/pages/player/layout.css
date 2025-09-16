@@ -8,3 +8,7 @@
   flex: 1;
   min-height: 0; /* Allow content to shrink */
 }
+
+.layout-loading-spinner .MuiCircularProgress-circle {
+  stroke: #4a9eff;
+}

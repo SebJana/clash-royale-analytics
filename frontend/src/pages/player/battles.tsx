@@ -1,20 +1,60 @@
 import { useParams } from "react-router-dom";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useCards } from "../../hooks/useCards";
 import { usePlayerBattlesInfinite } from "../../hooks/useLastBattles";
 import { BattleComponent } from "../../components/battle/battle";
 import { localeToUTC, getTodayDateTime } from "../../utils/datetime";
+import CircularProgress from "@mui/material/CircularProgress";
 import "./battles.css";
 
+/**
+ * PlayerBattles Component
+ *
+ * Displays a paginated list of battles for a specific player with the following features:
+ * - Date/time filtering to show battles before a specific date
+ * - Infinite scroll pagination for loading more battles
+ * - Loading states for better UX
+ * - Error handling for failed API calls
+ */
 export default function PlayerBattles() {
+  // Extract player tag from URL parameters
   const { playerTag = "" } = useParams();
 
-  const [beforeDate, setBeforeDate] = useState(getTodayDateTime()); // Pre-fill with today's date and time (string and locale time)
+  // Filter state: date input field value (in local timezone)
+  const [beforeDate, setBeforeDate] = useState(getTodayDateTime()); // Pre-fill with today's date and time
+
+  // Applied filter state: the actual filter being used for API calls (in UTC)
   const [appliedBeforeDate, setAppliedBeforeDate] = useState<
     string | undefined
-  >(undefined); // Store the applied filter date in UTC
-  const [isValidFilterDate, setIsValidFilterDate] = useState(true); // Initially true since we start with today's date
+  >(undefined);
 
+  // Validation state: tracks if the current date input is valid
+  const [isValidFilterDate, setIsValidFilterDate] = useState(true); // Initially true since filter starts with today's date
+
+  // Loading state: tracks initial page load to show spinner immediately
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Track if there ever was data to differentiate between first load and subsequent loads
+  // Subsequent load can hold more data, as a load before that may have cached any amount of battles already
+  // Leading to longer waiting/loading times
+  const [hasEverHadData, setHasEverHadData] = useState(false);
+
+  // Ref for the load more trigger element (used for intersection observer)
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Track component mount to ensure loading spinner shows immediately
+  const isMountedRef = useRef(false);
+  const loadStartTimeRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadStartTimeRef.current = Date.now();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Fetch card data (needed to display card information in battles)
   const {
     data: cards,
     isLoading: cardsLoading,
@@ -22,6 +62,7 @@ export default function PlayerBattles() {
     error: cardsError,
   } = useCards();
 
+  // Fetch battles with infinite pagination
   const {
     data: battles,
     isLoading: battlesLoading,
@@ -30,14 +71,111 @@ export default function PlayerBattles() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = usePlayerBattlesInfinite(playerTag, 3, true, appliedBeforeDate);
+  } = usePlayerBattlesInfinite(playerTag, 3, true, appliedBeforeDate); // Reduced page size (3) for better UX | loading/rendering times
 
+  // Flatten paginated battle data into a single array for easier rendering
   const battlesList = useMemo(
     () => battles?.pages.flatMap((p) => p.last_battles.battles) ?? [],
     [battles]
   );
 
-  // Check if there is a valid date that is not in the future
+  // Clear initial load state once data is available or loading is complete
+  useEffect(() => {
+    // Mark that there is data if there are battles
+    if (battlesList.length > 0 && !hasEverHadData) {
+      setHasEverHadData(true);
+    }
+
+    // Only clear initial load state when:
+    // 1. Page is not loading anymore AND
+    // 2. There either is data OR the first loading attempt was completed OR there's an error AND
+    // 3. At least 300ms have passed to ensure spinner is visible
+    if (
+      !battlesLoading &&
+      !cardsLoading &&
+      (battlesList.length > 0 || hasEverHadData || isBattlesError)
+    ) {
+      const timeElapsed = Date.now() - loadStartTimeRef.current;
+      // Always show the spinner to give the page and server loading time
+      const minDisplayTime = 300; // Minimum time to show loading spinner
+
+      if (timeElapsed >= minDisplayTime) {
+        setIsInitialLoad(false);
+      } else {
+        // Wait for the minimum display time to remove spinner
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            setIsInitialLoad(false);
+          }
+        }, minDisplayTime - timeElapsed);
+      }
+    }
+  }, [
+    battlesLoading,
+    cardsLoading,
+    battlesList.length,
+    hasEverHadData,
+    isBattlesError,
+  ]);
+
+  // Reset initial load state when playerTag changes (navigating to different player)
+  useEffect(() => {
+    setIsInitialLoad(true);
+    setHasEverHadData(false);
+    loadStartTimeRef.current = Date.now();
+  }, [playerTag]);
+
+  // Fallback timeout to ensure loading state doesn't persist indefinitely
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isInitialLoad && isMountedRef.current) {
+        // Still display page even tho it is not fully loaded yet
+        setIsInitialLoad(false);
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [isInitialLoad]);
+
+  // Intersection Observer for auto-loading more battles when user scrolls near bottom
+  useEffect(() => {
+    const loadMoreElement = loadMoreRef.current;
+    if (!loadMoreElement || !hasNextPage || isFetchingNextPage) return;
+
+    // Set up intersection observer to trigger loading when element becomes visible
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        // Only fetch more if the trigger element is visible and we can load more
+        // Also ensure we're not in initial load state to avoid conflicts
+        if (
+          entry.isIntersecting &&
+          hasNextPage &&
+          !isFetchingNextPage &&
+          !isInitialLoad
+        ) {
+          fetchNextPage();
+        }
+      },
+      {
+        rootMargin: "500px", // Start loading before the element comes into view
+        threshold: 0.1, // Trigger when 10% of the element is visible
+      }
+    );
+
+    observer.observe(loadMoreElement);
+
+    // Cleanup function to disconnect observer
+    return () => {
+      observer.disconnect();
+    };
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isInitialLoad]);
+
+  /**
+   * Validates if a date string represents a valid date
+   * @param dateString - The date string to validate
+   * @returns true if the date is valid, false otherwise
+   */
   const validateFilterDate = useCallback((dateString: string): boolean => {
     if (!dateString) {
       return false;
@@ -45,10 +183,20 @@ export default function PlayerBattles() {
 
     const selectedDate = new Date(dateString);
 
-    // Check if the date is valid
+    // Check if the date is valid (not NaN)
     return !isNaN(selectedDate.getTime());
   }, []);
 
+  // Validate date input and update filter validity state
+  useEffect(() => {
+    const isValid = validateFilterDate(beforeDate);
+    setIsValidFilterDate(isValid);
+  }, [beforeDate, validateFilterDate]);
+
+  /**
+   * Applies the current date filter to the battles query
+   * Converts local time to UTC before applying the filter
+   */
   const handleApplyFilter = () => {
     if (beforeDate && isValidFilterDate) {
       // Convert local datetime to UTC for API
@@ -60,37 +208,33 @@ export default function PlayerBattles() {
     }
   };
 
+  /**
+   * Clears the applied filter and resets the date input to today
+   */
   const handleClearFilter = () => {
     setAppliedBeforeDate(undefined);
     setBeforeDate(getTodayDateTime());
   };
 
-  // Check if the date in the filter is valid (enabling 'Apply Filter' button)
-  useEffect(() => {
-    const isValid = validateFilterDate(beforeDate);
-    setIsValidFilterDate(isValid);
-  }, [beforeDate, validateFilterDate]);
-
-  // Handle cards error early
+  // Handle cards error early - battles can't be displayed without card data
   if (isCardsError) return <div>Error: {cardsError.message}</div>;
 
   return (
     <div className="battles-page">
+      {/* Filter Controls Section */}
       <div className="battles-filter-container">
         <label className="battles-datetime-label" htmlFor="beforeDate">
           See battles before:
         </label>
         <input
-          className="battles-datetime-input"
+          className={`battles-datetime-input${
+            !isValidFilterDate ? " invalid" : ""
+          }`}
           type="datetime-local"
           name="beforeDate"
           id="beforeDate"
           value={beforeDate}
           onChange={(e) => setBeforeDate(e.target.value)}
-          style={{
-            // Signal invalid date
-            borderColor: !isValidFilterDate ? "#ff6b6b" : undefined,
-          }}
         />
         <button
           className="battles-apply-filter-button"
@@ -107,32 +251,59 @@ export default function PlayerBattles() {
         </button>
       </div>
 
-      {/* Battles content with stable height */}
       <div className="battles-content">
         {isBattlesError && <div>Error: {battlesError.message}</div>}
 
-        {(battlesLoading || cardsLoading) && <div>Loading battles...</div>}
+        {/* Loading State - Shows during initial load, cards loading, or battles loading */}
+        {/* By showing a loading spinner, the user can access the site instantly and doesn't have
+            to wait on the previous site till all battles loaded and rendered */}
+        {(isInitialLoad || battlesLoading || cardsLoading) && (
+          <div>
+            <CircularProgress className="battles-loading-spinner" />
+            <p>Loading battles...</p>
+          </div>
+        )}
 
-        {!isBattlesError && !battlesLoading && !cardsLoading && (
+        {/* Loaded State - Show battles when all data is available and no errors occurred */}
+        {!isBattlesError && !isInitialLoad && (
           <>
-            {battlesList.map((b, i) => (
-              <BattleComponent
-                key={`${b.battleTime}-${playerTag}-${i}`} // More stable unique ID
-                battle={b}
-                cards={cards ?? []} // fall back to empty list, if cards don't exist
-              />
-            ))}
+            {/* Show battles if there is any data to display */}
+            {battlesList.length > 0 && (
+              <>
+                {battlesList.map((b, i) => (
+                  <BattleComponent
+                    key={`${b.battleTime}-${playerTag}-${i}`} // More stable unique ID
+                    battle={b}
+                    cards={cards ?? []} // fall back to empty list, if cards don't exist
+                  />
+                ))}
 
-            {hasNextPage ? (
-              <button
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-              >
-                {isFetchingNextPage ? "Loading..." : "Load more"}
-              </button>
-            ) : (
-              // TODO upon reloading with many loaded battles, user sees "No more battles", but should see loading spinner
-              <div>No more battles</div>
+                {/* Infinite Scroll Trigger - Hidden element that triggers loading when visible */}
+                {hasNextPage && (
+                  <div ref={loadMoreRef} className="battles-load-more-trigger">
+                    {isFetchingNextPage && (
+                      <div className="battles-loading-more">
+                        <CircularProgress className="battles-loading-spinner" />
+                        <span>Loading more battles...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* End of List Message - Show when all battles have been loaded */}
+                {!hasNextPage && (
+                  <div className="battles-end-message">
+                    <p>No more battles to load</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Show message when no battles are found and not loading */}
+            {battlesList.length === 0 && !battlesLoading && !cardsLoading && (
+              <div className="no-battles-message">
+                <p>No battles found</p>
+              </div>
             )}
           </>
         )}

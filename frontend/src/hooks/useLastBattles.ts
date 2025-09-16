@@ -22,7 +22,7 @@ const cacheDuration = 5 * min;
  */
 export function usePlayerBattlesInfinite(
   playerTag: string,
-  limit = 10,
+  limit = 50,
   enabled = true,
   beforeDate?: string
 ) {

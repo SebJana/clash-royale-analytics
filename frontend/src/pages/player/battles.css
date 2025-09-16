@@ -48,7 +48,10 @@
   font-size: 1rem;
   font-family: inherit;
   transition: all 0.2s ease;
-  min-width: 200px;
+}
+
+.battles-datetime-input.invalid {
+  border-color: #ff6b6b;
 }
 
 .battles-datetime-input:focus {
@@ -122,4 +125,37 @@
 
 .battles-clear-filter-button:hover {
   background-color: rgb(80, 80, 80);
+}
+
+.battles-loading-spinner .MuiCircularProgress-circle {
+  stroke: #4a9eff;
+}
+
+/* Loading more battles */
+.battles-loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #bdc3c7;
+  font-size: 0.9rem;
+}
+
+.battles-end-message {
+  text-align: center;
+  color: #bdc3c7;
+  font-style: italic;
+  margin: 20px 0;
+}
+
+.battles-load-more-trigger {
+  min-height: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.battles-loading-more span {
+  margin-left: 8px;
 }
