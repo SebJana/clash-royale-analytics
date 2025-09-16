@@ -61,9 +61,7 @@ export default function PlayerBattles() {
   };
 
   const handleClearFilter = () => {
-    setBeforeDate("");
     setAppliedBeforeDate(undefined);
-    setIsValidFilterDate(false);
     setBeforeDate(getTodayDateTime());
   };
 
@@ -71,7 +69,6 @@ export default function PlayerBattles() {
   useEffect(() => {
     const isValid = validateFilterDate(beforeDate);
     setIsValidFilterDate(isValid);
-    console.log(beforeDate, isValid);
   }, [beforeDate, validateFilterDate]);
 
   if (battlesLoading || cardsLoading) return <div>Loading...</div>;
@@ -93,8 +90,7 @@ export default function PlayerBattles() {
           onChange={(e) => setBeforeDate(e.target.value)}
           style={{
             // Signal invalid date
-            borderColor:
-              beforeDate && !isValidFilterDate ? "#ff6b6b" : undefined,
+            borderColor: !isValidFilterDate ? "#ff6b6b" : undefined,
           }}
         />
         <button
