@@ -33,7 +33,7 @@
 /* Label styling */
 .battles-datetime-label {
   color: white;
-  font-size: 14px;
+  font-size: 1.1rem;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -45,7 +45,7 @@
   border-radius: 8px;
   color: white;
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: 1rem;
   font-family: inherit;
   transition: all 0.2s ease;
   min-width: 200px;
