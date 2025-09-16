@@ -34,6 +34,7 @@ export default function PlayerBattles() {
   if (isBattlesError) return <div>Error: {battlesError.message}</div>;
 
   return (
+    // TODO add before datetime selector, to filter for specific time
     <div>
       {battlesList.map((b, i) => (
         <BattleComponent
@@ -48,6 +49,7 @@ export default function PlayerBattles() {
           {isFetchingNextPage ? "Loading..." : "Load more"}
         </button>
       ) : (
+        // TODO upon reloading with many loaded battles, user sees "No more battles", but should see loading spinner
         <div>No more battles</div>
       )}
     </div>

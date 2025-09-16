@@ -32,7 +32,9 @@ class Settings:
     CACHE_TTL_GAME_MODES: int = 1 * 60 * 60  # 1 hour
     CACHE_TTL_PLAYER_PROFILE: int = 15 * 60  # 15 minutes
     CACHE_TTL_PLAYER_BATTLE_STATS: int = 10 * 60  # 10 minutes
-    CACHE_TTL_BATTLES: int = 10 * 60  # 10 minutes
+    CACHE_TTL_BATTLES: int = (
+        1 * 60
+    )  # 1 minutes (short cache time, query params likely to change often with before timestamp. Also no real calculation effort needed for retrieving last battles)
     CACHE_TTL_DECK_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_CARD_STATS: int = 10 * 60  # 10 minutes
 

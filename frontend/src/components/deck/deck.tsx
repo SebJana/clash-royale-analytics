@@ -124,6 +124,7 @@ export const DeckComponent = memo(function DeckComponent({
   return (
     <>
       <div>{rows}</div>
+      {/* TODO add elixir droplet icon to value*/}
       <div className="deck-component-footer">
         <div className="deck-component-stats">
           <div className="deck-component-stat-item">
