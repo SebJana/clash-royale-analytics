@@ -1,0 +1,10 @@
+.player-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.player-content {
+  flex: 1;
+  min-height: 0; /* Allow content to shrink */
+}

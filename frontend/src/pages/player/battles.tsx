@@ -71,12 +71,11 @@ export default function PlayerBattles() {
     setIsValidFilterDate(isValid);
   }, [beforeDate, validateFilterDate]);
 
-  if (battlesLoading || cardsLoading) return <div>Loading...</div>;
+  // Handle cards error early
   if (isCardsError) return <div>Error: {cardsError.message}</div>;
-  if (isBattlesError) return <div>Error: {battlesError.message}</div>;
 
   return (
-    <div>
+    <div className="battles-page">
       <div className="battles-filter-container">
         <label className="battles-datetime-label" htmlFor="beforeDate">
           See battles before:
@@ -107,22 +106,37 @@ export default function PlayerBattles() {
           Clear Filter
         </button>
       </div>
-      {battlesList.map((b, i) => (
-        <BattleComponent
-          key={`${b.battleTime}-${playerTag}-${i}`} // More stable unique ID
-          battle={b}
-          cards={cards ?? []} // fall back to empty list, if cards don't exist
-        />
-      ))}
 
-      {hasNextPage ? (
-        <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-          {isFetchingNextPage ? "Loading..." : "Load more"}
-        </button>
-      ) : (
-        // TODO upon reloading with many loaded battles, user sees "No more battles", but should see loading spinner
-        <div>No more battles</div>
-      )}
+      {/* Battles content with stable height */}
+      <div className="battles-content">
+        {isBattlesError && <div>Error: {battlesError.message}</div>}
+
+        {(battlesLoading || cardsLoading) && <div>Loading battles...</div>}
+
+        {!isBattlesError && !battlesLoading && !cardsLoading && (
+          <>
+            {battlesList.map((b, i) => (
+              <BattleComponent
+                key={`${b.battleTime}-${playerTag}-${i}`} // More stable unique ID
+                battle={b}
+                cards={cards ?? []} // fall back to empty list, if cards don't exist
+              />
+            ))}
+
+            {hasNextPage ? (
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? "Loading..." : "Load more"}
+              </button>
+            ) : (
+              // TODO upon reloading with many loaded battles, user sees "No more battles", but should see loading spinner
+              <div>No more battles</div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

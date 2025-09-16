@@ -1,3 +1,9 @@
+.battles-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .battles-filter-container {
   background-color: rgb(55, 55, 55);
   border-radius: 12px;
@@ -9,6 +15,12 @@
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.battles-content {
+  flex: 1;
+  min-height: 400px; /* Ensures content area has minimum height */
 }
 
 /* Responsive: center align on narrow screens */
