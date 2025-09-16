@@ -58,6 +58,14 @@
 }
 
 @media (max-width: 768px) {
+  .deck-component-footer {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .deck-component-stats {
+    gap: 15px;
+  }
+
   .deck-component-stat-value {
     font-size: 1.1rem;
   }

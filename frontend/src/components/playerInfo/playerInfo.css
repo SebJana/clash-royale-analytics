@@ -140,6 +140,13 @@
   .player-info-component-stats-grid {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
+
+  .player-info-component-info-label {
+    font-size: 1rem;
+  }
+  .player-info-component-info-value {
+    font-size: 1rem;
+  }
 }
 
 @media (min-width: 1024px) {

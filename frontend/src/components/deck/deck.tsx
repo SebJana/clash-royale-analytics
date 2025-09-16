@@ -123,6 +123,7 @@ export const DeckComponent = memo(function DeckComponent({
 
   return (
     <>
+      {/* TODO (potentially) add max deck row width/height*/}
       <div>{rows}</div>
       {/* TODO add elixir droplet icon to value*/}
       <div className="deck-component-footer">
