@@ -3,7 +3,7 @@ import { DeckComponent } from "../deck/deck";
 import type { Battle } from "../../types/lastBattles";
 import type { CardMeta } from "../../types/cards";
 import { Crown } from "lucide-react";
-import { datetimeToLocale } from "../../utils/datetimeToLocale";
+import { datetimeToLocale } from "../../utils/datetime";
 import "./battle.css";
 
 export const BattleComponent = memo(function BattleComponent({

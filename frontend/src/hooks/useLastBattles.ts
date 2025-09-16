@@ -23,12 +23,13 @@ const cacheDuration = 5 * min;
 export function usePlayerBattlesInfinite(
   playerTag: string,
   limit = 10,
-  enabled = true
+  enabled = true,
+  beforeDate?: string
 ) {
   const queryClient = useQueryClient();
   const queryKey = useMemo(
-    () => ["playerBattles", playerTag, limit] as const,
-    [playerTag, limit]
+    () => ["playerBattles", playerTag, limit, beforeDate] as const,
+    [playerTag, limit, beforeDate]
   );
 
   const q = useInfiniteQuery<
@@ -40,7 +41,7 @@ export function usePlayerBattlesInfinite(
   >({
     queryKey,
     enabled: enabled && !!playerTag && validatePlayerTagSyntax(playerTag),
-    initialPageParam: undefined, // First page has no "before" parameter
+    initialPageParam: beforeDate, // Use beforeDate as initial page param if provided
     queryFn: ({ pageParam }) => fetchLastBattles(playerTag, pageParam, limit),
     getNextPageParam: (lastPage) => {
       const lb = lastPage.last_battles;
@@ -68,7 +69,6 @@ export function usePlayerBattlesInfinite(
   // Force reset to first page when data becomes stale to prevent mass API calls
   useEffect(() => {
     if (q.isStale && q.data?.pages && q.data.pages.length > 1) {
-      console.log("Resetting infinite query to first page due to stale data");
       queryClient.resetQueries({ queryKey });
     }
   }, [q.isStale, q.data, queryClient, queryKey]);
