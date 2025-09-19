@@ -6,6 +6,7 @@ import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { useEffect } from "react";
+import { internalNamesToDisplayNames } from "../../utils/gameModes";
 
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
@@ -45,7 +46,10 @@ export default function PlayerDecks() {
   });
 
   useEffect(() => {
-    console.log(gameModes);
+    const gameModesMap = internalNamesToDisplayNames(gameModes ?? {});
+    for (const [internal, display] of gameModesMap) {
+      console.log(`Internal: ${internal}, Display: ${display}`);
+    }
   }, [gameModes]);
 
   return (
