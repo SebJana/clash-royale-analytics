@@ -1,9 +1,4 @@
-export type Card = {
-  name: string;
-  id: number;
-  level: number;
-  evolutionLevel?: number;
-};
+import type { Card } from "./cards";
 
 export type Player = {
   tag: string;

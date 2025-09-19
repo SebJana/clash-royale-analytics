@@ -5,11 +5,12 @@ import { DeckComponent } from "../../components/deck/deck";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
-import { useEffect } from "react";
-import { internalNamesToDisplayNames } from "../../utils/gameModes";
+import { useEffect, useState } from "react";
+import { GameModeFilter } from "../../components/gameModeFilter/gameModeFilter";
 
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
+  const [selectedGameModes, setSelectedGameModes] = useState<string[]>([]);
 
   const {
     data: cards,
@@ -31,7 +32,9 @@ export default function PlayerDecks() {
     isLoading: decksLoading,
     isError: isDecksError,
     error: decksError,
-  } = useDeckStats(playerTag, "2025-01-01", "2025-10-01");
+  } = useDeckStats(playerTag, "2025-01-01", "2025-10-01", selectedGameModes);
+
+  const modesKey = (selectedGameModes ?? []).join("|");
 
   // Use loading state logic
   const { isInitialLoad } = usePageLoadingState({
@@ -42,15 +45,12 @@ export default function PlayerDecks() {
         deckStats?.deck_statistics.decks &&
           deckStats.deck_statistics.decks.length > 0
       ),
-    resetDependency: playerTag, // TODO add game modes and start/end date
+    resetDependency: `${playerTag}-${modesKey}`, // TODO add game modes and start/end date
   });
 
   useEffect(() => {
-    const gameModesMap = internalNamesToDisplayNames(gameModes ?? {});
-    for (const [internal, display] of gameModesMap) {
-      console.log(`Internal: ${internal}, Display: ${display}`);
-    }
-  }, [gameModes]);
+    console.log(selectedGameModes);
+  }, [selectedGameModes]);
 
   return (
     <div className="decks-page">
@@ -72,8 +72,13 @@ export default function PlayerDecks() {
           </div>
         )}
         {/* Loaded State - Show decks when all data is available and no errors occurred */}
-        {!isDecksError && !isInitialLoad && (
+        {!isDecksError && !isGameModesError && !isInitialLoad && (
           <>
+            <GameModeFilter
+              gameModes={gameModes ?? {}}
+              selected={selectedGameModes}
+              onChange={setSelectedGameModes}
+            />
             <h2>Deck Stats</h2>
 
             {/* Show decks if there is any data to display */}
@@ -82,7 +87,7 @@ export default function PlayerDecks() {
                 <>
                   {deckStats.deck_statistics.decks.map((d) => (
                     // Unique deck id of all cards in the deck
-                    <div key={d.deck?.map((c) => c.id).join(";")}>
+                    <div key={`${d.deck?.map((c) => c.id).join(";")}`}>
                       <strong>{d.count}</strong> — {d.wins}
                       <DeckComponent deck={d.deck} cards={cards ?? []} />
                     </div>

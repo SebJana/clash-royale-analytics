@@ -14,3 +14,10 @@ export type CardMeta = {
 export type CardsResponse = {
   items: CardMeta[];
 };
+
+export type Card = {
+  name: string;
+  id: number;
+  level?: number;
+  evolutionLevel?: number;
+};

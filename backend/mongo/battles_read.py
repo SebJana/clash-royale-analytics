@@ -171,12 +171,28 @@ async def get_decks_win_percentage(
                 player_tag, start_date, end_date, game_modes, timezone
             ),
             extract_deck_cards_stage(player_tag),
+            # Remove level field from deck cards
+            {
+                "$addFields": {
+                    "deckCardsNormalized": {
+                        "$map": {
+                            "input": "$deckCards",
+                            "as": "card",
+                            "in": {
+                                "id": "$$card.id",
+                                "name": "$$card.name",
+                                "evolutionLevel": "$$card.evolutionLevel",
+                            },
+                        }
+                    }
+                }
+            },
             # Sort the decks by card properties - evolution level first, then id
             {
                 "$addFields": {
                     "deckSorted": {
                         "$sortArray": {
-                            "input": "$deckCards",
+                            "input": "$deckCardsNormalized",
                             "sortBy": {"evolutionLevel": -1, "id": 1},
                         }
                     }

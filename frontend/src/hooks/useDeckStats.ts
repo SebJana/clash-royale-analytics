@@ -16,16 +16,19 @@ export function useDeckStats(
     queryKey: ["deckStats", playerTag, startDate, endDate, modesKey],
     // Pass the playerTag to the query function from the query key
     queryFn: ({ queryKey }) => {
-      const [, tag, start, end, modes] = queryKey;
-      return fetchDeckStats(
-        tag as string,
-        start as string,
-        end as string,
-        modes as string[] | undefined
-      );
+      const [, tag, start, end, modesString] = queryKey as [
+        string,
+        string,
+        string,
+        string,
+        string
+      ];
+      const modes = modesString ? modesString.split("|") : undefined; // back to array from joined string
+      return fetchDeckStats(tag, start, end, modes);
     },
-    staleTime: 10 * min, // Cache duration
+    staleTime: 10 * min, // Cache duration, how long cards are considered fresh and aren't re-fetched from the backend
     gcTime: 15 * min,
     refetchOnWindowFocus: false,
+    retry: false, // Don't retry to avoid long waits when no data is found
   });
 }

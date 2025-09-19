@@ -1,0 +1,41 @@
+.game-mode-filter-component-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.game-mode-filter-component-tag {
+  position: relative;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: rgb(55, 55, 55);
+  color: rgba(255, 255, 255, 0.87);
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-mode-filter-component-tag:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background-color: rgb(65, 65, 65);
+}
+
+.game-mode-filter-component-tag.is-selected {
+  border-color: #3498db;
+  background-color: rgba(52, 152, 219, 0.15);
+  color: #3498db;
+}
+
+.game-mode-filter-component-tag-text {
+  display: block;
+  flex: 1;
+  text-align: center;
+}

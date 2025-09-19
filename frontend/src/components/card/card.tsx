@@ -1,7 +1,6 @@
 import { memo } from "react";
 import Tooltip from "@mui/material/Tooltip";
-import type { Card } from "../../types/lastBattles";
-import type { CardMeta } from "../../types/cards";
+import type { Card, CardMeta } from "../../types/cards";
 import {
   getCardName,
   getCardElixirCost,
@@ -61,7 +60,10 @@ export const CardComponent = memo(function CardComponent({
         </div>
       </Tooltip>
 
-      <p className="card-component-level-label">Level {card.level}</p>
+      {/* Only show level label if it exists (Battle page, not for Decks/Cards page) */}
+      {card?.level != null && (
+        <p className="card-component-level-label">Level {card.level}</p>
+      )}
     </div>
   );
 });

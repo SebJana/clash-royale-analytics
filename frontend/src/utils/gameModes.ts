@@ -80,7 +80,7 @@ export function internalDisplayMapToInternalNamesList(
     internalNames.add(internal);
   }
 
-  return Array.from(internalNames); // Return as list
+  return Array.from(internalNames).sort((a, b) => a.localeCompare(b)); // Return as list and sort ascending
 }
 
 /**
@@ -99,5 +99,5 @@ export function internalDisplayMapToDisplayNamesList(
     displayNames.add(display);
   }
 
-  return Array.from(displayNames); // Return as list
+  return Array.from(displayNames).sort((a, b) => a.localeCompare(b)); // Return as list and sort ascending
 }

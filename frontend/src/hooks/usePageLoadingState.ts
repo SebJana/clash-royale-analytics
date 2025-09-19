@@ -51,7 +51,7 @@ export function usePageLoadingState({
   hasData,
   resetDependency,
   minDisplayTime = 300,
-  maxLoadTime = 10000,
+  maxLoadTime = 5000,
 }: UsePageLoadingStateOptions): UsePageLoadingStateReturn {
   // Loading state: tracks initial page load to show spinner immediately
   const [isInitialLoad, setIsInitialLoad] = useState(true);

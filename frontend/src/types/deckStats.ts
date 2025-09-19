@@ -1,3 +1,5 @@
+import type { Card } from "./cards";
+
 export type DeckStats = {
   player_tag: string;
   game_modes: string[] | null; // Applied filters on game mode
@@ -14,11 +16,4 @@ type Deck = {
   lastSeen: string;
   modes: string[]; // Game modes in which the deck appeared
   deck: Card[];
-};
-
-type Card = {
-  id: number;
-  name: string;
-  level: number;
-  evolutionLevel?: number;
 };
