@@ -1,8 +1,7 @@
 import { memo } from "react";
 import { CardComponent } from "../card/card";
 import { getCardElixirCost } from "../../utils/getCardMetaFields";
-import type { Card } from "../../types/lastBattles";
-import type { CardMeta } from "../../types/cards";
+import type { Card, CardMeta } from "../../types/cards";
 import { round } from "../../utils/round";
 import { Copy } from "lucide-react";
 import "./deck.css";
