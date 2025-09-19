@@ -19,6 +19,7 @@ from mongo import MongoConn
 # TODO (potentially) add optional query param to tracked players
 # so that user can search the players with a name/tag or a substring of them
 
+# TODO (potentially) add own game mode id to keep query params short
 # TODO check game modes that are passed as query param, if they exist in mongo
 
 
