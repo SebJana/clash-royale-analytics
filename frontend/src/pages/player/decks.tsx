@@ -10,7 +10,10 @@ import { GameModeFilter } from "../../components/gameModeFilter/gameModeFilter";
 
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
+  // Start with empty array, will be populated once game modes are loaded
   const [selectedGameModes, setSelectedGameModes] = useState<string[]>([]);
+  // Track if the game modes selection was initialized to prevent double loading
+  const [gameModesInitialized, setGameModesInitialized] = useState(false);
 
   const {
     data: cards,
@@ -26,15 +29,32 @@ export default function PlayerDecks() {
     error: gameModesError,
   } = useGameModes();
 
-  // Fetch decks statistics
+  // Initialize selected game modes once when game modes are loaded
+  // This prevents the double-load by ensuring deck stats only load after game modes are ready
+  useEffect(() => {
+    if (gameModes && !gameModesInitialized && !gameModesLoading) {
+      // Auto-select all game modes when they first become available
+      const allGameModeKeys = Object.keys(gameModes);
+      setSelectedGameModes(allGameModeKeys);
+      setGameModesInitialized(true);
+    }
+  }, [gameModes, gameModesInitialized, gameModesLoading]);
+
+  // Fetch deck statistics only when game modes are properly initialized
+  // Passes null to disable the query until gameModesInitialized is true
   const {
     data: deckStats,
     isLoading: decksLoading,
     isError: isDecksError,
     error: decksError,
-  } = useDeckStats(playerTag, "2025-01-01", "2025-10-01", selectedGameModes);
+  } = useDeckStats(
+    playerTag,
+    "2025-01-01",
+    "2025-10-01",
+    gameModesInitialized ? selectedGameModes : null // Only fetch decks once gameModes are initialized
+  );
 
-  const modesKey = (selectedGameModes ?? []).join("|");
+  const modesKey = selectedGameModes.join("|");
 
   // Use loading state logic
   const { isInitialLoad } = usePageLoadingState({
@@ -45,12 +65,8 @@ export default function PlayerDecks() {
         deckStats?.deck_statistics.decks &&
           deckStats.deck_statistics.decks.length > 0
       ),
-    resetDependency: `${playerTag}-${modesKey}`, // TODO add game modes and start/end date
+    resetDependency: `${playerTag}-${modesKey}`,
   });
-
-  useEffect(() => {
-    console.log(selectedGameModes);
-  }, [selectedGameModes]);
 
   return (
     <div className="decks-page">
@@ -59,9 +75,8 @@ export default function PlayerDecks() {
         {isCardsError && <div>Error: {cardsError?.message}</div>}
         {isGameModesError && <div>Error: {gameModesError?.message}</div>}
 
-        {/* Loading State - Shows during initial load, cards loading, or decks loading */}
-        {/* By showing a loading spinner, the user can access the site instantly and doesn't have
-            to wait on the previous site till all decks loaded and rendered */}
+        {/* Loading State - Shows during initial load, cards loading, decks loading, or game mode loading */}
+        {/* The loading spinner prevents users from seeing incomplete data during the initialization process */}
         {(isInitialLoad ||
           decksLoading ||
           cardsLoading ||

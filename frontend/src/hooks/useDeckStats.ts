@@ -8,7 +8,7 @@ export function useDeckStats(
   playerTag: string,
   startDate: string,
   endDate: string,
-  gameModes?: string[]
+  gameModes?: string[] | null // Can be null to disable query until game modes are initialized
 ) {
   const modesKey = (gameModes ?? []).join("|"); // Make game modes a stable key
 
@@ -30,5 +30,6 @@ export function useDeckStats(
     gcTime: 15 * min,
     refetchOnWindowFocus: false,
     retry: false, // Don't retry to avoid long waits when no data is found
+    enabled: gameModes !== null, // Only run query when gameModes are initialized (prevents double loading)
   });
 }

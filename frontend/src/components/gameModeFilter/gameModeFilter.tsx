@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import {
   internalNamesToDisplayNames,
   internalDisplayMapToDisplayNamesList,
@@ -39,15 +39,6 @@ export function GameModeFilter({
       return { display, internals };
     });
   }, [uniqueDisplayNames, gameModesMap]);
-
-  // Initialize with ALL options selected if no selection exists
-  // That takes effect upon initialization but also when the user toggles off all
-  // game modes, that is the same as toggling them all on
-  useEffect(() => {
-    if (selected.length === 0 && options.length > 0) {
-      onChange(options.flatMap((o) => o.internals));
-    }
-  }, [options, selected.length, onChange]);
 
   const isSelected = (internals: string[]) =>
     internals.some((internal) => selected.includes(internal));
