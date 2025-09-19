@@ -4,6 +4,7 @@ import type { Battle } from "../../types/lastBattles";
 import type { CardMeta } from "../../types/cards";
 import { Crown } from "lucide-react";
 import { datetimeToLocale } from "../../utils/datetime";
+import { mapInternalNameToDisplayName } from "../../utils/gameModes";
 import "./battle.css";
 
 export const BattleComponent = memo(function BattleComponent({
@@ -27,6 +28,8 @@ export const BattleComponent = memo(function BattleComponent({
     }
   };
 
+  const gameMode = mapInternalNameToDisplayName(battle.gameMode);
+
   return (
     <div className="battle-component-container">
       <div className="battle-component-header">
@@ -42,7 +45,7 @@ export const BattleComponent = memo(function BattleComponent({
             {datetimeToLocale(battle.battleTime)}
           </span>
         </div>
-        <h2 className="battle-component-game-mode">{battle.gameMode}</h2>
+        <h2 className="battle-component-game-mode">{gameMode}</h2>
         <div className="battle-component-score">
           <Crown className="battle-component-crown battle-component-team-crown battle-component-crown-blue" />
           <span className="battle-component-score-text">

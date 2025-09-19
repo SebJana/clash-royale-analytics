@@ -41,7 +41,7 @@ export function internalNamesToDisplayNames(
  * mapInternalNameToDisplayName("Ranked1v1_NewArena");
  * // "Ranked 1v1"
  */
-function mapInternalNameToDisplayName(internalName: string): string {
+export function mapInternalNameToDisplayName(internalName: string): string {
   if (internalName.startsWith("Ranked1v1_")) {
     return "Ranked 1v1";
   }
