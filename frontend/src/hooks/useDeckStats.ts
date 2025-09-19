@@ -24,7 +24,7 @@ export function useDeckStats(
         modes as string[] | undefined
       );
     },
-    staleTime: 10 * min, // Cache duration, how long cards are considered fresh and aren't re-fetched from the backend
+    staleTime: 10 * min, // Cache duration
     gcTime: 15 * min,
     refetchOnWindowFocus: false,
   });

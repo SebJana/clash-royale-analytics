@@ -4,6 +4,8 @@ import { useDeckStats } from "../../hooks/useDeckStats";
 import { DeckComponent } from "../../components/deck/deck";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
+import { useGameModes } from "../../hooks/useGameModes";
+import { useEffect } from "react";
 
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
@@ -15,6 +17,13 @@ export default function PlayerDecks() {
     error: cardsError,
   } = useCards();
 
+  const {
+    data: gameModes,
+    isLoading: gameModesLoading,
+    isError: isGameModesError,
+    error: gameModesError,
+  } = useGameModes();
+
   // Fetch decks statistics
   const {
     data: deckStats,
@@ -25,26 +34,34 @@ export default function PlayerDecks() {
 
   // Use loading state logic
   const { isInitialLoad } = usePageLoadingState({
-    loadingStates: [decksLoading, cardsLoading],
-    errorStates: [isDecksError, isCardsError],
+    loadingStates: [decksLoading, cardsLoading, gameModesLoading],
+    errorStates: [isDecksError, isCardsError, isGameModesError],
     hasData: () =>
       Boolean(
         deckStats?.deck_statistics.decks &&
           deckStats.deck_statistics.decks.length > 0
       ),
-    resetDependency: playerTag,
+    resetDependency: playerTag, // TODO add game modes and start/end date
   });
+
+  useEffect(() => {
+    console.log(gameModes);
+  }, [gameModes]);
 
   return (
     <div className="decks-page">
       <div className="decks-content">
         {isDecksError && <div>Error: {decksError?.message}</div>}
         {isCardsError && <div>Error: {cardsError?.message}</div>}
+        {isGameModesError && <div>Error: {gameModesError?.message}</div>}
 
         {/* Loading State - Shows during initial load, cards loading, or decks loading */}
         {/* By showing a loading spinner, the user can access the site instantly and doesn't have
             to wait on the previous site till all decks loaded and rendered */}
-        {(isInitialLoad || decksLoading || cardsLoading) && (
+        {(isInitialLoad ||
+          decksLoading ||
+          cardsLoading ||
+          gameModesLoading) && (
           <div>
             <CircularProgress className="decks-loading-spinner" />
             <p>Loading decks...</p>
@@ -73,6 +90,7 @@ export default function PlayerDecks() {
             {(!deckStats?.deck_statistics.decks ||
               deckStats.deck_statistics.decks.length === 0) &&
               !decksLoading &&
+              !gameModesLoading &&
               !cardsLoading && (
                 <div className="no-decks-message">
                   <p>No decks found with the current filters applied</p>
