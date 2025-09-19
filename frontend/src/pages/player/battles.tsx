@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useCards } from "../../hooks/useCards";
 import { usePlayerBattlesInfinite } from "../../hooks/useLastBattles";
+import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import { BattleComponent } from "../../components/battle/battle";
 import { localeToUTC, getTodayDateTime } from "../../utils/datetime";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -31,28 +32,8 @@ export default function PlayerBattles() {
   // Validation state: tracks if the current date input is valid
   const [isValidFilterDate, setIsValidFilterDate] = useState(true); // Initially true since filter starts with today's date
 
-  // Loading state: tracks initial page load to show spinner immediately
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Track if there ever was data to differentiate between first load and subsequent loads
-  // Subsequent load can hold more data, as a load before that may have cached any amount of battles already
-  // Leading to longer waiting/loading times
-  const [hasEverHadData, setHasEverHadData] = useState(false);
-
   // Ref for the load more trigger element (used for intersection observer)
   const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  // Track component mount to ensure loading spinner shows immediately
-  const isMountedRef = useRef(false);
-  const loadStartTimeRef = useRef<number>(Date.now());
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    loadStartTimeRef.current = Date.now();
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   // Fetch card data (needed to display card information in battles)
   const {
@@ -79,63 +60,13 @@ export default function PlayerBattles() {
     [battles]
   );
 
-  // Clear initial load state once data is available or loading is complete
-  useEffect(() => {
-    // Mark that there is data if there are battles
-    if (battlesList.length > 0 && !hasEverHadData) {
-      setHasEverHadData(true);
-    }
-
-    // Only clear initial load state when:
-    // 1. Page is not loading anymore AND
-    // 2. There either is data OR the first loading attempt was completed OR there's an error AND
-    // 3. At least 300ms have passed to ensure spinner is visible
-    if (
-      !battlesLoading &&
-      !cardsLoading &&
-      (battlesList.length > 0 || hasEverHadData || isBattlesError)
-    ) {
-      const timeElapsed = Date.now() - loadStartTimeRef.current;
-      // Always show the spinner to give the page and server loading time
-      const minDisplayTime = 300; // Minimum time to show loading spinner
-
-      if (timeElapsed >= minDisplayTime) {
-        setIsInitialLoad(false);
-      } else {
-        // Wait for the minimum display time to remove spinner
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            setIsInitialLoad(false);
-          }
-        }, minDisplayTime - timeElapsed);
-      }
-    }
-  }, [
-    battlesLoading,
-    cardsLoading,
-    battlesList.length,
-    hasEverHadData,
-    isBattlesError,
-  ]);
-
-  // Reset initial load state when playerTag changes (navigating to different player)
-  useEffect(() => {
-    setIsInitialLoad(true);
-    setHasEverHadData(false);
-    loadStartTimeRef.current = Date.now();
-  }, [playerTag]);
-
-  // Fallback timeout to ensure loading state doesn't persist indefinitely
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (isInitialLoad && isMountedRef.current) {
-        // Still display page even tho it is not fully loaded yet
-        setIsInitialLoad(false);
-      }
-    }, 10000); // 10 second timeout
-
-    return () => clearTimeout(timeout);
-  }, [isInitialLoad]);
+  // Use loading state logic
+  const { isInitialLoad } = usePageLoadingState({
+    loadingStates: [battlesLoading, cardsLoading],
+    errorStates: [isBattlesError, isCardsError],
+    hasData: () => battlesList.length > 0,
+    resetDependency: `${playerTag}-${appliedBeforeDate}`,
+  });
 
   // Intersection Observer for auto-loading more battles when user scrolls near bottom
   useEffect(() => {
@@ -298,7 +229,9 @@ export default function PlayerBattles() {
                 )}
               </>
             )}
+            {/* TODO add back to top button*/}
 
+            {/* TODO add limit (max 100/200 battles?) and feedback message to filter if user wants to see more */}
             {/* Show message when no battles are found and not loading */}
             {battlesList.length === 0 && !battlesLoading && !cardsLoading && (
               <div className="no-battles-message">
