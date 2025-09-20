@@ -1,0 +1,36 @@
+.decks-filter-container {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 24px;
+  margin: 16px 0;
+}
+
+.decks-filter-header {
+  margin: 0px;
+  padding-left: 3px;
+  padding-bottom: 10px;
+  text-align: left;
+}
+
+.decks-apply-filters-button {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 12px;
+  margin-left: auto;
+  display: block;
+  transition: background-color 0.2s ease;
+}
+
+.decks-apply-filters-button:hover {
+  background-color: #45a049;
+}
+
+.decks-apply-filters-button:active {
+  background-color: #3d8b40;
+}

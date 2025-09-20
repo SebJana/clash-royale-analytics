@@ -99,11 +99,11 @@
 
 /* Apply Filter button */
 .battles-apply-filter-button {
-  background-color: #4a9eff;
+  background-color: #4caf50;
 }
 
 .battles-apply-filter-button:hover:not(:disabled) {
-  background-color: #3d8ae6;
+  background-color: #45a049;
   transform: translateY(-1px);
 }
 

@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   internalNamesToDisplayNames,
   internalDisplayMapToDisplayNamesList,
 } from "../../utils/gameModes";
+import { ChevronUp } from "lucide-react";
 import "./gameModeFilter.css";
 
 export function GameModeFilter({
@@ -14,6 +15,8 @@ export function GameModeFilter({
   selected: string[]; // internal keys currently selected
   onChange: (next: string[]) => void; // emit internal keys
 }>) {
+  const [isExpanded, setIsExpanded] = useState(false); // init with hidden option
+
   // Build map: internal -> display
   const gameModesMap = useMemo(
     () => internalNamesToDisplayNames(gameModes),
@@ -54,21 +57,68 @@ export function GameModeFilter({
     }
   };
 
+  const selectAll = () => {
+    // Get all internal names from all options
+    const allInternals = options.flatMap((option) => option.internals);
+    onChange(allInternals);
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
   return (
-    <div className="game-mode-filter-component-grid">
-      {options.map(({ internals, display }) => (
-        <button
-          key={display}
-          type="button"
-          className={`game-mode-filter-component-tag ${
-            isSelected(internals) ? "is-selected" : ""
+    <div className="game-mode-filter-container">
+      <button
+        type="button"
+        className="game-mode-filter-component-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <span className="game-mode-filter-component-title">Game Modes</span>
+        <ChevronUp
+          className={`game-mode-filter-component-toggle ${
+            !isExpanded ? "collapsed" : ""
           }`}
-          onClick={() => toggle(internals)}
-          aria-pressed={isSelected(internals)}
-        >
-          <span className="game-mode-filter-component-tag-text">{display}</span>
-        </button>
-      ))}
+        />
+      </button>
+      <div
+        id="game-mode-filter-grid"
+        className={`game-mode-filter-component-grid ${
+          !isExpanded ? "hidden" : ""
+        }`}
+      >
+        {options.map(({ internals, display }) => (
+          <button
+            key={display}
+            type="button"
+            className={`game-mode-filter-component-tag ${
+              isSelected(internals) ? "is-selected" : ""
+            }`}
+            onClick={() => toggle(internals)}
+            aria-pressed={isSelected(internals)}
+          >
+            <span className="game-mode-filter-component-tag-text">
+              {display}
+            </span>
+          </button>
+        ))}
+        <div className="game-mode-filter-component-actions">
+          <button
+            type="button"
+            className="game-mode-filter-component-action-button game-mode-filter-component-select-all"
+            onClick={selectAll}
+          >
+            Select All
+          </button>
+          <button
+            type="button"
+            className="game-mode-filter-component-action-button game-mode-filter-component-clear"
+            onClick={clearAll}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

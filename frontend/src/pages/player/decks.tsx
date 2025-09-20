@@ -7,11 +7,14 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { useEffect, useState } from "react";
 import { GameModeFilter } from "../../components/gameModeFilter/gameModeFilter";
+import "./decks.css";
 
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
   // Start with empty array, will be populated once game modes are loaded
   const [selectedGameModes, setSelectedGameModes] = useState<string[]>([]);
+  // Applied filters that are actually used for the query
+  const [appliedGameModes, setAppliedGameModes] = useState<string[]>([]);
   // Track if the game modes selection was initialized to prevent double loading
   const [gameModesInitialized, setGameModesInitialized] = useState(false);
 
@@ -36,9 +39,15 @@ export default function PlayerDecks() {
       // Auto-select all game modes when they first become available
       const allGameModeKeys = Object.keys(gameModes);
       setSelectedGameModes(allGameModeKeys);
+      setAppliedGameModes(allGameModeKeys); // Also initialize applied filters
       setGameModesInitialized(true);
     }
   }, [gameModes, gameModesInitialized, gameModesLoading]);
+
+  // Function to apply the currently selected filters
+  const applyAllFilters = () => {
+    setAppliedGameModes(selectedGameModes);
+  };
 
   // Fetch deck statistics only when game modes are properly initialized
   // Passes null to disable the query until gameModesInitialized is true
@@ -51,10 +60,10 @@ export default function PlayerDecks() {
     playerTag,
     "2025-01-01",
     "2025-10-01",
-    gameModesInitialized ? selectedGameModes : null // Only fetch decks once gameModes are initialized
+    gameModesInitialized ? appliedGameModes : null // Use applied filters for the query
   );
 
-  const modesKey = selectedGameModes.join("|");
+  const modesKey = appliedGameModes.join("|");
 
   // Use loading state logic
   const { isInitialLoad } = usePageLoadingState({
@@ -89,11 +98,21 @@ export default function PlayerDecks() {
         {/* Loaded State - Show decks when all data is available and no errors occurred */}
         {!isDecksError && !isGameModesError && !isInitialLoad && (
           <>
-            <GameModeFilter
-              gameModes={gameModes ?? {}}
-              selected={selectedGameModes}
-              onChange={setSelectedGameModes}
-            />
+            <div className="decks-filter-container">
+              <h2 className="decks-filter-header">Filters</h2>
+              <GameModeFilter
+                gameModes={gameModes ?? {}}
+                selected={selectedGameModes}
+                onChange={setSelectedGameModes}
+              />
+              <button
+                type="button"
+                className="decks-apply-filters-button"
+                onClick={applyAllFilters}
+              >
+                Apply
+              </button>
+            </div>
             <h2>Deck Stats</h2>
 
             {/* Show decks if there is any data to display */}

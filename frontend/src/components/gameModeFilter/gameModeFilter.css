@@ -1,7 +1,72 @@
+.game-mode-filter-container {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.game-mode-filter-component-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  font: inherit;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+}
+
+.game-mode-filter-component-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.game-mode-filter-component-header:focus {
+  outline: none;
+}
+
+.game-mode-filter-component-header:focus .game-mode-filter-component-toggle {
+  outline: 2px solid #3498db;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.game-mode-filter-component-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.game-mode-filter-component-toggle {
+  width: 24px;
+  height: 24px;
+  color: rgba(255, 255, 255, 0.87);
+  transition: transform 0.2s ease;
+}
+
+/* Flip the arrow upside down, if filter options are not expanded */
+.game-mode-filter-component-toggle.collapsed {
+  transform: rotate(180deg);
+}
+
 .game-mode-filter-component-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 0.75rem;
+  overflow: hidden;
+  transition: max-height 0.5s ease;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.game-mode-filter-component-grid.hidden {
+  max-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .game-mode-filter-component-tag {
@@ -10,8 +75,6 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 0.75rem 1rem;
   font-size: 0.9rem;
-  font-weight: 500;
-  font-family: inherit;
   background-color: rgb(55, 55, 55);
   color: rgba(255, 255, 255, 0.87);
   cursor: pointer;
@@ -38,4 +101,49 @@
   display: block;
   flex: 1;
   text-align: center;
+}
+
+.game-mode-filter-component-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: left;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.game-mode-filter-component-action-button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 90px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.game-mode-filter-component-select-all {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+}
+
+.game-mode-filter-component-select-all:hover {
+  background: linear-gradient(135deg, #2980b9, #1f648f);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.game-mode-filter-component-clear {
+  background: linear-gradient(135deg, #6c757d, #5a6268);
+  color: white;
+}
+
+.game-mode-filter-component-clear:hover {
+  background: linear-gradient(135deg, #5a6268, #454d55);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }

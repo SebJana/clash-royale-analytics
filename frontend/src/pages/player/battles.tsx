@@ -172,13 +172,13 @@ export default function PlayerBattles() {
           disabled={!isValidFilterDate}
           onClick={handleApplyFilter}
         >
-          Apply Filter
+          Apply
         </button>
         <button
           className="battles-clear-filter-button"
           onClick={handleClearFilter}
         >
-          Clear Filter
+          Clear
         </button>
       </div>
 
