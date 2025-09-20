@@ -1,28 +1,28 @@
 .start-end-date-filter-container {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  padding-left: 16px;
-  padding-right: 16px;
-  padding-top: 5px;
-  padding-bottom: 5px;
+  background: var(--bg-overlay-light);
+  border-radius: var(--radius-lg);
+  padding-left: var(--spacing-lg);
+  padding-right: var(--spacing-lg);
+  padding-top: var(--spacing-xs);
+  padding-bottom: var(--spacing-xs);
 }
 
 .start-end-date-filter-component-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.25rem 0;
+  padding: var(--spacing-xs) 0;
   background: none;
   border: none;
   cursor: pointer;
   width: 100%;
   font: inherit;
-  transition: all 0.2s ease;
-  border-radius: 6px;
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
 }
 
 .start-end-date-filter-component-header:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-overlay-light);
 }
 
 .start-end-date-filter-component-header:focus {
@@ -31,22 +31,22 @@
 
 .start-end-date-filter-component-header:focus
   .start-end-date-filter-component-toggle {
-  outline: 2px solid #3498db;
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .start-end-date-filter-component-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.87);
+  font-size: var(--font-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 .start-end-date-filter-component-toggle {
   width: 24px;
   height: 24px;
-  color: rgba(255, 255, 255, 0.87);
-  transition: transform 0.2s ease;
+  color: var(--text-primary);
+  transition: transform var(--transition-fast);
 }
 
 /* Flip the arrow upside down, if filter options are not expanded */
@@ -57,8 +57,8 @@
 .start-end-date-filter-component-grid {
   overflow: hidden;
   transition: max-height 0.5s ease;
-  margin-top: 12px;
-  margin-bottom: 12px;
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
 }
 
 .start-end-date-filter-component-grid.hidden {
@@ -70,18 +70,18 @@
 .start-end-date-filter-component-tags {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
 }
 
 .start-end-date-filter-component-tag {
   position: relative;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 0.75rem 1rem;
-  font-size: 0.9rem;
-  background-color: rgb(55, 55, 55);
-  color: rgba(255, 255, 255, 0.87);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  padding: var(--spacing-md) var(--spacing-md);
+  font-size: var(--font-base);
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
   cursor: pointer;
   text-align: center;
   overflow: hidden;
@@ -92,14 +92,14 @@
 }
 
 .start-end-date-filter-component-tag:hover {
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: var(--border-hover);
   background-color: rgb(65, 65, 65);
 }
 
 .start-end-date-filter-component-tag.is-selected {
-  border-color: #3498db;
+  border-color: var(--color-primary);
   background-color: rgba(52, 152, 219, 0.15);
-  color: #3498db;
+  color: var(--color-primary);
 }
 
 .start-end-date-filter-component-tag-text {
@@ -110,9 +110,9 @@
 
 .start-end-date-filter-component-custom-inputs {
   display: flex;
-  gap: 1.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-light);
   justify-content: flex-start;
   flex-wrap: wrap;
 }
@@ -120,30 +120,30 @@
 .start-end-date-filter-component-input-group {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
 }
 
 .start-end-date-filter-component-label {
   color: white;
-  font-size: 1.1rem;
-  font-weight: 500;
+  font-size: var(--font-lg);
+  font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
 
 .start-end-date-filter-component-input {
-  background-color: rgb(45, 45, 45);
+  background-color: var(--bg-darker);
   border: 2px solid rgb(70, 70, 70);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: white;
-  padding: 10px 12px;
-  font-size: 1rem;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-md);
   font-family: inherit;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .start-end-date-filter-component-input:focus {
   outline: none;
-  border-color: #4a9eff;
+  border-color: var(--color-accent);
   box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
 }
 
@@ -153,27 +153,27 @@
 
 /* Style the calendar/clock icons in datetime input */
 .start-end-date-filter-component-input::-webkit-calendar-picker-indicator {
-  background-color: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-  padding: 6px;
+  background-color: var(--bg-overlay-light);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  padding: var(--spacing-sm);
   cursor: pointer;
   filter: brightness(0) invert(1);
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
   width: 16px;
   height: 16px;
 }
 
 .start-end-date-filter-component-input::-webkit-calendar-picker-indicator:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--bg-overlay-medium);
+  border-color: var(--border-active);
   transform: scale(1.1);
 }
 
 @media (max-width: 768px) {
   .start-end-date-filter-component-custom-inputs {
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--spacing-md);
   }
 
   .start-end-date-filter-component-tags {
@@ -185,7 +185,7 @@
 @media (max-width: 580px) {
   .start-end-date-filter-component-custom-inputs {
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--spacing-md);
     align-items: stretch;
   }
 }

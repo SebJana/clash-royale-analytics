@@ -1,28 +1,28 @@
 .stat-card {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 20px 16px;
+  background: var(--bg-overlay-medium);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl) var(--spacing-lg);
   text-align: center;
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal);
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 20px var(--shadow-light);
+  background: var(--bg-overlay-strong);
 }
 
 .stat-card-number {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-  color: #ecf0f1;
+  font-size: var(--font-3xl);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--spacing-sm) 0;
+  color: var(--text-muted);
 }
 
 .stat-card-label {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #bdc3c7;
+  font-size: var(--font-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }

@@ -1,66 +1,66 @@
 .battle-component-container {
-  background-color: rgb(55, 55, 55);
-  border-radius: 12px;
-  margin-bottom: 20px;
+  background-color: var(--bg-dark);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-xl);
 }
 
 .battle-component-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 5px;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: var(--spacing-xs);
 }
 
 .battle-component-header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-md);
   flex: 1;
 }
 
 .battle-component-header-result {
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-weight: 600;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
-  font-size: 14px;
+  font-size: var(--font-sm);
 }
 
 .battle-component-battle-time {
-  color: #bdc3c7;
-  font-size: 1rem;
-  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: var(--font-md);
+  font-weight: var(--font-weight-medium);
 }
 
 .battle-component-result-blue {
-  background-color: #3b82f6;
+  background-color: var(--color-info);
   color: white;
 }
 
 .battle-component-result-red {
-  background-color: #ef4444;
+  background-color: var(--color-error);
   color: white;
 }
 
 .battle-component-result-gray {
-  background-color: #6b7280;
+  background-color: var(--color-neutral);
   color: white;
 }
 
 .battle-component-game-mode {
   flex: 1;
   margin: 0;
-  font-size: 24px;
-  font-weight: 700;
+  font-size: var(--font-2xl);
+  font-weight: var(--font-weight-bold);
   text-align: center;
 }
 
 .battle-component-score {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-sm);
   flex: 1;
   justify-content: flex-end;
 }
@@ -71,68 +71,68 @@
 }
 
 .battle-component-crown-blue {
-  color: #3b82f6;
-  fill: #3b82f6;
+  color: var(--color-info);
+  fill: var(--color-info);
 }
 
 .battle-component-crown-red {
-  color: #ef4444;
-  fill: #ef4444;
+  color: var(--color-error);
+  fill: var(--color-error);
 }
 
 .battle-component-score-text {
-  font-weight: 600;
-  font-size: 20px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-xl);
   margin: 0;
 }
 
 .battle-component-decks {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--spacing-lg);
   align-items: start;
 }
 
 .battle-component-col {
   display: grid;
   grid-auto-rows: min-content;
-  gap: 12px;
+  gap: var(--spacing-md);
 }
 
 .battle-component-heading {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .battle-component-player-block {
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
 }
 
 .battle-component-player-info {
-  margin-bottom: 12px;
+  margin-bottom: var(--spacing-md);
 }
 
 .battle-component-player-info-left {
-  margin-left: 5px;
+  margin-left: var(--spacing-xs);
   text-align: left;
 }
 
 .battle-component-player-info-right {
-  margin-right: 5px;
+  margin-right: var(--spacing-xs);
   text-align: right;
 }
 
 .battle-component-player-name {
-  margin: 0 0 6px 0;
-  font-weight: 600;
-  font-size: 1.5rem;
+  margin: 0 0 var(--spacing-sm) 0;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-2xl);
 }
 
 .battle-component-player-tag {
-  color: #bdc3c7;
-  font-size: 1rem;
-  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: var(--font-md);
+  font-weight: var(--font-weight-medium);
 }
 
 @media (max-width: 768px) {
@@ -143,8 +143,8 @@
   .battle-component-header {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
-    padding: 12px;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
     justify-content: stretch;
   }
 
@@ -154,32 +154,32 @@
   }
 
   .battle-component-game-mode {
-    font-size: 20px;
+    font-size: var(--font-2xl);
     text-align: center;
     order: 1;
   }
 
   .battle-component-score {
     justify-content: center;
-    gap: 12px;
+    gap: var(--spacing-md);
     order: 2;
   }
 
   .battle-component-score-text {
-    font-size: 18px;
+    font-size: var(--font-xl);
   }
 
   .battle-component-crown {
-    width: 20px;
-    height: 20px;
+    width: 25px;
+    height: 25px;
   }
 
   .battle-component-header-result {
-    font-size: 12px;
-    padding: 6px 12px;
+    font-size: var(--font-s);
+    padding: var(--spacing-sm) var(--spacing-md);
   }
 
   .battle-component-battle-time {
-    font-size: 12px;
+    font-size: var(--font-s);
   }
 }

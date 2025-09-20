@@ -5,17 +5,17 @@
 }
 
 .battles-filter-container {
-  background-color: rgb(55, 55, 55);
-  border-radius: 12px;
-  margin-bottom: 20px;
-  margin-top: 20px;
-  padding: 20px;
+  background-color: var(--bg-dark);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-xl);
+  margin-top: var(--spacing-xl);
+  padding: var(--spacing-xl);
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: var(--spacing-md);
   flex-wrap: wrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px var(--shadow-light);
 }
 
 .battles-content {
@@ -33,30 +33,30 @@
 /* Label styling */
 .battles-datetime-label {
   color: white;
-  font-size: 1.1rem;
-  font-weight: 500;
+  font-size: var(--font-lg);
+  font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
 
 /* Datetime input styling */
 .battles-datetime-input {
-  background-color: rgb(45, 45, 45);
+  background-color: var(--bg-darker);
   border: 2px solid rgb(70, 70, 70);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: white;
-  padding: 10px 12px;
-  font-size: 1rem;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-md);
   font-family: inherit;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .battles-datetime-input.invalid {
-  border-color: #ff6b6b;
+  border-color: var(--color-error-alt);
 }
 
 .battles-datetime-input:focus {
   outline: none;
-  border-color: #4a9eff;
+  border-color: var(--color-accent);
   box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
 }
 
@@ -66,20 +66,20 @@
 
 /* Style the calendar/clock icons in datetime input */
 .battles-datetime-input::-webkit-calendar-picker-indicator {
-  background-color: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-  padding: 6px;
+  background-color: var(--bg-overlay-light);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  padding: var(--spacing-sm);
   cursor: pointer;
   filter: brightness(0) invert(1);
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
   width: 16px;
   height: 16px;
 }
 
 .battles-datetime-input::-webkit-calendar-picker-indicator:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--bg-overlay-medium);
+  border-color: var(--border-active);
   transform: scale(1.1);
 }
 
@@ -87,23 +87,23 @@
 .battles-apply-filter-button,
 .battles-clear-filter-button {
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: white;
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 500;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--font-sm);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
   min-width: 100px;
 }
 
 /* Apply Filter button */
 .battles-apply-filter-button {
-  background-color: #4caf50;
+  background-color: var(--color-success);
 }
 
 .battles-apply-filter-button:hover:not(:disabled) {
-  background-color: #45a049;
+  background-color: var(--color-success-hover);
   transform: translateY(-1px);
 }
 
@@ -119,16 +119,20 @@
 
 /* Clear Filter button */
 .battles-clear-filter-button {
-  background-color: rgb(70, 70, 70);
-  color: rgb(200, 200, 200);
+  background: linear-gradient(135deg, #6c757d, #5a6268);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.5px;
 }
 
 .battles-clear-filter-button:hover {
-  background-color: rgb(80, 80, 80);
+  background: linear-gradient(135deg, #5a6268, #454d55);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px var(--shadow-light);
 }
 
 .battles-loading-spinner .MuiCircularProgress-circle {
-  stroke: #4a9eff;
+  stroke: var(--color-accent);
 }
 
 /* Loading more battles */
@@ -136,15 +140,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #bdc3c7;
-  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-size: var(--font-base);
 }
 
 .battles-end-message {
   text-align: center;
-  color: #bdc3c7;
+  color: var(--text-secondary);
   font-style: italic;
-  margin: 20px 0;
+  margin: var(--spacing-xl) 0;
 }
 
 .battles-load-more-trigger {
@@ -153,9 +157,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 20px 0;
+  margin: var(--spacing-xl) 0;
 }
 
 .battles-loading-more span {
-  margin-left: 8px;
+  margin-left: var(--spacing-sm);
 }

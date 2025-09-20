@@ -10,5 +10,5 @@
 }
 
 .layout-loading-spinner .MuiCircularProgress-circle {
-  stroke: #4a9eff;
+  stroke: var(--color-accent);
 }

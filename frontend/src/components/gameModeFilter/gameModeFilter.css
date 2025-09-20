@@ -1,28 +1,28 @@
 .game-mode-filter-container {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  padding-left: 16px;
-  padding-right: 16px;
-  padding-top: 5px;
-  padding-bottom: 5px;
+  background: var(--bg-overlay-light);
+  border-radius: var(--radius-lg);
+  padding-left: var(--spacing-lg);
+  padding-right: var(--spacing-lg);
+  padding-top: var(--spacing-xs);
+  padding-bottom: var(--spacing-xs);
 }
 
 .game-mode-filter-component-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.25rem 0;
+  padding: var(--spacing-xs) 0;
   background: none;
   border: none;
   cursor: pointer;
   width: 100%;
   font: inherit;
-  transition: all 0.2s ease;
-  border-radius: 6px;
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
 }
 
 .game-mode-filter-component-header:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-overlay-light);
 }
 
 .game-mode-filter-component-header:focus {
@@ -30,22 +30,22 @@
 }
 
 .game-mode-filter-component-header:focus .game-mode-filter-component-toggle {
-  outline: 2px solid #3498db;
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .game-mode-filter-component-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.87);
+  font-size: var(--font-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 .game-mode-filter-component-toggle {
   width: 24px;
   height: 24px;
-  color: rgba(255, 255, 255, 0.87);
-  transition: transform 0.2s ease;
+  color: var(--text-primary);
+  transition: transform var(--transition-fast);
 }
 
 /* Flip the arrow upside down, if filter options are not expanded */
@@ -56,11 +56,11 @@
 .game-mode-filter-component-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.75rem;
+  gap: var(--spacing-md);
   overflow: hidden;
   transition: max-height 0.5s ease;
-  margin-top: 12px;
-  margin-bottom: 12px;
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
 }
 
 .game-mode-filter-component-grid.hidden {
@@ -71,12 +71,12 @@
 
 .game-mode-filter-component-tag {
   position: relative;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 0.75rem 1rem;
-  font-size: 0.9rem;
-  background-color: rgb(55, 55, 55);
-  color: rgba(255, 255, 255, 0.87);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  padding: var(--spacing-md) var(--spacing-md);
+  font-size: var(--font-base);
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
   cursor: pointer;
   text-align: center;
   overflow: hidden;
@@ -87,14 +87,14 @@
 }
 
 .game-mode-filter-component-tag:hover {
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: var(--border-hover);
   background-color: rgb(65, 65, 65);
 }
 
 .game-mode-filter-component-tag.is-selected {
-  border-color: #3498db;
+  border-color: var(--color-primary);
   background-color: rgba(52, 152, 219, 0.15);
-  color: #3498db;
+  color: var(--color-primary);
 }
 
 .game-mode-filter-component-tag-text {
@@ -106,35 +106,43 @@
 .game-mode-filter-component-actions {
   grid-column: 1 / -1;
   display: flex;
-  gap: 0.75rem;
+  gap: var(--spacing-md);
   justify-content: left;
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-light);
 }
 
 .game-mode-filter-component-action-button {
   padding: 0.6rem 1.2rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: none;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--font-sm);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
   min-width: 90px;
   letter-spacing: 0.5px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .game-mode-filter-component-select-all {
-  background: linear-gradient(135deg, #3498db, #2980b9);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    var(--color-primary-hover)
+  );
   color: white;
 }
 
 .game-mode-filter-component-select-all:hover {
-  background: linear-gradient(135deg, #2980b9, #1f648f);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-hover),
+    var(--color-primary-alt)
+  );
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 8px var(--shadow-light);
 }
 
 .game-mode-filter-component-clear {
@@ -145,5 +153,5 @@
 .game-mode-filter-component-clear:hover {
   background: linear-gradient(135deg, #5a6268, #454d55);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 8px var(--shadow-light);
 }
