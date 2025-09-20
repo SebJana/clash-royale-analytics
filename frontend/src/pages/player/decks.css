@@ -1,41 +1,212 @@
-.decks-filter-container {
-  background-color: rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 24px;
-  margin: 16px 0;
+:root {
+  --divider-color: rgba(255, 255, 255, 0.1);
+  --card-background: rgba(255, 255, 255, 0.08);
+  --button-primary: #4caf50;
+  --button-primary-hover: #45a049;
+  --button-primary-active: #3d8b40;
+  --border-radius-large: 12px;
+  --border-radius-small: 6px;
+  --spacing-xs: 6px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --container-max-width: 1200px;
 }
 
-/* Give the 2nd to N-1th filter option margin on the bottom */
+.decks-filter-container {
+  background-color: var(--card-background);
+  border-radius: var(--border-radius-large);
+  padding: var(--spacing-xl);
+  margin: var(--spacing-lg) 0;
+}
+
 .decks-filter-container > *:not(:first-child):not(:last-child) {
   margin-bottom: 15px;
 }
 
 .decks-filter-header {
-  margin: 0px;
+  margin: 0;
   padding-left: 3px;
   padding-bottom: 10px;
   text-align: left;
 }
 
 .decks-apply-filters-button {
-  background-color: #4caf50;
+  background-color: var(--button-primary);
   color: white;
   border: none;
-  padding: 8px 24px;
-  border-radius: 6px;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  border-radius: var(--border-radius-small);
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 500;
-  margin-top: 12px;
-  margin-left: auto;
+  margin: var(--spacing-md) auto 0;
   display: block;
   transition: background-color 0.2s ease;
 }
 
 .decks-apply-filters-button:hover {
-  background-color: #45a049;
+  background-color: var(--button-primary-hover);
 }
 
 .decks-apply-filters-button:active {
-  background-color: #3d8b40;
+  background-color: var(--button-primary-active);
+}
+
+.stat-card-number {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-card-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.decks-general-stats {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+  flex-wrap: wrap;
+  padding-bottom: var(--spacing-xl);
+  border-bottom: 1px solid var(--divider-color);
+  justify-content: center;
+}
+
+.decks-general-stats .stat-card {
+  flex: 1 1 0;
+  min-width: 120px;
+  max-width: 200px;
+}
+
+.decks-deck-row {
+  display: flex;
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0 var(--spacing-xl) var(--spacing-xl);
+  border-bottom: 1px solid var(--divider-color);
+  justify-content: center;
+  max-width: var(--container-max-width);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.deck-section {
+  flex: 0 0 auto;
+  max-width: 700px;
+}
+
+.deck-stats-container {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-direction: column;
+  flex: 1;
+  min-width: 200px;
+}
+
+.deck-stats-container .stat-card {
+  flex: 0 0 auto;
+  min-width: 180px;
+}
+
+@media (max-width: 1024px) {
+  .decks-deck-row {
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    align-items: center;
+  }
+
+  .deck-section {
+    min-width: unset;
+    max-width: unset;
+  }
+
+  .deck-stats-container {
+    justify-content: center;
+    min-width: unset;
+    gap: 10px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    flex: none;
+  }
+
+  .deck-stats-container .stat-card {
+    flex: 1 1 calc(33.333% - 7px);
+    width: auto;
+    min-width: 100px;
+  }
+
+  .decks-general-stats {
+    gap: 10px;
+  }
+
+  .decks-general-stats .stat-card {
+    min-width: 100px;
+  }
+}
+
+@media (max-width: 768px) {
+  .decks-general-stats {
+    gap: var(--spacing-sm);
+  }
+
+  .decks-general-stats .stat-card {
+    min-width: 90px;
+  }
+
+  .deck-stats-container {
+    gap: var(--spacing-sm);
+  }
+
+  .deck-stats-container .stat-card {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 85px;
+  }
+
+  /* Responsive font sizing */
+  .decks-deck-row .stat-card-number,
+  .decks-general-stats .stat-card-number {
+    font-size: 1.4rem;
+  }
+
+  .decks-deck-row .stat-card-label,
+  .decks-general-stats .stat-card-label {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .decks-general-stats {
+    gap: var(--spacing-xs);
+  }
+
+  .decks-general-stats .stat-card {
+    min-width: 80px;
+  }
+
+  .deck-stats-container {
+    gap: var(--spacing-xs);
+  }
+
+  .deck-stats-container .stat-card {
+    flex: 1 1 calc(50% - 3px);
+    min-width: 75px;
+  }
+
+  /* Mobile font sizing */
+  .decks-deck-row .stat-card-number,
+  .decks-general-stats .stat-card-number {
+    font-size: 1.2rem;
+  }
+
+  .decks-deck-row .stat-card-label,
+  .decks-general-stats .stat-card-label {
+    font-size: 0.7rem;
+  }
 }

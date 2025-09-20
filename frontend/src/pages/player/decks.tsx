@@ -214,16 +214,18 @@ export default function PlayerDecks() {
             {deckStats?.deck_statistics.decks &&
               deckStats.deck_statistics.decks.length > 0 && (
                 <div className="decks-stats">
-                  <StatCard label="Battles" value={totalBattles} />
-                  <StatCard
-                    label="Decks"
-                    value={deckStats.deck_statistics.decks.length}
-                  />
-                  <StatCard label="Wins" value={totalWins} />
-                  <StatCard
-                    label="Win Rate"
-                    value={`${round((totalWins / totalBattles) * 100, 1)}%`}
-                  />
+                  <div className="decks-general-stats">
+                    <StatCard label="Battles" value={totalBattles} />
+                    <StatCard
+                      label="Decks"
+                      value={deckStats.deck_statistics.decks.length}
+                    />
+                    <StatCard label="Wins" value={totalWins} />
+                    <StatCard
+                      label="Win Rate"
+                      value={`${round((totalWins / totalBattles) * 100, 1)}%`}
+                    />
+                  </div>
                   {deckStats.deck_statistics.decks.map((d) => (
                     <div
                       className="decks-deck-row"
