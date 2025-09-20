@@ -179,7 +179,7 @@
 
 @media (max-width: 480px) {
   .decks-general-stats {
-    gap: var(--spacing-xs);
+    gap: var(--spacing-sm);
   }
 
   .decks-general-stats .stat-card {
@@ -187,7 +187,7 @@
   }
 
   .deck-stats-container {
-    gap: var(--spacing-xs);
+    gap: var(--spacing-sm);
   }
 
   .deck-stats-container .stat-card {
