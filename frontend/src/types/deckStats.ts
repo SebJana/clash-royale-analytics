@@ -16,4 +16,5 @@ type Deck = {
   lastSeen: string;
   modes: string[]; // Game modes in which the deck appeared
   deck: Card[];
+  winRate: number;
 };

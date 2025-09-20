@@ -5,10 +5,34 @@ import { DeckComponent } from "../../components/deck/deck";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
+import { round } from "../../utils/round";
+import { datetimeToLocale } from "../../utils/datetime";
 import { useEffect, useState } from "react";
+import { StatCard } from "../../components/statCard/StatCard";
 import { GameModeFilter } from "../../components/gameModeFilter/gameModeFilter";
 import { StartEndDateFilter } from "../../components/startEndDateFilter/startEndDateFilter";
 import "./decks.css";
+import type { DeckStats } from "../../types/deckStats";
+
+function calculateAndFormatUsageRate(
+  battleCount: number,
+  totalBattles: number
+) {
+  const usageRate = (battleCount / totalBattles) * 100; // In percent
+  const roundedUsageRate = round(usageRate, 1);
+  return `${roundedUsageRate}%`;
+}
+
+function calculateTotalWins(deckStats: DeckStats | undefined) {
+  if (!deckStats?.deck_statistics?.decks) {
+    return 0;
+  }
+  let winSum = 0;
+  for (const deck of deckStats.deck_statistics.decks) {
+    winSum += deck.wins;
+  }
+  return winSum;
+}
 
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
@@ -136,6 +160,9 @@ export default function PlayerDecks() {
     resetDependency: `${playerTag}}-${appliedStartDate}-${appliedEndDate}-${modesKey}`,
   });
 
+  const totalBattles = deckStats?.deck_statistics.totalBattles ?? 0;
+  const totalWins = calculateTotalWins(deckStats);
+
   return (
     <div className="decks-page">
       <div className="decks-content">
@@ -186,15 +213,49 @@ export default function PlayerDecks() {
             {/* Show decks if there is any data to display */}
             {deckStats?.deck_statistics.decks &&
               deckStats.deck_statistics.decks.length > 0 && (
-                <>
+                <div className="decks-stats">
+                  <StatCard label="Battles" value={totalBattles} />
+                  <StatCard
+                    label="Decks"
+                    value={deckStats.deck_statistics.decks.length}
+                  />
+                  <StatCard label="Wins" value={totalWins} />
+                  <StatCard
+                    label="Win Rate"
+                    value={`${round((totalWins / totalBattles) * 100, 1)}%`}
+                  />
                   {deckStats.deck_statistics.decks.map((d) => (
-                    // Unique deck id of all cards in the deck
-                    <div key={`${d.deck?.map((c) => c.id).join(";")}`}>
-                      <strong>{d.count}</strong> — {d.wins}
-                      <DeckComponent deck={d.deck} cards={cards ?? []} />
+                    <div
+                      className="decks-deck-row"
+                      // Unique deck id of all cards in the deck
+                      key={`${d.deck?.map((c) => c.id).join(";")}`}
+                    >
+                      <div className="deck-section">
+                        <DeckComponent deck={d.deck} cards={cards ?? []} />
+                      </div>
+                      <div className="deck-stats-container">
+                        <StatCard label="Battles" value={d.count} />
+                        <StatCard label="Wins" value={d.wins} />
+                        <StatCard
+                          label="Win Rate"
+                          value={`${round(d.winRate, 1)}%`}
+                        />
+                        <StatCard
+                          label="Usage Rate"
+                          value={calculateAndFormatUsageRate(
+                            d.count,
+                            totalBattles
+                          )}
+                        />
+                        <StatCard label="Game Modes" value={d.modes.length} />
+                        <StatCard
+                          label="Last Seen"
+                          value={datetimeToLocale(d.lastSeen)}
+                        />
+                      </div>
                     </div>
                   ))}
-                </>
+                </div>
               )}
 
             {/* Show message when no decks are found and not still loading */}

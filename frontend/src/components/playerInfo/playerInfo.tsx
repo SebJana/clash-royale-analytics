@@ -1,5 +1,6 @@
 import type { Player } from "../../types/player";
 import { round } from "../../utils/round";
+import { StatCard } from "../statCard/StatCard";
 import "./playerInfo.css";
 
 /**
@@ -106,40 +107,23 @@ export function PlayerInfo({
         <div className="player-info-component-battle-stats-section">
           <h3>Battle Statistics</h3>
           <div className="player-info-component-stats-grid">
-            <div className="player-info-component-stat-card">
-              <div className="player-info-component-stat-number">
-                {player?.wins?.toLocaleString() ?? 0}
-              </div>
-              <div className="player-info-component-stat-label">Wins</div>
-            </div>
-            <div className="player-info-component-stat-card">
-              <div className="player-info-component-stat-number">
-                {player?.losses?.toLocaleString() ?? 0}
-              </div>
-              <div className="player-info-component-stat-label">Losses</div>
-            </div>
-            <div className="player-info-component-stat-card">
-              <div className="player-info-component-stat-number">
-                {player?.battleCount?.toLocaleString() ?? 0}
-              </div>
-              <div className="player-info-component-stat-label">
-                Total Battles
-              </div>
-            </div>
-            <div className="player-info-component-stat-card">
-              <div className="player-info-component-stat-number">
-                {winPercentage}%
-              </div>
-              <div className="player-info-component-stat-label">Win Rate</div>
-            </div>
-            <div className="player-info-component-stat-card">
-              <div className="player-info-component-stat-number">
-                {player?.threeCrownWins.toLocaleString()}
-              </div>
-              <div className="player-info-component-stat-label">
-                Three Crown Wins
-              </div>
-            </div>
+            <StatCard
+              value={player?.wins?.toLocaleString() ?? 0}
+              label="Wins"
+            />
+            <StatCard
+              value={player?.losses?.toLocaleString() ?? 0}
+              label="Losses"
+            />
+            <StatCard
+              value={player?.battleCount?.toLocaleString() ?? 0}
+              label="Total Battles"
+            />
+            <StatCard value={`${winPercentage}%`} label="Win Rate" />
+            <StatCard
+              value={player?.threeCrownWins.toLocaleString()}
+              label="Three Crown Wins"
+            />
           </div>
         </div>
       </div>
