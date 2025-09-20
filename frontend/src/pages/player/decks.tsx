@@ -7,15 +7,62 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { useEffect, useState } from "react";
 import { GameModeFilter } from "../../components/gameModeFilter/gameModeFilter";
+import { StartEndDateFilter } from "../../components/startEndDateFilter/startEndDateFilter";
 import "./decks.css";
 
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
-  // Start with empty array, will be populated once game modes are loaded
-  const [selectedGameModes, setSelectedGameModes] = useState<string[]>([]);
-  // Applied filters that are actually used for the query
-  const [appliedGameModes, setAppliedGameModes] = useState<string[]>([]);
-  // Track if the game modes selection was initialized to prevent double loading
+
+  // Helper function to format date for input fields (YYYY-MM-DD format)
+  const formatDateForInput = (date: Date): string => {
+    return date.toISOString().slice(0, 10); // Format as YYYY-MM-DD
+  };
+
+  // Initialize with last 7 days as default date range
+  // This provides a slim default range that shows recent deck data immediately
+  // NOTE: Whenever this initialization changes, also update the "pre-chosen"
+  // selectedTimespanOption of the StartEndDateFilter
+  const getInitialDates = () => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+    return {
+      start: formatDateForInput(startDate),
+      end: formatDateForInput(endDate),
+    };
+  };
+
+  const initialDates = getInitialDates();
+
+  // Filter state management maintains two sets of state for each filter type:
+  // 1. "selected" - what the user has chosen in the UI (not yet applied)
+  // 2. "applied" - what is actually used for the API query
+  // This allows users to configure multiple filters before applying them all at once to reduce API calls and loading times
+
+  // Game mode filters
+  const [selectedGameModes, setSelectedGameModes] = useState<string[]>([]); // UI selection
+  const [appliedGameModes, setAppliedGameModes] = useState<string[]>([]); // Query parameters
+
+  // Date range filters
+  const [selectedStartDate, setSelectedStartDate] = useState<string>(
+    initialDates.start // Initialize with last 7 days start
+  );
+  const [appliedStartDate, setAppliedStartDate] = useState<string>(
+    initialDates.start // Initialize applied state so query runs immediately
+  );
+
+  const [selectedEndDate, setSelectedEndDate] = useState<string>(
+    initialDates.end // Initialize with today
+  );
+  const [appliedEndDate, setAppliedEndDate] = useState<string>(
+    initialDates.end // Initialize applied state so query runs immediately
+  );
+
+  // Timespan option selection (persists which preset was chosen)
+  const [selectedTimespanOption, setSelectedTimespanOption] =
+    useState<string>("Last 7 days");
+
+  // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
   const [gameModesInitialized, setGameModesInitialized] = useState(false);
 
   const {
@@ -32,25 +79,33 @@ export default function PlayerDecks() {
     error: gameModesError,
   } = useGameModes();
 
+  // Game mode initialization
   // Initialize selected game modes once when game modes are loaded
-  // This prevents the double-load by ensuring deck stats only load after game modes are ready
+  // This prevents double API calls by ensuring deck stats only load after game modes are ready
   useEffect(() => {
     if (gameModes && !gameModesInitialized && !gameModesLoading) {
       // Auto-select all game modes when they first become available
+      // This provides a good default that shows all available data
       const allGameModeKeys = Object.keys(gameModes);
-      setSelectedGameModes(allGameModeKeys);
-      setAppliedGameModes(allGameModeKeys); // Also initialize applied filters
+      setSelectedGameModes(allGameModeKeys); // Set UI selection
+      setAppliedGameModes(allGameModeKeys); // Set query parameters immediately
       setGameModesInitialized(true);
     }
   }, [gameModes, gameModesInitialized, gameModesLoading]);
 
-  // Function to apply the currently selected filters
+  // Filter application
+  // Transfers all selected filter values to applied filter state
+  // This triggers the deck statistics query with the new parameters
   const applyAllFilters = () => {
+    setAppliedStartDate(selectedStartDate);
+    setAppliedEndDate(selectedEndDate);
     setAppliedGameModes(selectedGameModes);
   };
 
+  // Deck statistics API call
   // Fetch deck statistics only when game modes are properly initialized
-  // Passes null to disable the query until gameModesInitialized is true
+  // Uses applied filter values (not selected ones) to ensure query stability
+  // Passes null for game modes to disable the query until gameModesInitialized is true
   const {
     data: deckStats,
     isLoading: decksLoading,
@@ -58,14 +113,17 @@ export default function PlayerDecks() {
     error: decksError,
   } = useDeckStats(
     playerTag,
-    "2025-01-01",
-    "2025-10-01",
+    appliedStartDate,
+    appliedEndDate,
     gameModesInitialized ? appliedGameModes : null // Use applied filters for the query
   );
 
+  // Create cache key from applied filters for loading state dependency
   const modesKey = appliedGameModes.join("|");
 
-  // Use loading state logic
+  // Loading state management
+  // Determines when to show loading spinner vs content
+  // Uses a custom hook that tracks multiple loading states and prevents flickering
   const { isInitialLoad } = usePageLoadingState({
     loadingStates: [decksLoading, cardsLoading, gameModesLoading],
     errorStates: [isDecksError, isCardsError, isGameModesError],
@@ -74,7 +132,8 @@ export default function PlayerDecks() {
         deckStats?.deck_statistics.decks &&
           deckStats.deck_statistics.decks.length > 0
       ),
-    resetDependency: `${playerTag}-${modesKey}`,
+    // Reset dependency ensures loading state recalculates when any filter changes
+    resetDependency: `${playerTag}}-${appliedStartDate}-${appliedEndDate}-${modesKey}`,
   });
 
   return (
@@ -100,11 +159,20 @@ export default function PlayerDecks() {
           <>
             <div className="decks-filter-container">
               <h2 className="decks-filter-header">Filters</h2>
+              <StartEndDateFilter
+                selectedStart={selectedStartDate}
+                selectedEnd={selectedEndDate}
+                selectedOption={selectedTimespanOption}
+                onStartChange={setSelectedStartDate}
+                onEndChange={setSelectedEndDate}
+                onOptionChange={setSelectedTimespanOption}
+              />
               <GameModeFilter
                 gameModes={gameModes ?? {}}
                 selected={selectedGameModes}
                 onChange={setSelectedGameModes}
               />
+              {/* TODO only enable Apply Button when any selectedValue changed */}
               <button
                 type="button"
                 className="decks-apply-filters-button"

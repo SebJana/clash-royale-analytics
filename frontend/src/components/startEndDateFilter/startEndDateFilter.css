@@ -1,0 +1,191 @@
+.start-end-date-filter-container {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.start-end-date-filter-component-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  font: inherit;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+}
+
+.start-end-date-filter-component-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.start-end-date-filter-component-header:focus {
+  outline: none;
+}
+
+.start-end-date-filter-component-header:focus
+  .start-end-date-filter-component-toggle {
+  outline: 2px solid #3498db;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.start-end-date-filter-component-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.start-end-date-filter-component-toggle {
+  width: 24px;
+  height: 24px;
+  color: rgba(255, 255, 255, 0.87);
+  transition: transform 0.2s ease;
+}
+
+/* Flip the arrow upside down, if filter options are not expanded */
+.start-end-date-filter-component-toggle.collapsed {
+  transform: rotate(180deg);
+}
+
+.start-end-date-filter-component-grid {
+  overflow: hidden;
+  transition: max-height 0.5s ease;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.start-end-date-filter-component-grid.hidden {
+  max-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.start-end-date-filter-component-tags {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.start-end-date-filter-component-tag {
+  position: relative;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  background-color: rgb(55, 55, 55);
+  color: rgba(255, 255, 255, 0.87);
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.start-end-date-filter-component-tag:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background-color: rgb(65, 65, 65);
+}
+
+.start-end-date-filter-component-tag.is-selected {
+  border-color: #3498db;
+  background-color: rgba(52, 152, 219, 0.15);
+  color: #3498db;
+}
+
+.start-end-date-filter-component-tag-text {
+  display: block;
+  flex: 1;
+  text-align: center;
+}
+
+.start-end-date-filter-component-custom-inputs {
+  display: flex;
+  gap: 1.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.start-end-date-filter-component-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.start-end-date-filter-component-label {
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.start-end-date-filter-component-input {
+  background-color: rgb(45, 45, 45);
+  border: 2px solid rgb(70, 70, 70);
+  border-radius: 8px;
+  color: white;
+  padding: 10px 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.start-end-date-filter-component-input:focus {
+  outline: none;
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
+}
+
+.start-end-date-filter-component-input:hover {
+  border-color: rgb(90, 90, 90);
+}
+
+/* Style the calendar/clock icons in datetime input */
+.start-end-date-filter-component-input::-webkit-calendar-picker-indicator {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 6px;
+  cursor: pointer;
+  filter: brightness(0) invert(1);
+  transition: all 0.2s ease;
+  width: 16px;
+  height: 16px;
+}
+
+.start-end-date-filter-component-input::-webkit-calendar-picker-indicator:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
+}
+
+@media (max-width: 768px) {
+  .start-end-date-filter-component-custom-inputs {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .start-end-date-filter-component-tags {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
+/* Additional breakpoint for better responsive behavior */
+@media (max-width: 580px) {
+  .start-end-date-filter-component-custom-inputs {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+}

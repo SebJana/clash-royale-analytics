@@ -5,6 +5,11 @@
   margin: 16px 0;
 }
 
+/* Give the 2nd to N-1th filter option margin on the bottom */
+.decks-filter-container > *:not(:first-child):not(:last-child) {
+  margin-bottom: 15px;
+}
+
 .decks-filter-header {
   margin: 0px;
   padding-left: 3px;
