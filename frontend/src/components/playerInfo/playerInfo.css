@@ -98,6 +98,13 @@
   gap: var(--spacing-lg);
 }
 
+/* Allow StatCard labels to wrap in playerInfo component */
+.player-info-component-stats-grid .stat-card-label {
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: var(--line-height-normal);
+}
+
 @media (min-width: 1024px) {
   .player-info-component-container {
     padding: var(--spacing-3xl);

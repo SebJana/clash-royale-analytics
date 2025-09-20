@@ -1,6 +1,6 @@
 import type { Player } from "../../types/player";
 import { round } from "../../utils/round";
-import { StatCard } from "../statCard/StatCard";
+import { StatCard } from "../statCard/statCard";
 import "./playerInfo.css";
 
 /**

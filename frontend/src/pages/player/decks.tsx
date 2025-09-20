@@ -8,7 +8,7 @@ import { useGameModes } from "../../hooks/useGameModes";
 import { round } from "../../utils/round";
 import { datetimeToLocale } from "../../utils/datetime";
 import { useEffect, useState } from "react";
-import { StatCard } from "../../components/statCard/StatCard";
+import { StatCard } from "../../components/statCard/statCard";
 import { GameModeFilter } from "../../components/gameModeFilter/gameModeFilter";
 import { StartEndDateFilter } from "../../components/startEndDateFilter/startEndDateFilter";
 import "./decks.css";
