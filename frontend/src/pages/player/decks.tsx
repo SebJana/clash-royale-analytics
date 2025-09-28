@@ -211,12 +211,12 @@ export default function PlayerDecks() {
                 Apply
               </button>
             </div>
-            <h2>Deck Stats</h2>
 
             {/* Show decks if there is any data to display */}
             {deckStats?.deck_statistics.decks &&
               deckStats.deck_statistics.decks.length > 0 && (
                 <div className="decks-stats">
+                  <h2>Overall Performance</h2>
                   <div className="decks-general-stats">
                     <StatCard
                       label={pluralize(totalBattles, "Battle", "Battles")}
