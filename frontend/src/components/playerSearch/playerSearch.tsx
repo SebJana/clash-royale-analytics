@@ -1,4 +1,5 @@
 import { Autocomplete, TextField, ListItem, ListItemText } from "@mui/material";
+import "./playerSearch.css";
 
 type Player = { tag: string; name: string };
 
@@ -24,38 +25,28 @@ export function PlayerSearch({
 
   // TODO show first N options of the current search, don't make it a scrollable list
   return (
-    <Autocomplete
-      options={options}
-      value={value}
-      getOptionLabel={(option) => option.label}
-      slotProps={{
-        listbox: {
-          style: { maxHeight: 240, overflow: "auto" },
-        },
-      }}
-      renderOption={(props, option) => {
-        const { key, ...optionProps } = props;
-        return (
-          <ListItem key={key} {...optionProps} disableGutters>
-            <ListItemText
-              primary={option.name}
-              secondary={option.tag}
-              slotProps={{
-                primary: { noWrap: true },
-                secondary: { noWrap: true },
-              }}
-            />
-          </ListItem>
-        );
-      }}
-      renderInput={(params) => (
-        <TextField {...params} label="Search players…" size="small" />
-      )}
-      onChange={(_, selected) => {
-        if (selected && onSelectPlayer) {
-          onSelectPlayer(selected); // notify parent upon changed selection
-        }
-      }}
-    />
+    <div className="player-search">
+      <Autocomplete
+        options={options}
+        value={value}
+        getOptionLabel={(option) => option.label}
+        renderOption={(props, option) => {
+          const { key, ...optionProps } = props;
+          return (
+            <ListItem key={key} {...optionProps} disableGutters>
+              <ListItemText primary={option.name} secondary={option.tag} />
+            </ListItem>
+          );
+        }}
+        renderInput={(params) => (
+          <TextField {...params} label="Search players…" size="small" />
+        )}
+        onChange={(_, selected) => {
+          if (selected && onSelectPlayer) {
+            onSelectPlayer(selected);
+          }
+        }}
+      />
+    </div>
   );
 }

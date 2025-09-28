@@ -1,0 +1,68 @@
+.player-search {
+  width: 100%;
+  max-width: 400px;
+  border-radius: var(--radius-lg);
+}
+
+/* Input styling */
+.player-search .MuiTextField-root {
+  background-color: var(--bg-overlay-light);
+  border-radius: var(--radius-md);
+}
+
+.player-search .MuiTextField-root:hover {
+  background-color: var(--bg-overlay-medium);
+}
+
+.player-search .MuiOutlinedInput-root {
+  color: var(--text-primary);
+}
+
+.player-search .MuiOutlinedInput-notchedOutline {
+  border-color: var(--border-light);
+}
+
+.player-search .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: var(--border-medium);
+}
+
+.player-search
+  .MuiOutlinedInput-root.Mui-focused
+  .MuiOutlinedInput-notchedOutline {
+  border-color: var(--color-primary);
+}
+
+.player-search .MuiInputLabel-root {
+  color: var(--text-secondary);
+}
+
+.player-search .MuiInputLabel-root.Mui-focused {
+  color: var(--color-primary);
+}
+
+/* Dropdown styling */
+.player-search .MuiAutocomplete-paper {
+  background-color: var(--bg-dark);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px var(--shadow-medium);
+}
+
+.player-search .MuiAutocomplete-option {
+  padding: var(--spacing-md) var(--spacing-lg);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.player-search .MuiAutocomplete-option:last-child {
+  border-bottom: none;
+}
+
+.player-search .MuiAutocomplete-option:hover {
+  background-color: var(--bg-overlay-medium);
+}
+
+.player-search .MuiListItemText-secondary {
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+}
