@@ -13,9 +13,11 @@ import "./card.css";
 export const CardComponent = memo(function CardComponent({
   card,
   cards,
+  showTooltip = true,
 }: Readonly<{
   card: Card;
   cards: CardMeta[];
+  showTooltip?: boolean;
 }>) {
   const name = getCardName(card.id, cards);
   const elixir = getCardElixirCost(card.id, cards);
@@ -30,35 +32,42 @@ export const CardComponent = memo(function CardComponent({
 
   const outlineImg = getCardOutline(rarity);
 
+  const cardContent = (
+    <div className="card-component-wrap">
+      <img
+        src={outlineImg}
+        alt={`outline`}
+        loading="lazy"
+        className="card-component-outline"
+      />
+      <img
+        src={icon}
+        alt={name}
+        loading="lazy"
+        className="card-component-icon"
+      />
+    </div>
+  );
+
   return (
     <div className="card-component-card">
-      <Tooltip
-        arrow
-        placement="auto"
-        title={
-          <div className="card-component-tooltip">
-            <strong>{name}</strong>
-            <span>{elixir} Elixir</span>
-            <span>{rarityLabel}</span>
-          </div>
-        }
-      >
-        {/* Card outline implemented using overlaid PNG images */}
-        <div className="card-component-wrap">
-          <img
-            src={outlineImg}
-            alt={`outline`}
-            loading="lazy"
-            className="card-component-outline"
-          />
-          <img
-            src={icon}
-            alt={name}
-            loading="lazy"
-            className="card-component-icon"
-          />
-        </div>
-      </Tooltip>
+      {showTooltip ? (
+        <Tooltip
+          arrow
+          placement="auto"
+          title={
+            <div className="card-component-tooltip">
+              <strong>{name}</strong>
+              <span>{elixir} Elixir</span>
+              <span>{rarityLabel}</span>
+            </div>
+          }
+        >
+          {cardContent}
+        </Tooltip>
+      ) : (
+        cardContent
+      )}
 
       {/* Only show level label if it exists (Battle page, not for Decks/Cards page) */}
       {card?.level != null && (
