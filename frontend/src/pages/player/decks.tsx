@@ -6,6 +6,7 @@ import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { round } from "../../utils/round";
+import { pluralize } from "../../utils/plural";
 import { datetimeToLocale } from "../../utils/datetime";
 import { useEffect, useState } from "react";
 import { StatCard } from "../../components/statCard/statCard";
@@ -163,6 +164,8 @@ export default function PlayerDecks() {
   const totalBattles = deckStats?.deck_statistics.totalBattles ?? 0;
   const totalWins = calculateTotalWins(deckStats);
 
+  const totalDecks = deckStats?.deck_statistics.decks.length ?? 0;
+
   return (
     <div className="decks-page">
       <div className="decks-content">
@@ -215,12 +218,18 @@ export default function PlayerDecks() {
               deckStats.deck_statistics.decks.length > 0 && (
                 <div className="decks-stats">
                   <div className="decks-general-stats">
-                    <StatCard label="Battles" value={totalBattles} />
                     <StatCard
-                      label="Decks"
-                      value={deckStats.deck_statistics.decks.length}
+                      label={pluralize(totalBattles, "Battle", "Battles")}
+                      value={totalBattles}
                     />
-                    <StatCard label="Wins" value={totalWins} />
+                    <StatCard
+                      label={pluralize(totalDecks, "Deck", "Decks")}
+                      value={totalDecks}
+                    />
+                    <StatCard
+                      label={pluralize(totalWins, "Win", "Wins")}
+                      value={totalWins}
+                    />
                     <StatCard
                       label="Win Rate"
                       value={`${round((totalWins / totalBattles) * 100, 1)}%`}
@@ -232,12 +241,20 @@ export default function PlayerDecks() {
                       // Unique deck id of all cards in the deck
                       key={`${d.deck?.map((c) => c.id).join(";")}`}
                     >
+                      {/* TODO add a deck name, by using the top x elixir cards 
+                      or by using the win condition and the most expensive card */}
                       <div className="deck-section">
                         <DeckComponent deck={d.deck} cards={cards ?? []} />
                       </div>
                       <div className="deck-stats-container">
-                        <StatCard label="Battles" value={d.count} />
-                        <StatCard label="Wins" value={d.wins} />
+                        <StatCard
+                          label={pluralize(d.count, "Battle", "Battles")}
+                          value={d.count}
+                        />
+                        <StatCard
+                          label={pluralize(d.wins, "Win", "Wins")}
+                          value={d.wins}
+                        />
                         <StatCard
                           label="Win Rate"
                           value={`${round(d.winRate, 1)}%`}
@@ -249,7 +266,14 @@ export default function PlayerDecks() {
                             totalBattles
                           )}
                         />
-                        <StatCard label="Game Modes" value={d.modes.length} />
+                        <StatCard
+                          label={pluralize(
+                            d.modes.length,
+                            "Game Mode",
+                            "Game Modes"
+                          )}
+                          value={d.modes.length}
+                        />
                         <StatCard
                           label="Last Seen"
                           value={datetimeToLocale(d.lastSeen)}
