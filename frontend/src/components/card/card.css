@@ -1,5 +1,6 @@
 .card-component-card {
   text-align: center;
+  user-select: none;
 }
 
 .card-component-tooltip {

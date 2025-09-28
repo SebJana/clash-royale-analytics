@@ -1,0 +1,5 @@
+.card-filter-component-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 50px);
+  gap: 0.1rem;
+}

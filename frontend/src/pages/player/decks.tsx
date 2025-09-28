@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { StatCard } from "../../components/statCard/statCard";
 import { GameModeFilter } from "../../components/gameModeFilter/gameModeFilter";
 import { StartEndDateFilter } from "../../components/startEndDateFilter/startEndDateFilter";
+import { CardFilter } from "../../components/cardFilter/cardFilter";
 import "./decks.css";
 import type { DeckStats } from "../../types/deckStats";
 
@@ -202,6 +203,7 @@ export default function PlayerDecks() {
                 selected={selectedGameModes}
                 onChange={setSelectedGameModes}
               />
+              <CardFilter cards={cards ?? []} />
               {/* TODO only enable Apply Button when any selectedValue changed */}
               <button
                 type="button"
