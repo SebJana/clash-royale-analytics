@@ -5,6 +5,7 @@ import { validatePlayerTagSyntax } from "../utils/playerTag";
 import { useFetch } from "../hooks/useFetch";
 import type { Players } from "../types/players";
 import { PlayerSearch } from "../components/playerSearch/playerSearch";
+import "./home.css";
 
 function HomePage() {
   const {
@@ -46,17 +47,27 @@ function HomePage() {
   };
 
   return (
-    <section>
-      <h2>Select a player</h2>
-      <PlayerSearch
-        players={playerList}
-        selectedPlayerTag={selectedPlayerTag}
-        onSelectPlayer={(player) => setSelectedPlayerTag(player.tag)}
-      />
-      <button onClick={handleViewClick} disabled={!canEnableViewButton()}>
-        View
-      </button>
-    </section>
+    <div className="home-page">
+      <div className="home-container">
+        <h1 className="home-title">Clash Royale Analytics</h1>
+        <div className="player-selection">
+          <div className="search-section">
+            <PlayerSearch
+              players={playerList}
+              selectedPlayerTag={selectedPlayerTag}
+              onSelectPlayer={(player) => setSelectedPlayerTag(player.tag)}
+            />
+            <button
+              className="view-button"
+              onClick={handleViewClick}
+              disabled={!canEnableViewButton()}
+            >
+              View Player
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
