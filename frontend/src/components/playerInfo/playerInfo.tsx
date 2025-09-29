@@ -64,14 +64,12 @@ export function PlayerInfo({
         <div className="player-info-component-basic-info">
           <h1 className="player-info-component-name">{player?.name}</h1>
           <p className="player-info-component-tag">{player?.tag}</p>
-          {player?.clan?.name && (
-            <p className="player-info-component-clan"> 🛡️ {player.clan.name}</p>
-          )}
-          {player?.arena?.name && (
-            <p className="player-info-component-arena">
-              🏟️ {player.arena.name}
-            </p>
-          )}
+          <p className="player-info-component-clan">
+            🛡️ {player?.clan?.name ?? "No Clan"}
+          </p>
+          <p className="player-info-component-arena">
+            🏟️ {player?.arena?.name ?? "No Arena"}
+          </p>
           {Boolean(player?.trophies) && (
             <p className="player-info-component-trophies">
               🏆 {player.trophies.toLocaleString()}
