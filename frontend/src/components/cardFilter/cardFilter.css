@@ -1,5 +1,161 @@
+.card-filter-container {
+  background: var(--bg-overlay-light);
+  border-radius: var(--radius-lg);
+  padding-left: var(--spacing-lg);
+  padding-right: var(--spacing-lg);
+  padding-top: var(--spacing-xs);
+  padding-bottom: var(--spacing-xs);
+}
+
+.card-filter-component-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xs) 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  font: inherit;
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
+}
+
+.card-filter-component-header:hover {
+  background: var(--bg-overlay-light);
+}
+
+.card-filter-component-header:focus {
+  outline: none;
+}
+
+.card-filter-component-header:focus .card-filter-component-toggle {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.card-filter-component-title {
+  font-size: var(--font-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.card-filter-component-toggle {
+  width: 24px;
+  height: 24px;
+  color: var(--text-primary);
+  transition: transform var(--transition-fast);
+}
+
+/* Flip the arrow upside down, if filter options are not expanded */
+.card-filter-component-toggle.collapsed {
+  transform: rotate(180deg);
+}
+
 .card-filter-component-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 50px);
+  grid-template-columns: repeat(auto-fill, 70px);
   gap: 0.1rem;
+  overflow: hidden;
+  transition: max-height 0.5s ease;
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.card-filter-component-grid.hidden {
+  max-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.card-filter-item {
+  position: relative;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  padding: 2px;
+  transition: transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.card-filter-item:hover {
+  border-color: var(--border-hover);
+  background-color: rgba(65, 65, 65, 0.3);
+}
+
+.card-filter-item.is-selected {
+  border-color: var(--color-primary);
+  background-color: rgba(52, 152, 219, 0.15);
+}
+
+.card-filter-item.is-selected:hover {
+  border-color: var(--color-primary);
+  background-color: rgba(52, 152, 219, 0.25);
+}
+
+.card-filter-item:focus,
+.card-filter-item:focus-visible {
+  outline: none;
+}
+
+.card-filter-item.is-selected:focus,
+.card-filter-item.is-selected:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  background-color: rgba(52, 152, 219, 0.15);
+}
+
+.card-filter-component-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: left;
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-light);
+}
+
+.card-filter-component-action-button {
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: var(--font-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 90px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-filter-component-select-all {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    var(--color-primary-hover)
+  );
+  color: white;
+}
+
+.card-filter-component-select-all:hover {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-hover),
+    var(--color-primary-alt)
+  );
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px var(--shadow-light);
+}
+
+.card-filter-component-clear {
+  background: linear-gradient(135deg, #6c757d, #5a6268);
+  color: white;
+}
+
+.card-filter-component-clear:hover {
+  background: linear-gradient(135deg, #5a6268, #454d55);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px var(--shadow-light);
 }

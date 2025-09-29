@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { Card, CardMeta } from "../../types/cards";
 import { CardComponent } from "../card/card";
+import { ChevronUp } from "lucide-react";
 import "./cardFilter.css";
 
 /**
@@ -8,6 +10,7 @@ import "./cardFilter.css";
  * @returns Sorted array of card metadata
  */
 function sortCards(cards: CardMeta[]): CardMeta[] {
+  // Ascending order of rarities
   const rarityOrder = ["common", "rare", "epic", "legendary", "champion"];
   const rarityMap = new Map(rarityOrder.map((r, i) => [r, i]));
 
@@ -27,12 +30,17 @@ function sortCards(cards: CardMeta[]): CardMeta[] {
 /**
  * Creates a Card object with the specified ID and evolution level.
  * @param cardId - The unique identifier for the card
+ * @param cardName - The name of the specified card
  * @param cardEvolutionLevel - The evolution level of the card (0 for regular cards)
  * @returns A Card object with the specified properties
  */
-function createCard(cardId: number, cardEvolutionLevel: number): Card {
+function createCard(
+  cardId: number,
+  cardName: string,
+  cardEvolutionLevel: number
+): Card {
   const card: Card = {
-    name: "dummy", // name is irrelevant to the card display
+    name: cardName, // name is irrelevant to the card display
     id: cardId,
   };
 
@@ -57,14 +65,14 @@ function createCardList(cards: CardMeta[]): Card[] {
     const maxEvoLvl = card.maxEvolutionLevel ?? 0;
     if (maxEvoLvl > 0) {
       // NOTE if evolutions ever end up getting another level, this has to be changed
-      const c = createCard(card.id, 1);
+      const c = createCard(card.id, card.name, 1);
       cardList.push(c);
     }
   }
 
   // All regular cards
   for (const card of cards) {
-    const c = createCard(card.id, 0);
+    const c = createCard(card.id, card.name, 0);
     cardList.push(c);
   }
 
@@ -73,26 +81,91 @@ function createCardList(cards: CardMeta[]): Card[] {
 
 export function CardFilter({
   cards,
-}: // selected,
-// onChange,
-Readonly<{
+  selected,
+  onChange,
+}: Readonly<{
   cards: CardMeta[];
-  // selected: Card[];
-  // onChange: (next: Card[]) => void; // emit card tuple
+  selected: Card[];
+  onChange: (next: Card[]) => void; // emit cards
 }>) {
   const sortedCards = sortCards(cards);
   const cardOptions = createCardList(sortedCards);
 
+  const [isExpanded, setIsExpanded] = useState(false); // init with hidden option
+
+  // Check if the given card is in the selection pool, with same id and evolution level
+  const isSelected = (card: Card) =>
+    selected.some(
+      (s) =>
+        s.id === card.id &&
+        (s.evolutionLevel ?? 0) === (card.evolutionLevel ?? 0)
+    );
+
+  const toggle = (card: Card) => {
+    const isCurrentlySelected = isSelected(card);
+    // If card is already selected, remove it
+    if (isCurrentlySelected) {
+      // Remove this card
+      onChange(
+        selected.filter(
+          (s) =>
+            !(
+              // CardId and Evo Level have to match, then remove that card
+              (
+                s.id === card.id &&
+                (s.evolutionLevel ?? 0) === (card.evolutionLevel ?? 0)
+              )
+            )
+        )
+      );
+    } else {
+      // Append this card to the selection
+      onChange([...selected, card]);
+    }
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
   return (
-    <div className="card-filter-component-grid">
-      {cardOptions.map((c, i) => (
-        <CardComponent
-          key={`${c.id}-${i}`}
-          card={c}
-          cards={cards ?? []}
-          showTooltip={false}
+    <div className="card-filter-container">
+      <button
+        type="button"
+        className="card-filter-component-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <span className="card-filter-component-title">Cards</span>
+        <ChevronUp
+          className={`card-filter-component-toggle ${
+            !isExpanded ? "collapsed" : ""
+          }`}
         />
-      ))}
+      </button>
+      <div
+        id="card-filter-grid"
+        className={`card-filter-component-grid ${!isExpanded ? "hidden" : ""}`}
+      >
+        {cardOptions.map((c, i) => (
+          <button
+            key={`${c.id}-${i}`}
+            type="button"
+            className={`card-filter-item ${isSelected(c) ? "is-selected" : ""}`}
+            onClick={() => toggle(c)}
+          >
+            <CardComponent card={c} cards={cards ?? []} showTooltip={false} />
+          </button>
+        ))}
+        <div className="card-filter-component-actions">
+          <button
+            type="button"
+            className="card-filter-component-action-button card-filter-component-clear"
+            onClick={clearAll}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -14,7 +14,7 @@ import { GameModeFilter } from "../../components/gameModeFilter/gameModeFilter";
 import { StartEndDateFilter } from "../../components/startEndDateFilter/startEndDateFilter";
 import { CardFilter } from "../../components/cardFilter/cardFilter";
 import "./decks.css";
-import type { DeckStats } from "../../types/deckStats";
+import type { Card } from "../../types/cards";
 
 function calculateAndFormatUsageRate(
   battleCount: number,
@@ -23,17 +23,6 @@ function calculateAndFormatUsageRate(
   const usageRate = (battleCount / totalBattles) * 100; // In percent
   const roundedUsageRate = round(usageRate, 1);
   return `${roundedUsageRate}%`;
-}
-
-function calculateTotalWins(deckStats: DeckStats | undefined) {
-  if (!deckStats?.deck_statistics?.decks) {
-    return 0;
-  }
-  let winSum = 0;
-  for (const deck of deckStats.deck_statistics.decks) {
-    winSum += deck.wins;
-  }
-  return winSum;
 }
 
 export default function PlayerDecks() {
@@ -62,12 +51,16 @@ export default function PlayerDecks() {
 
   // Filter state management maintains two sets of state for each filter type:
   // 1. "selected" - what the user has chosen in the UI (not yet applied)
-  // 2. "applied" - what is actually used for the API query
+  // 2. "applied" - what is actually used for the API query (in case of cards for the frontend filter)
   // This allows users to configure multiple filters before applying them all at once to reduce API calls and loading times
 
   // Game mode filters
   const [selectedGameModes, setSelectedGameModes] = useState<string[]>([]); // UI selection
   const [appliedGameModes, setAppliedGameModes] = useState<string[]>([]); // Query parameters
+
+  // Cards filter
+  const [selectedCards, setSelectedCards] = useState<Card[]>([]);
+  const [appliedCards, setAppliedCards] = useState<Card[]>([]);
 
   // Date range filters
   const [selectedStartDate, setSelectedStartDate] = useState<string>(
@@ -85,6 +78,7 @@ export default function PlayerDecks() {
   );
 
   // Timespan option selection (persists which preset was chosen)
+  // For all the other filters, the selected/applied options are the chosen preset
   const [selectedTimespanOption, setSelectedTimespanOption] =
     useState<string>("Last 7 days");
 
@@ -126,6 +120,7 @@ export default function PlayerDecks() {
     setAppliedStartDate(selectedStartDate);
     setAppliedEndDate(selectedEndDate);
     setAppliedGameModes(selectedGameModes);
+    setAppliedCards(selectedCards);
   };
 
   // Deck statistics API call
@@ -144,28 +139,48 @@ export default function PlayerDecks() {
     gameModesInitialized ? appliedGameModes : null // Use applied filters for the query
   );
 
+  // Filter decks based on applied cards
+  const filteredDecks =
+    deckStats?.deck_statistics.decks?.filter((deck) => {
+      // If no cards are applied as filters, show all decks
+      if (!appliedCards || appliedCards.length === 0) {
+        return true;
+      }
+
+      // Check if the deck contains all applied cards (matching both id and evolutionLevel)
+      return appliedCards.every((appliedCard) =>
+        deck.deck?.some(
+          (deckCard) =>
+            deckCard.id === appliedCard.id &&
+            // Non-evolution cards don't have that field, but need to match too
+            (deckCard.evolutionLevel ?? 0) === (appliedCard.evolutionLevel ?? 0)
+        )
+      );
+    }) ?? [];
+
   // Create cache key from applied filters for loading state dependency
   const modesKey = appliedGameModes.join("|");
 
   // Loading state management
   // Determines when to show loading spinner vs content
   // Uses a custom hook that tracks multiple loading states and prevents flickering
+  // NOTE: Cards filter is frontend-only, so not included in resetDependency
   const { isInitialLoad } = usePageLoadingState({
     loadingStates: [decksLoading, cardsLoading, gameModesLoading],
     errorStates: [isDecksError, isCardsError, isGameModesError],
-    hasData: () =>
-      Boolean(
-        deckStats?.deck_statistics.decks &&
-          deckStats.deck_statistics.decks.length > 0
-      ),
-    // Reset dependency ensures loading state recalculates when any filter changes
+    hasData: () => Boolean(filteredDecks && filteredDecks.length > 0),
+    // Reset dependency ensures loading state recalculates when any backend filter changes
     resetDependency: `${playerTag}}-${appliedStartDate}-${appliedEndDate}-${modesKey}`,
   });
 
-  const totalBattles = deckStats?.deck_statistics.totalBattles ?? 0;
-  const totalWins = calculateTotalWins(deckStats);
-
-  const totalDecks = deckStats?.deck_statistics.decks.length ?? 0;
+  // Calculate totals based on filtered decks
+  let totalBattles = 0;
+  let totalWins = 0;
+  for (const deck of filteredDecks) {
+    totalBattles += deck.count;
+    totalWins += deck.wins;
+  }
+  const totalDecks = filteredDecks.length;
 
   return (
     <div className="decks-page">
@@ -203,7 +218,11 @@ export default function PlayerDecks() {
                 selected={selectedGameModes}
                 onChange={setSelectedGameModes}
               />
-              <CardFilter cards={cards ?? []} />
+              <CardFilter
+                cards={cards ?? []}
+                selected={selectedCards}
+                onChange={setSelectedCards}
+              />
               {/* TODO only enable Apply Button when any selectedValue changed */}
               <button
                 type="button"
@@ -215,80 +234,78 @@ export default function PlayerDecks() {
             </div>
 
             {/* Show decks if there is any data to display */}
-            {deckStats?.deck_statistics.decks &&
-              deckStats.deck_statistics.decks.length > 0 && (
-                <div className="decks-stats">
-                  <h2>Overall Performance</h2>
-                  <div className="decks-general-stats">
-                    <StatCard
-                      label={pluralize(totalBattles, "Battle", "Battles")}
-                      value={totalBattles}
-                    />
-                    <StatCard
-                      label={pluralize(totalDecks, "Deck", "Decks")}
-                      value={totalDecks}
-                    />
-                    <StatCard
-                      label={pluralize(totalWins, "Win", "Wins")}
-                      value={totalWins}
-                    />
-                    <StatCard
-                      label="Win Rate"
-                      value={`${round((totalWins / totalBattles) * 100, 1)}%`}
-                    />
-                  </div>
-                  {deckStats.deck_statistics.decks.map((d) => (
-                    <div
-                      className="decks-deck-row"
-                      // Unique deck id of all cards in the deck
-                      key={`${d.deck?.map((c) => c.id).join(";")}`}
-                    >
-                      {/* TODO add a deck name, by using the top x elixir cards 
-                      or by using the win condition and the most expensive card */}
-                      <div className="deck-section">
-                        <DeckComponent deck={d.deck} cards={cards ?? []} />
-                      </div>
-                      <div className="deck-stats-container">
-                        <StatCard
-                          label={pluralize(d.count, "Battle", "Battles")}
-                          value={d.count}
-                        />
-                        <StatCard
-                          label={pluralize(d.wins, "Win", "Wins")}
-                          value={d.wins}
-                        />
-                        <StatCard
-                          label="Win Rate"
-                          value={`${round(d.winRate, 1)}%`}
-                        />
-                        <StatCard
-                          label="Usage Rate"
-                          value={calculateAndFormatUsageRate(
-                            d.count,
-                            totalBattles
-                          )}
-                        />
-                        <StatCard
-                          label={pluralize(
-                            d.modes.length,
-                            "Game Mode",
-                            "Game Modes"
-                          )}
-                          value={d.modes.length}
-                        />
-                        <StatCard
-                          label="Last Seen"
-                          value={datetimeToLocale(d.lastSeen)}
-                        />
-                      </div>
-                    </div>
-                  ))}
+            {filteredDecks && filteredDecks.length > 0 && (
+              <div className="decks-stats">
+                <h2>Overall Performance</h2>
+                <div className="decks-general-stats">
+                  <StatCard
+                    label={pluralize(totalBattles, "Battle", "Battles")}
+                    value={totalBattles}
+                  />
+                  <StatCard
+                    label={pluralize(totalDecks, "Deck", "Decks")}
+                    value={totalDecks}
+                  />
+                  <StatCard
+                    label={pluralize(totalWins, "Win", "Wins")}
+                    value={totalWins}
+                  />
+                  <StatCard
+                    label="Win Rate"
+                    value={`${round((totalWins / totalBattles) * 100, 1)}%`}
+                  />
                 </div>
-              )}
+                {filteredDecks.map((d) => (
+                  <div
+                    className="decks-deck-row"
+                    // Unique deck id of all cards in the deck
+                    key={`${d.deck?.map((c) => c.id).join(";")}`}
+                  >
+                    {/* TODO add a deck name, by using the top x elixir cards 
+                      or by using the win condition and the most expensive card */}
+                    <div className="deck-section">
+                      <DeckComponent deck={d.deck} cards={cards ?? []} />
+                    </div>
+                    <div className="deck-stats-container">
+                      <StatCard
+                        label={pluralize(d.count, "Battle", "Battles")}
+                        value={d.count}
+                      />
+                      <StatCard
+                        label={pluralize(d.wins, "Win", "Wins")}
+                        value={d.wins}
+                      />
+                      <StatCard
+                        label="Win Rate"
+                        value={`${round(d.winRate, 1)}%`}
+                      />
+                      <StatCard
+                        label="Usage Rate"
+                        value={calculateAndFormatUsageRate(
+                          d.count,
+                          totalBattles
+                        )}
+                      />
+                      <StatCard
+                        label={pluralize(
+                          d.modes.length,
+                          "Game Mode",
+                          "Game Modes"
+                        )}
+                        value={d.modes.length}
+                      />
+                      <StatCard
+                        label="Last Seen"
+                        value={datetimeToLocale(d.lastSeen)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Show message when no decks are found and not still loading */}
-            {(!deckStats?.deck_statistics.decks ||
-              deckStats.deck_statistics.decks.length === 0) &&
+            {(!filteredDecks || filteredDecks.length === 0) &&
               !decksLoading &&
               !gameModesLoading &&
               !cardsLoading && (
