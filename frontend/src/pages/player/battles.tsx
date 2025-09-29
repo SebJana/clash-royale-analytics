@@ -32,6 +32,9 @@ export default function PlayerBattles() {
   // Validation state: tracks if the current date input is valid
   const [isValidFilterDate, setIsValidFilterDate] = useState(true); // Initially true since filter starts with today's date
 
+  // Apply button state: tracks if the apply button should be disabled
+  const [applyButtonDisabled, setApplyButtonDisabled] = useState(true); // Initially true since no filter is applied
+
   // Ref for the load more trigger element (used for intersection observer)
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -124,6 +127,20 @@ export default function PlayerBattles() {
     setIsValidFilterDate(isValid);
   }, [beforeDate, validateFilterDate]);
 
+  // Apply button logic - enable only when date has changed and is valid
+  useEffect(() => {
+    // Check if the current selected date (converted to UTC) differs from applied date
+    const currentSelectedDateUTC =
+      beforeDate && isValidFilterDate ? localeToUTC(beforeDate) : undefined;
+
+    // If date is invalid it will differ from the applied date, but the button will be disabled via 'isValidFilterDate'
+    if (currentSelectedDateUTC !== appliedBeforeDate) {
+      setApplyButtonDisabled(false); // Enable button when there's a change
+    } else {
+      setApplyButtonDisabled(true); // Disable button when no change
+    }
+  }, [beforeDate, appliedBeforeDate, isValidFilterDate]);
+
   /**
    * Applies the current date filter to the battles query
    * Converts local time to UTC before applying the filter
@@ -169,7 +186,7 @@ export default function PlayerBattles() {
         />
         <button
           className="battles-apply-filter-button"
-          disabled={!isValidFilterDate}
+          disabled={!isValidFilterDate || applyButtonDisabled}
           onClick={handleApplyFilter}
         >
           Apply

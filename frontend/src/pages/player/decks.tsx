@@ -85,6 +85,9 @@ export default function PlayerDecks() {
   // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
   const [gameModesInitialized, setGameModesInitialized] = useState(false);
 
+  // Upon loading no configuration is changed --> disable apply button
+  const [applyButtonDisabled, setApplyButtonDisabled] = useState(true);
+
   const {
     data: cards,
     isLoading: cardsLoading,
@@ -112,6 +115,30 @@ export default function PlayerDecks() {
       setGameModesInitialized(true);
     }
   }, [gameModes, gameModesInitialized, gameModesLoading]);
+
+  // Only enable apply button, when any selection differs from the current applied state
+  useEffect(() => {
+    // Simple comparison using JSON.stringify for arrays
+    if (
+      appliedStartDate !== selectedStartDate ||
+      appliedEndDate !== selectedEndDate ||
+      JSON.stringify(appliedGameModes) !== JSON.stringify(selectedGameModes) ||
+      JSON.stringify(appliedCards) !== JSON.stringify(selectedCards)
+    ) {
+      setApplyButtonDisabled(false); // Button enabled
+    } else {
+      setApplyButtonDisabled(true); // Button disabled
+    }
+  }, [
+    appliedStartDate,
+    appliedEndDate,
+    appliedGameModes,
+    appliedCards,
+    selectedStartDate,
+    selectedEndDate,
+    selectedGameModes,
+    selectedCards,
+  ]);
 
   // Filter application
   // Transfers all selected filter values to applied filter state
@@ -223,11 +250,11 @@ export default function PlayerDecks() {
                 selected={selectedCards}
                 onChange={setSelectedCards}
               />
-              {/* TODO only enable Apply Button when any selectedValue changed */}
               <button
                 type="button"
                 className="decks-apply-filters-button"
                 onClick={applyAllFilters}
+                disabled={applyButtonDisabled}
               >
                 Apply
               </button>
@@ -255,6 +282,7 @@ export default function PlayerDecks() {
                     value={`${round((totalWins / totalBattles) * 100, 1)}%`}
                   />
                 </div>
+                {/* TODO potentially(?) supply sort by options (battles, wins, win rate, usage rate, last seen) */}
                 {filteredDecks.map((d) => (
                   <div
                     className="decks-deck-row"
