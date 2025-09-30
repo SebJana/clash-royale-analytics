@@ -118,6 +118,8 @@ export default function PlayerBattles() {
     const selectedDate = new Date(dateString);
 
     // Check if the date is valid (not NaN)
+    // TODO add business logic validation - prevent dates before Clash Royale launch (2016-03-02) and future dates
+    // TODO add reasonable date range limits to prevent performance issues
     return !isNaN(selectedDate.getTime());
   }, []);
 

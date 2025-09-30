@@ -128,6 +128,8 @@ async def deck_percentage_stats(
     req: BetweenRequest = Depends(),
 ):
     try:
+        # TODO add game_modes validation - check if modes exist in database before processing
+        # TODO add input sanitization for all user-provided parameters
         params = {
             "playerTag": player_tag,
             "startDate": req.start_date,
