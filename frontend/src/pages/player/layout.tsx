@@ -1,13 +1,19 @@
-import { Outlet, NavLink, useParams } from "react-router-dom";
+import { Outlet, NavLink, useParams, useLocation } from "react-router-dom";
 import { usePlayerProfile } from "../../hooks/usePlayerProfile";
+import { House, Menu, X } from "lucide-react";
 import { PlayerInfo } from "../../components/playerInfo/playerInfo";
-import { House } from "lucide-react";
+import { useEffect, useState } from "react";
 import CircularProgress from "@mui/material/CircularProgress";
 import "./layout.css";
 
 export default function PlayerLayout() {
   const { playerTag = "" } = useParams();
+  const [menuOpen, setMenuOpen] = useState(false);
   const encodedTag = encodeURIComponent(playerTag ?? "");
+  const { pathname } = useLocation();
+
+  // Close menu after navigation
+  useEffect(() => setMenuOpen(false), [pathname]);
 
   const {
     data: player,
@@ -30,14 +36,37 @@ export default function PlayerLayout() {
             Home
           </NavLink>
         </div>
-        <div className="nav-section nav-pages">
-          <NavLink to={`/player/${encodedTag}/battles`} className="nav-link">
+
+        {/* Hamburger Button nur auf Mobile sichtbar */}
+        <button className="nav-toggle" onClick={() => setMenuOpen((v) => !v)}>
+          {menuOpen ? <X /> : <Menu />}
+        </button>
+
+        {/* Menü: Desktop = inline, Mobile = Dropdown/Drawer */}
+        <div
+          id="player-nav-menu"
+          className={`nav-section nav-pages ${menuOpen ? "is-open" : ""}`}
+          role="menu"
+        >
+          <NavLink
+            to={`/player/${encodedTag}/battles`}
+            className="nav-link"
+            role="menuitem"
+          >
             Battles
           </NavLink>
-          <NavLink to={`/player/${encodedTag}/decks`} className="nav-link">
+          <NavLink
+            to={`/player/${encodedTag}/decks`}
+            className="nav-link"
+            role="menuitem"
+          >
             Decks
           </NavLink>
-          <NavLink to={`/player/${encodedTag}/cards`} className="nav-link">
+          <NavLink
+            to={`/player/${encodedTag}/cards`}
+            className="nav-link"
+            role="menuitem"
+          >
             Cards
           </NavLink>
         </div>

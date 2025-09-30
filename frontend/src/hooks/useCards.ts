@@ -4,6 +4,7 @@ import type { CardMeta } from "../types/cards";
 
 const min = 60_000;
 
+// TODO pull cache times into settings file
 export function useCards() {
   return useQuery<CardMeta[], Error>({
     queryKey: ["cards"],
