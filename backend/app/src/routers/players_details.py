@@ -24,8 +24,9 @@ router = APIRouter(
 
 @router.get("/{player_tag}/profile")
 async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn):
-    # TODO how to handle more users than the allowed key limit?
-    # TODO maybe save the player data upon every refresh/request here?
+    # TODO how to handle more active users than the allowed key limit of the Clash Royale API?
+    # maybe save/cache the player data upon every refresh/request here?
+    # only 1 call per cycle per user, but 1 call per cycle for every user no matter if their data is even being viewed
     try:
         params = {"playerTag": player_tag}
         key = await build_redis_key(
@@ -300,7 +301,7 @@ async def daily_player_statistics(
 
     except ValueError as e:
         # Value Errors: invalid date range and invalid timezone
-        # TODO differentiate between them
+        # TODO differentiate between them in the error message of the HTTPException
         raise HTTPException(
             status_code=403,
             detail=f"Given date range is invalid: {req.start_date} – {req.end_date}",

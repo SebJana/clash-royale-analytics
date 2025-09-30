@@ -78,6 +78,7 @@ export function PlayerInfo({
         </div>
       </div>
 
+      {/* TODO make player info collapsable and default to that when on mobile */}
       <div className="player-info-component-details">
         <div className="player-info-component-account-info-section">
           <h3>Account Information</h3>
