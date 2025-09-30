@@ -1,4 +1,3 @@
-/* ===== PAGE LAYOUT ===== */
 .decks-page {
   display: flex;
   flex-direction: column;
@@ -10,7 +9,6 @@
   min-height: 0; /* Allow content to shrink */
 }
 
-/* ===== FILTER SECTION ===== */
 .decks-filter-container {
   background-color: var(--bg-overlay-medium);
   border-radius: var(--radius-lg);
@@ -108,6 +106,11 @@
 .deck-stats-container .stat-card {
   flex: 0 0 auto;
   min-width: 180px;
+}
+
+.decks-loading-spinner {
+  margin: var(--spacing-2xl) auto;
+  display: block;
 }
 
 @media (max-width: 1024px) {

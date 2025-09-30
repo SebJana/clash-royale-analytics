@@ -37,6 +37,9 @@ export default function PlayerLayout() {
           <NavLink to={`/player/${encodedTag}/decks`} className="nav-link">
             Decks
           </NavLink>
+          <NavLink to={`/player/${encodedTag}/cards`} className="nav-link">
+            Cards
+          </NavLink>
         </div>
       </nav>
       <header className="player-header">
