@@ -50,3 +50,12 @@ export function getTodayDateTime(): string {
   const minutes = String(now.getMinutes()).padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
+
+/**
+ * Helper function to format date for input fields
+ * @param date date-time in YYYY-MM-DDTHH:MM format
+ * @returns YYYY-MM-DD format
+ */
+export function formatDateForInput(date: Date): string {
+  return date.toISOString().slice(0, 10); // Format as YYYY-MM-DD
+}

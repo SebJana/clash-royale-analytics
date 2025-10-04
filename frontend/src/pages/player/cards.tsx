@@ -6,6 +6,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { round } from "../../utils/round";
 import { pluralize } from "../../utils/plural";
+import { getInitialFilterState } from "../../utils/filter";
 import { useEffect, useState } from "react";
 import { FilterContainer } from "../../components/filter/filter";
 import type { FilterState } from "../../components/filter/filter";
@@ -23,37 +24,6 @@ function calculateAndFormatUsageRate(
 
 export default function PlayerCards() {
   const { playerTag = "" } = useParams();
-
-  // Helper function to format date for input fields (YYYY-MM-DD format)
-  const formatDateForInput = (date: Date): string => {
-    return date.toISOString().slice(0, 10); // Format as YYYY-MM-DD
-  };
-
-  // Initialize with last 7 days as default date range
-  // This provides a slim default range that shows recent deck data immediately
-  // NOTE: Whenever this initialization changes, also update the "pre-chosen"
-  // selectedTimespanOption of the StartEndDateFilter
-  const getInitialDates = () => {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7);
-    return {
-      start: formatDateForInput(startDate),
-      end: formatDateForInput(endDate),
-    };
-  };
-
-  const initialDates = getInitialDates();
-
-  // Create shared initial filter configuration to ensure consistency
-  // between applied state and initialFilters prop
-  const getInitialFilterState = (): FilterState => ({
-    startDate: initialDates.start,
-    endDate: initialDates.end,
-    gameModes: [],
-    cards: [],
-    timespanOption: "Last 7 days",
-  });
 
   // Filter state management maintains two sets of state for each filter type:
   // 1. "selected" - what the user has chosen in the UI (not yet applied)
