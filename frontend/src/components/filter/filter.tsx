@@ -177,8 +177,8 @@ export function FilterContainer({
   };
 
   return (
-    <div className="filter-container">
-      <h2 className="filter-header">Filters</h2>
+    <div className="filter-component-container">
+      <h2 className="filter-component-header">Filters</h2>
       <StartEndDateFilter
         selectedStart={selectedStartDate}
         selectedEnd={selectedEndDate}
@@ -201,7 +201,7 @@ export function FilterContainer({
       )}
       <button
         type="button"
-        className="apply-filters-button"
+        className="filter-component-apply-button"
         onClick={applyAllFilters}
         disabled={applyButtonDisabled}
       >

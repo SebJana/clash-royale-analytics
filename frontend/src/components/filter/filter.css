@@ -1,22 +1,22 @@
-.filter-container {
+.filter-component-container {
   background-color: var(--bg-overlay-medium);
   border-radius: var(--radius-lg);
   padding: var(--spacing-2xl);
   margin: var(--spacing-lg) 0;
 }
 
-.filter-container > *:not(:first-child):not(:last-child) {
+.filter-component-container > *:not(:first-child):not(:last-child) {
   margin-bottom: 15px;
 }
 
-.filter-header {
+.filter-component-header {
   margin: 0;
   padding-left: 3px;
   padding-bottom: 10px;
   text-align: left;
 }
 
-.apply-filters-button {
+.filter-component-apply-button {
   background-color: var(--color-success);
   color: white;
   border: none;
@@ -30,19 +30,19 @@
   transition: background-color var(--transition-fast);
 }
 
-.apply-filters-button:hover {
+.filter-component-apply-button:hover {
   background-color: var(--color-success-hover);
 }
 
-.apply-filters-button:active {
+.filter-component-apply-button:active {
   background-color: var(--color-success-active);
 }
 
-.apply-filters-button:disabled {
+.filter-component-apply-button:disabled {
   background-color: var(--color-disabled);
   cursor: not-allowed;
 }
 
-.apply-filters-button:disabled:hover {
+.filter-component-apply-button:disabled:hover {
   background-color: var(--color-disabled);
 }
