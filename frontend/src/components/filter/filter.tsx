@@ -3,6 +3,7 @@ import { GameModeFilter } from "../gameModeFilter/gameModeFilter";
 import { StartEndDateFilter } from "../startEndDateFilter/startEndDateFilter";
 import { CardFilter } from "../cardFilter/cardFilter";
 import type { Card, CardMeta } from "../../types/cards";
+import { getInitialDates } from "../../utils/filter";
 import "./filter.css";
 
 export type FilterState = {
@@ -32,22 +33,6 @@ export function FilterContainer({
   showCardFilter,
   appliedFilters,
 }: Readonly<FilterContainerProps>) {
-  // Helper function to format date for input fields (YYYY-MM-DD format)
-  const formatDateForInput = (date: Date): string => {
-    return date.toISOString().slice(0, 10);
-  };
-
-  // Initialize with last 7 days as default date range
-  const getInitialDates = () => {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7);
-    return {
-      start: formatDateForInput(startDate),
-      end: formatDateForInput(endDate),
-    };
-  };
-
   const initialDates = getInitialDates();
 
   // Filter state management maintains two sets of state for each filter type:
