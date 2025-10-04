@@ -24,8 +24,6 @@ function calculateAndFormatUsageRate(
   return `${roundedUsageRate}%`;
 }
 
-// TODO (potentially) extract filter container and logic/utils into component for use in decks, cards and stats page
-// TODO (potentially) sync filters
 // TODO add same error handling for all pages if no data is found or the tag is invalid
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();

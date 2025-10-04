@@ -24,6 +24,7 @@ type FilterContainerProps = {
   appliedFilters?: FilterState; // Current applied filters to sync UI
 };
 
+// TODO sync filters, so that every instance uses the same values via localStorage and only if there are none, default values
 export function FilterContainer({
   gameModes,
   cards,
