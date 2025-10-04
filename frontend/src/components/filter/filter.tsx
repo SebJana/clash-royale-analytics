@@ -3,7 +3,7 @@ import { GameModeFilter } from "../gameModeFilter/gameModeFilter";
 import { StartEndDateFilter } from "../startEndDateFilter/startEndDateFilter";
 import { CardFilter } from "../cardFilter/cardFilter";
 import type { Card, CardMeta } from "../../types/cards";
-import { getInitialDates } from "../../utils/filter";
+import { getDateRange, setFilterStateToLocalStorage } from "../../utils/filter";
 import "./filter.css";
 
 export type FilterState = {
@@ -34,7 +34,7 @@ export function FilterContainer({
   showCardFilter,
   appliedFilters,
 }: Readonly<FilterContainerProps>) {
-  const initialDates = getInitialDates();
+  const initialDates = getDateRange();
 
   // Filter state management maintains two sets of state for each filter type:
   // 1. "selected" - what the user has chosen in the UI (not yet applied)
@@ -144,6 +144,7 @@ export function FilterContainer({
 
   // Apply all filters and notify parent
   const applyAllFilters = () => {
+    // TODO set applied filter values to localStorage
     const newFilters: FilterState = {
       startDate: selectedStartDate,
       endDate: selectedEndDate,
@@ -158,6 +159,8 @@ export function FilterContainer({
     if (showCardFilter) {
       setAppliedCards(selectedCards);
     }
+
+    setFilterStateToLocalStorage(newFilters);
 
     onFiltersApply(newFilters);
   };
