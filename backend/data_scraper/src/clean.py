@@ -99,7 +99,7 @@ def adjust_card_levels(cards):
 
     # Clash Royale changed the level system, but their API still returns the old
     # levels. Back then all cards started at level 1 and could be leveled up.
-    # Level 13 for common cards, level 11 for rare cards, level 8 for epic cards, ...
+    # Maxed out: Level 13 for common cards, level 11 for rare cards, level 8 for epic cards, ...
     # Nowadays everything is capped at level 14 (15), and the different rarities
     # just start off at different starting levels:
     #   common: 1
@@ -384,3 +384,4 @@ def get_player_name(battles, player_tag):
             return player.get("name")
 
     return player_tag  # Default to the tag if the name couldn't be found
+ b

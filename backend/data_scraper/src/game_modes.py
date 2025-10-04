@@ -2,6 +2,13 @@ import threading
 
 
 class UniqueGameModes:
+    """
+    A thread-safe container for collecting and managing unique game modes.
+
+    This class provides a thread-safe way to collect unique game mode strings,
+    typically used during data scraping operations where multiple threads are processing players concurrently and want to collect the unique game modes found in the battle logs.
+    """
+
     def __init__(self):
         self._lock = threading.Lock()
         self._values = set()

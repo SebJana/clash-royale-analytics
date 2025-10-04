@@ -51,6 +51,8 @@ export function usePageLoadingState({
   hasData,
   resetDependency,
   minDisplayTime = 300,
+  // TODO upon no game in last 7 days, the load takes max time, but api returns empty list
+  // --> fix that delay when data is returned, even if it is empty
   maxLoadTime = 5000,
 }: UsePageLoadingStateOptions): UsePageLoadingStateReturn {
   // Loading state: tracks initial page load to show spinner immediately
