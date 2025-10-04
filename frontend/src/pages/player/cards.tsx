@@ -7,8 +7,8 @@ import { useGameModes } from "../../hooks/useGameModes";
 import { round } from "../../utils/round";
 import { pluralize } from "../../utils/plural";
 import { useEffect, useState } from "react";
-import { GameModeFilter } from "../../components/gameModeFilter/gameModeFilter";
-import { StartEndDateFilter } from "../../components/startEndDateFilter/startEndDateFilter";
+import { FilterContainer } from "../../components/filter/filter";
+import type { FilterState } from "../../components/filter/filter";
 import { CardComponent } from "../../components/card/card";
 import "./cards.css";
 
@@ -45,40 +45,28 @@ export default function PlayerCards() {
 
   const initialDates = getInitialDates();
 
+  // Create shared initial filter configuration to ensure consistency
+  // between applied state and initialFilters prop
+  const getInitialFilterState = (): FilterState => ({
+    startDate: initialDates.start,
+    endDate: initialDates.end,
+    gameModes: [],
+    cards: [],
+    timespanOption: "Last 7 days",
+  });
+
   // Filter state management maintains two sets of state for each filter type:
   // 1. "selected" - what the user has chosen in the UI (not yet applied)
   // 2. "applied" - what is actually used for the API query (in case of cards for the frontend filter)
   // This allows users to configure multiple filters before applying them all at once to reduce API calls and loading times
 
-  // Game mode filters
-  const [selectedGameModes, setSelectedGameModes] = useState<string[]>([]); // UI selection
-  const [appliedGameModes, setAppliedGameModes] = useState<string[]>([]); // Query parameters
-
-  // Date range filters
-  const [selectedStartDate, setSelectedStartDate] = useState<string>(
-    initialDates.start // Initialize with last 7 days start
+  // State to store applied filters from FilterContainer
+  const [appliedFilters, setAppliedFilters] = useState<FilterState>(
+    getInitialFilterState()
   );
-  const [appliedStartDate, setAppliedStartDate] = useState<string>(
-    initialDates.start // Initialize applied state so query runs immediately
-  );
-
-  const [selectedEndDate, setSelectedEndDate] = useState<string>(
-    initialDates.end // Initialize with today
-  );
-  const [appliedEndDate, setAppliedEndDate] = useState<string>(
-    initialDates.end // Initialize applied state so query runs immediately
-  );
-
-  // Timespan option selection (persists which preset was chosen)
-  // For all the other filters, the selected/applied options are the chosen preset
-  const [selectedTimespanOption, setSelectedTimespanOption] =
-    useState<string>("Last 7 days");
 
   // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
   const [gameModesInitialized, setGameModesInitialized] = useState(false);
-
-  // Upon loading no configuration is changed --> disable apply button
-  const [applyButtonDisabled, setApplyButtonDisabled] = useState(true);
 
   const {
     data: cards,
@@ -102,40 +90,21 @@ export default function PlayerCards() {
       // Auto-select all game modes when they first become available
       // This provides a good default that shows all available data
       const allGameModeKeys = Object.keys(gameModes);
-      setSelectedGameModes(allGameModeKeys); // Set UI selection
-      setAppliedGameModes(allGameModeKeys); // Set query parameters immediately
+
+      // Only initialize if no game modes are already selected to avoid overriding user selections
+      setAppliedFilters((prev) => ({
+        ...prev,
+        gameModes:
+          prev.gameModes.length === 0 ? allGameModeKeys : prev.gameModes,
+      }));
       setGameModesInitialized(true);
     }
   }, [gameModes, gameModesInitialized, gameModesLoading]);
 
-  // Only enable apply button, when any selection differs from the current applied state
-  useEffect(() => {
-    // Simple comparison using JSON.stringify for arrays
-    if (
-      appliedStartDate !== selectedStartDate ||
-      appliedEndDate !== selectedEndDate ||
-      JSON.stringify(appliedGameModes) !== JSON.stringify(selectedGameModes)
-    ) {
-      setApplyButtonDisabled(false); // Button enabled
-    } else {
-      setApplyButtonDisabled(true); // Button disabled
-    }
-  }, [
-    appliedStartDate,
-    appliedEndDate,
-    appliedGameModes,
-    selectedStartDate,
-    selectedEndDate,
-    selectedGameModes,
-  ]);
-
-  // Filter application
-  // Transfers all selected filter values to applied filter state
-  // This triggers the deck statistics query with the new parameters
-  const applyAllFilters = () => {
-    setAppliedStartDate(selectedStartDate);
-    setAppliedEndDate(selectedEndDate);
-    setAppliedGameModes(selectedGameModes);
+  const handleFiltersApply = (filters: FilterState) => {
+    setAppliedFilters(filters);
+    console.log("Filters applied:", filters);
+    // The API queries will automatically re-run when appliedFilters changes
   };
 
   // Card statistics API call
@@ -149,13 +118,13 @@ export default function PlayerCards() {
     error: cardStatsError,
   } = useCardStats(
     playerTag,
-    appliedStartDate,
-    appliedEndDate,
-    gameModesInitialized ? appliedGameModes : null // Use applied filters for the query
+    appliedFilters.startDate,
+    appliedFilters.endDate,
+    gameModesInitialized ? appliedFilters.gameModes : null // Use applied filters for the query
   );
 
   // Create cache key from applied filters for loading state dependency
-  const modesKey = appliedGameModes.join("|");
+  const modesKey = appliedFilters.gameModes.join("|");
 
   // Loading state management
   // Determines when to show loading spinner vs content
@@ -166,7 +135,7 @@ export default function PlayerCards() {
     hasData: () =>
       Boolean(cardStats && cardStats.card_statistics.cards.length > 0),
     // Reset dependency ensures loading state recalculates when any backend filter changes
-    resetDependency: `${playerTag}-${appliedStartDate}-${appliedEndDate}-${modesKey}`,
+    resetDependency: `${playerTag}-${appliedFilters.startDate}-${appliedFilters.endDate}-${modesKey}`,
   });
 
   const totalBattles = cardStats?.card_statistics.totalBattles ?? 0;
@@ -192,30 +161,16 @@ export default function PlayerCards() {
         {/* Loaded State - Show decks when all data is available and no errors occurred */}
         {!isCardStatsError && !isGameModesError && !isInitialLoad && (
           <>
-            <div className="cards-filter-container">
-              <h2 className="cards-filter-header">Filters</h2>
-              <StartEndDateFilter
-                selectedStart={selectedStartDate}
-                selectedEnd={selectedEndDate}
-                selectedOption={selectedTimespanOption}
-                onStartChange={setSelectedStartDate}
-                onEndChange={setSelectedEndDate}
-                onOptionChange={setSelectedTimespanOption}
-              />
-              <GameModeFilter
-                gameModes={gameModes ?? {}}
-                selected={selectedGameModes}
-                onChange={setSelectedGameModes}
-              />
-              <button
-                type="button"
-                className="cards-apply-filters-button"
-                onClick={applyAllFilters}
-                disabled={applyButtonDisabled}
-              >
-                Apply
-              </button>
-            </div>
+            {/* FilterContainer component */}
+            <FilterContainer
+              gameModes={gameModes || {}}
+              cards={cards || []}
+              gameModesLoading={gameModesLoading}
+              onFiltersApply={handleFiltersApply}
+              showCardFilter={false}
+              appliedFilters={appliedFilters}
+              initialFilters={getInitialFilterState()}
+            />
 
             {/* Show cards if there is any data to display */}
             {cardStats && (

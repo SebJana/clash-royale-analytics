@@ -1,0 +1,48 @@
+.filter-container {
+  background-color: var(--bg-overlay-medium);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+  margin: var(--spacing-lg) 0;
+}
+
+.filter-container > *:not(:first-child):not(:last-child) {
+  margin-bottom: 15px;
+}
+
+.filter-header {
+  margin: 0;
+  padding-left: 3px;
+  padding-bottom: 10px;
+  text-align: left;
+}
+
+.apply-filters-button {
+  background-color: var(--color-success);
+  color: white;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-2xl);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--font-base);
+  font-weight: var(--font-weight-medium);
+  margin: var(--spacing-md) 0 0 auto;
+  display: block;
+  transition: background-color var(--transition-fast);
+}
+
+.apply-filters-button:hover {
+  background-color: var(--color-success-hover);
+}
+
+.apply-filters-button:active {
+  background-color: var(--color-success-active);
+}
+
+.apply-filters-button:disabled {
+  background-color: var(--color-disabled);
+  cursor: not-allowed;
+}
+
+.apply-filters-button:disabled:hover {
+  background-color: var(--color-disabled);
+}
