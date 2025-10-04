@@ -8,8 +8,8 @@ import { round } from "../../utils/round";
 import { pluralize } from "../../utils/plural";
 import { getInitialFilterState } from "../../utils/filter";
 import { useEffect, useState } from "react";
-import { FilterContainer } from "../../components/filter/filter";
-import type { FilterState } from "../../components/filter/filter";
+import { FilterContainer } from "../../components/filterContainer/filterContainer";
+import type { FilterState } from "../../components/filterContainer/filterContainer";
 import { CardComponent } from "../../components/card/card";
 import "./cards.css";
 

@@ -4,7 +4,7 @@ import { StartEndDateFilter } from "../startEndDateFilter/startEndDateFilter";
 import { CardFilter } from "../cardFilter/cardFilter";
 import type { Card, CardMeta } from "../../types/cards";
 import { getDateRange, setFilterStateToLocalStorage } from "../../utils/filter";
-import "./filter.css";
+import "./filterContainer.css";
 
 export type FilterState = {
   startDate: string;
@@ -24,7 +24,6 @@ type FilterContainerProps = {
   appliedFilters?: FilterState; // Current applied filters to sync UI
 };
 
-// TODO sync filters, so that every instance uses the same values via localStorage and only if there are none, default values
 export function FilterContainer({
   gameModes,
   cards,

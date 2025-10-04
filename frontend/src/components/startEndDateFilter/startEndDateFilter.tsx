@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatDateForInput } from "../../utils/datetime";
 import { ChevronUp } from "lucide-react";
 import "./startEndDateFilter.css";
 
@@ -46,11 +47,6 @@ export function StartEndDateFilter({
 }>) {
   // Only manages UI expansion state - all filter values are controlled by parent
   const [isExpanded, setIsExpanded] = useState(false);
-
-  // Helper to format JavaScript Date objects for HTML date inputs
-  const formatDateForInput = (date: Date): string => {
-    return date.toISOString().slice(0, 10); // Format as YYYY-MM-DD
-  };
 
   // Calculates start/end dates for preset options (7 days, 30 days, etc.)
   const handleDateRangeSelection = (days: number) => {

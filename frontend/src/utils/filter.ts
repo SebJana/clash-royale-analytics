@@ -1,5 +1,10 @@
 import { formatDateForInput } from "./datetime";
-import type { FilterState } from "../components/filter/filter";
+import type { FilterState } from "../components/filterContainer/filterContainer";
+
+// NOTE: Default day value HAS to exist as option of StartEndDateFilter
+// If this value isn't an option, it will still be the value used in the queries (applied filter)
+// but it WON'T be highlighted in the filter UI, no option will be shown as selected
+const DEFAULT_DAY_RANGE = 7;
 
 /**
  * Saves filter state to localStorage.
@@ -8,6 +13,7 @@ import type { FilterState } from "../components/filter/filter";
  * @param filters - The filter state object to persist
  */
 export function setFilterStateToLocalStorage(filters: FilterState) {
+  // TODO add TTL/maxAge till filter resets to default values
   localStorage.setItem("filterState", JSON.stringify(filters));
 }
 
@@ -33,11 +39,11 @@ export function getFilterStateFromLocalStorage(): FilterState | null {
 
 /**
  * Calculates initial date range for filters.
- * Sets the end date to today and start date to dayOffset (default: 7) days ago.
+ * Sets the end date to today and start date to dayOffset (default: DEFAULT_DAY_RANGE) days ago.
  *
  * @returns Object containing formatted start and end date strings in YYYY-MM-DD format
  */
-export function getDateRange(dayOffset: number = 7) {
+export function getDateRange(dayOffset: number = DEFAULT_DAY_RANGE) {
   const endDate = new Date();
   const startDate = new Date();
   // Initialize with last dayOffset days as default date range
@@ -46,6 +52,24 @@ export function getDateRange(dayOffset: number = 7) {
     start: formatDateForInput(startDate),
     end: formatDateForInput(endDate),
   };
+}
+
+/**
+ * Extracts the first integer found in a string.
+ *
+ * @param str - The input string to search.
+ * @returns The first integer found, or null if none exists.
+ */
+function extractFirstNumber(str: string): number | null {
+  const regex = /\d+/;
+  const numberMatch = regex.exec(str);
+
+  if (!numberMatch) {
+    return null;
+  }
+
+  const numberValue = parseInt(numberMatch[0], 10);
+  return numberValue;
 }
 
 /**
@@ -60,10 +84,10 @@ export function getDateRange(dayOffset: number = 7) {
  * 2. If no saved filters: Returns default filter state
  *
  * Default fallback configuration:
- * - Date range: Last 7 days (from today)
+ * - Date range: Last DEFAULT_DAY_RANGE days (from today)
  * - Game modes: Empty array (no filters applied)
  * - Cards: Empty array (no filters applied)
- * - Timespan option: "Last 7 days"
+ * - Timespan option: "Last DEFAULT_DAY_RANGE days"
  *
  * @returns FilterState object with either restored or default filter values
  */
@@ -71,16 +95,16 @@ export function getInitialFilterState(): FilterState {
   const filters = getFilterStateFromLocalStorage();
   // Check if there are filters saved
   if (filters) {
-    // If timespan is NOT custom, calculate start and end date new
+    // If timespan is NOT custom, calculate start and end date new, because last X days
+    // might mean a different time span, now that possibly the day the user uses the site on changed
     if (filters.timespanOption !== "Custom") {
-      // Extract which Last X days option is selected
-      const daysOption = filters.timespanOption
-        .replace("Last ", "")
-        .replace(" days", "");
-      const days = Number(daysOption);
+      // Extract which Last X days option is selected (Extract the X)
+      // Fall back to specified value if no day amount could be extracted
+      const days =
+        extractFirstNumber(filters.timespanOption) ?? DEFAULT_DAY_RANGE;
       const newlyCalcDates = getDateRange(days);
 
-      // Return updated filter state
+      // Return updated filter state, with new start and end date
       return {
         startDate: newlyCalcDates.start,
         endDate: newlyCalcDates.end,
@@ -94,12 +118,12 @@ export function getInitialFilterState(): FilterState {
   }
 
   // Return default filter state
-  const initialDates = getDateRange(7);
+  const initialDates = getDateRange(DEFAULT_DAY_RANGE);
   return {
     startDate: initialDates.start,
     endDate: initialDates.end,
     gameModes: [],
     cards: [],
-    timespanOption: "Last 7 days",
+    timespanOption: `Last ${DEFAULT_DAY_RANGE} days`,
   };
 }

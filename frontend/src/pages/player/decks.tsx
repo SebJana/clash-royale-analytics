@@ -11,8 +11,8 @@ import { getInitialFilterState } from "../../utils/filter";
 import { datetimeToLocale } from "../../utils/datetime";
 import { useEffect, useState } from "react";
 import { StatCard } from "../../components/statCard/statCard";
-import { FilterContainer } from "../../components/filter/filter";
-import type { FilterState } from "../../components/filter/filter";
+import { FilterContainer } from "../../components/filterContainer/filterContainer";
+import type { FilterState } from "../../components/filterContainer/filterContainer";
 import "./decks.css";
 
 function calculateAndFormatUsageRate(
