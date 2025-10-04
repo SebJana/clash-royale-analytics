@@ -144,7 +144,6 @@ export function FilterContainer({
 
   // Apply all filters and notify parent
   const applyAllFilters = () => {
-    // TODO set applied filter values to localStorage
     const newFilters: FilterState = {
       startDate: selectedStartDate,
       endDate: selectedEndDate,
@@ -160,6 +159,7 @@ export function FilterContainer({
       setAppliedCards(selectedCards);
     }
 
+    // Save the current state of the filter to the local Storage
     setFilterStateToLocalStorage(newFilters);
 
     onFiltersApply(newFilters);
