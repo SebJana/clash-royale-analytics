@@ -73,6 +73,32 @@ function extractFirstNumber(str: string): number | null {
 }
 
 /**
+ * Default configuration for the filters
+ *
+ * Default fallback configuration:
+ * - Date range: Last DEFAULT_DAY_RANGE days (from today)
+ * - Game modes: Empty array (no filters applied)
+ * - Cards: Empty array (no filters applied)
+ * - Card inclusion filter mode: true, meaning all selected cards HAVE to be included in the shown decks
+ * - Timespan option: "Last DEFAULT_DAY_RANGE days"
+ *
+ * @returns FilterState object with either restored or default filter values
+
+ */
+export function getDefaultFilterState(): FilterState {
+  // Return default filter state
+  const initialDates = getDateRange(DEFAULT_DAY_RANGE);
+  return {
+    startDate: initialDates.start,
+    endDate: initialDates.end,
+    gameModes: [],
+    cards: [],
+    includeCardFilterMode: true,
+    timespanOption: `Last ${DEFAULT_DAY_RANGE} days`,
+  };
+}
+
+/**
  * Creates an initial filter state, prioritizing saved state from localStorage with smart date handling.
  * This function is used to persist filter states over different pages and page visits.
  *
@@ -83,16 +109,9 @@ function extractFirstNumber(str: string): number | null {
  *    - Preserves saved game modes and cards
  * 2. If no saved filters: Returns default filter state
  *
- * Default fallback configuration:
- * - Date range: Last DEFAULT_DAY_RANGE days (from today)
- * - Game modes: Empty array (no filters applied)
- * - Cards: Empty array (no filters applied)
- * - Card inclusion filter mode: true, meaning all selected cards HAVE to be included in the shown decks
- * - Timespan option: "Last DEFAULT_DAY_RANGE days"
- *
  * @returns FilterState object with either restored or default filter values
  */
-export function getInitialFilterState(): FilterState {
+export function getCurrentFilterState(): FilterState {
   const filters = getFilterStateFromLocalStorage();
   // Check if there are filters saved
   if (filters) {
@@ -120,13 +139,5 @@ export function getInitialFilterState(): FilterState {
   }
 
   // Return default filter state
-  const initialDates = getDateRange(DEFAULT_DAY_RANGE);
-  return {
-    startDate: initialDates.start,
-    endDate: initialDates.end,
-    gameModes: [],
-    cards: [],
-    includeCardFilterMode: true,
-    timespanOption: `Last ${DEFAULT_DAY_RANGE} days`,
-  };
+  return getDefaultFilterState();
 }

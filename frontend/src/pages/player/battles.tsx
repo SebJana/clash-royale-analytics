@@ -197,7 +197,7 @@ export default function PlayerBattles() {
           className="battles-clear-filter-button"
           onClick={handleClearFilter}
         >
-          Clear
+          Reset
         </button>
       </div>
 

@@ -7,7 +7,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { round } from "../../utils/round";
 import { pluralize } from "../../utils/plural";
-import { getInitialFilterState } from "../../utils/filter";
+import { getCurrentFilterState } from "../../utils/filter";
 import { datetimeToLocale } from "../../utils/datetime";
 import { useEffect, useState } from "react";
 import { StatCard } from "../../components/statCard/statCard";
@@ -42,7 +42,7 @@ export default function PlayerDecks() {
 
   // State to store applied filters from FilterContainer
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(
-    getInitialFilterState()
+    getCurrentFilterState()
   );
 
   // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
@@ -83,7 +83,6 @@ export default function PlayerDecks() {
 
   const handleFiltersApply = (filters: FilterState) => {
     setAppliedFilters(filters);
-    console.log("Filters applied:", filters);
     // The API queries will automatically re-run when appliedFilters changes
   };
 
@@ -211,7 +210,7 @@ export default function PlayerDecks() {
               onFiltersApply={handleFiltersApply}
               showCardFilter={true}
               appliedFilters={appliedFilters}
-              initialFilters={getInitialFilterState()}
+              initialFilters={getCurrentFilterState()}
             />
 
             {/* Show decks if there is any data to display */}

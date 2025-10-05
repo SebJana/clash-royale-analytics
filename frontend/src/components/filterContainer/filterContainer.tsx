@@ -3,7 +3,11 @@ import { GameModeFilter } from "../gameModeFilter/gameModeFilter";
 import { StartEndDateFilter } from "../startEndDateFilter/startEndDateFilter";
 import { CardFilter } from "../cardFilter/cardFilter";
 import type { Card, CardMeta } from "../../types/cards";
-import { getDateRange, setFilterStateToLocalStorage } from "../../utils/filter";
+import {
+  getDateRange,
+  getDefaultFilterState,
+  setFilterStateToLocalStorage,
+} from "../../utils/filter";
 import "./filterContainer.css";
 
 export type FilterState = {
@@ -192,6 +196,20 @@ export function FilterContainer({
     onFiltersApply(newFilters);
   };
 
+  // Reset clears the selection, user still has to click apply for the default to take effect
+  const resetAllFilters = () => {
+    const defaultFilters = getDefaultFilterState();
+
+    setSelectedStartDate(defaultFilters.startDate);
+    setSelectedEndDate(defaultFilters.endDate);
+    setSelectedTimespanOption(defaultFilters.timespanOption);
+    setSelectedGameModes(defaultFilters.gameModes);
+    setSelectedIncludeCardFilterMode(defaultFilters.includeCardFilterMode);
+    if (showCardFilter) {
+      setSelectedCards(defaultFilters.cards);
+    }
+  };
+
   return (
     <div className="filter-component-container">
       <h2 className="filter-component-header">Filters</h2>
@@ -217,14 +235,23 @@ export function FilterContainer({
           onCardFilterModeChange={setSelectedIncludeCardFilterMode}
         />
       )}
-      <button
-        type="button"
-        className="filter-component-apply-button"
-        onClick={applyAllFilters}
-        disabled={applyButtonDisabled}
-      >
-        Apply
-      </button>
+      <div className="filter-component-button-container">
+        <button
+          type="button"
+          className="filter-component-apply-button"
+          onClick={applyAllFilters}
+          disabled={applyButtonDisabled}
+        >
+          Apply
+        </button>
+        <button
+          type="button"
+          className="filter-component-reset-button filter-component-action-button"
+          onClick={resetAllFilters}
+        >
+          Reset
+        </button>
+      </div>
     </div>
   );
 }

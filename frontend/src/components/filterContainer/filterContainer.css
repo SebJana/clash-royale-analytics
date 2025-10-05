@@ -16,6 +16,14 @@
   text-align: left;
 }
 
+.filter-component-button-container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
 .filter-component-apply-button {
   background-color: var(--color-success);
   color: white;
@@ -25,8 +33,6 @@
   cursor: pointer;
   font-size: var(--font-base);
   font-weight: var(--font-weight-medium);
-  margin: var(--spacing-md) 0 0 auto;
-  display: block;
   transition: background-color var(--transition-fast);
 }
 
@@ -45,4 +51,28 @@
 
 .filter-component-apply-button:disabled:hover {
   background-color: var(--color-disabled);
+}
+
+.filter-component-action-button {
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: var(--font-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 90px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.filter-component-reset-button {
+  background: linear-gradient(135deg, #6c757d, #5a6268);
+  color: white;
+}
+
+.filter-component-reset-button:hover {
+  background: linear-gradient(135deg, #5a6268, #454d55);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px var(--shadow-light);
 }
