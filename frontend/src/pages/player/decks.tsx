@@ -96,6 +96,10 @@ export default function PlayerDecks() {
     gameModesInitialized ? appliedFilters.gameModes : null // Use applied filters for the query
   );
 
+  // TODO make card filtering toggle-able between modes (reset selection when swapping?):
+  // 1) decks HAVE to include ALL cards
+  // 2) decks have a percentage of how many cards of the selection are in them
+  //    and are sorted by that value, if it is bigger than zero
   // Filter decks based on applied cards
   const filteredDecks =
     deckStats?.deck_statistics.decks?.filter((deck) => {
