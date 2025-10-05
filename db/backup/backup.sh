@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -eu
 
 MONGO_HOST="$MONGO_HOST"
 MONGO_PORT="$MONGO_PORT"
