@@ -384,4 +384,3 @@ def get_player_name(battles, player_tag):
             return player.get("name")
 
     return player_tag  # Default to the tag if the name couldn't be found
- b
