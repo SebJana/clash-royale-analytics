@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail 2>/dev/null || set -eu
 
 MONGO_HOST="$MONGO_HOST"
