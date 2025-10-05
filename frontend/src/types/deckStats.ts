@@ -9,7 +9,7 @@ export type DeckStats = {
   };
 };
 
-type Deck = {
+export type Deck = {
   count: number;
   wins: number;
   firstSeen: string;

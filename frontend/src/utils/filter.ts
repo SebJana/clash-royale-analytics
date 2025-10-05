@@ -87,6 +87,7 @@ function extractFirstNumber(str: string): number | null {
  * - Date range: Last DEFAULT_DAY_RANGE days (from today)
  * - Game modes: Empty array (no filters applied)
  * - Cards: Empty array (no filters applied)
+ * - Card inclusion filter mode: true, meaning all selected cards HAVE to be included in the shown decks
  * - Timespan option: "Last DEFAULT_DAY_RANGE days"
  *
  * @returns FilterState object with either restored or default filter values
@@ -110,6 +111,7 @@ export function getInitialFilterState(): FilterState {
         endDate: newlyCalcDates.end,
         gameModes: filters.gameModes,
         cards: filters.cards,
+        includeCardFilterMode: filters.includeCardFilterMode,
         timespanOption: filters.timespanOption,
       };
     }
@@ -124,6 +126,7 @@ export function getInitialFilterState(): FilterState {
     endDate: initialDates.end,
     gameModes: [],
     cards: [],
+    includeCardFilterMode: true,
     timespanOption: `Last ${DEFAULT_DAY_RANGE} days`,
   };
 }

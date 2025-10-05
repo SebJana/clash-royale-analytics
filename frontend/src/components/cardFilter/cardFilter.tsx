@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Card, CardMeta } from "../../types/cards";
 import { CardComponent } from "../card/card";
 import { ChevronUp } from "lucide-react";
@@ -82,16 +82,38 @@ function createCardList(cards: CardMeta[]): Card[] {
 export function CardFilter({
   cards,
   selected,
-  onChange,
+  onCardsChange,
+  includeCardFilterMode,
+  onCardFilterModeChange,
 }: Readonly<{
   cards: CardMeta[];
   selected: Card[];
-  onChange: (next: Card[]) => void; // emit cards
+  onCardsChange: (next: Card[]) => void; // emit cards
+  includeCardFilterMode?: boolean; // Optional prop to control filter mode
+  onCardFilterModeChange?: (next: boolean) => void;
 }>) {
   const sortedCards = sortCards(cards);
   const cardOptions = createCardList(sortedCards);
 
   const [isExpanded, setIsExpanded] = useState(false); // init with hidden option
+  // Keep track of the selected matching mode
+  const [localFilterMode, setLocalFilterMode] = useState(
+    includeCardFilterMode ?? true
+  );
+
+  // Sync local state with prop changes, so that the parent component knows the selected option
+  useEffect(() => {
+    setLocalFilterMode(includeCardFilterMode ?? true);
+  }, [includeCardFilterMode]);
+
+  // Handle toggle of filter mode
+  const toggleFilterMode = () => {
+    const newMode = !localFilterMode;
+    setLocalFilterMode(newMode);
+    if (onCardFilterModeChange) {
+      onCardFilterModeChange(newMode);
+    }
+  };
 
   // Check if the given card is in the selection pool, with same id and evolution level
   const isSelected = (card: Card) =>
@@ -106,7 +128,7 @@ export function CardFilter({
     // If card is already selected, remove it
     if (isCurrentlySelected) {
       // Remove this card
-      onChange(
+      onCardsChange(
         selected.filter(
           (s) =>
             !(
@@ -120,12 +142,12 @@ export function CardFilter({
       );
     } else {
       // Append this card to the selection
-      onChange([...selected, card]);
+      onCardsChange([...selected, card]);
     }
   };
 
   const clearAll = () => {
-    onChange([]);
+    onCardsChange([]);
   };
 
   return (
@@ -142,6 +164,35 @@ export function CardFilter({
           }`}
         />
       </button>
+      {isExpanded && onCardFilterModeChange && (
+        <div className="card-filter-component-mode-toggle">
+          <div className="card-filter-component-mode-label">
+            <span>
+              {localFilterMode
+                ? "Only show decks that include all selected cards"
+                : "Show decks that share the most cards with your selection"}
+            </span>
+            <div className="card-filter-component-toggle-container">
+              <span className="card-filter-component-toggle-label">Match</span>
+              <label
+                className="card-filter-component-slide-toggle"
+                aria-label="Toggle card filter mode"
+              >
+                <input
+                  type="checkbox"
+                  checked={localFilterMode}
+                  onChange={toggleFilterMode}
+                  className="card-filter-component-toggle-input"
+                />
+                <span className="card-filter-component-toggle-slider"></span>
+              </label>
+              <span className="card-filter-component-toggle-label">
+                Include
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
       <div
         id="card-filter-grid"
         className={`card-filter-component-grid ${!isExpanded ? "hidden" : ""}`}

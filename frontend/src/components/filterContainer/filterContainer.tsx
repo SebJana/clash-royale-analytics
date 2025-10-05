@@ -11,6 +11,7 @@ export type FilterState = {
   endDate: string;
   gameModes: string[];
   cards: Card[];
+  includeCardFilterMode: boolean;
   timespanOption: string;
 };
 
@@ -21,6 +22,8 @@ type FilterContainerProps = {
   onFiltersApply: (filters: FilterState) => void;
   initialFilters?: Partial<FilterState>;
   showCardFilter?: boolean; // Optional prop to show/hide card filter
+  // Optional prop to control wether the card filter works by definite inclusion (true) or closest match (false)
+  includeCardFilterMode?: boolean;
   appliedFilters?: FilterState; // Current applied filters to sync UI
 };
 
@@ -31,6 +34,7 @@ export function FilterContainer({
   onFiltersApply,
   initialFilters,
   showCardFilter,
+  includeCardFilterMode,
   appliedFilters,
 }: Readonly<FilterContainerProps>) {
   const initialDates = getDateRange();
@@ -52,6 +56,21 @@ export function FilterContainer({
   const [appliedCards, setAppliedCards] = useState<Card[]>(
     showCardFilter ? appliedFilters?.cards || initialFilters?.cards || [] : []
   );
+
+  const [selectedIncludeCardFilterMode, setSelectedIncludeCardFilterMode] =
+    useState<boolean>(
+      appliedFilters?.includeCardFilterMode ??
+        initialFilters?.includeCardFilterMode ??
+        includeCardFilterMode ??
+        true
+    );
+  const [appliedIncludeCardFilterMode, setAppliedIncludeCardFilterMode] =
+    useState<boolean>(
+      appliedFilters?.includeCardFilterMode ??
+        initialFilters?.includeCardFilterMode ??
+        includeCardFilterMode ??
+        true
+    );
 
   const [selectedStartDate, setSelectedStartDate] = useState<string>(
     appliedFilters?.startDate || initialFilters?.startDate || initialDates.start
@@ -83,6 +102,7 @@ export function FilterContainer({
       setSelectedEndDate(appliedFilters.endDate);
       setSelectedGameModes(appliedFilters.gameModes);
       setSelectedTimespanOption(appliedFilters.timespanOption);
+      setSelectedIncludeCardFilterMode(appliedFilters.includeCardFilterMode);
       if (showCardFilter) {
         setSelectedCards(appliedFilters.cards);
       }
@@ -91,6 +111,7 @@ export function FilterContainer({
       setAppliedStartDate(appliedFilters.startDate);
       setAppliedEndDate(appliedFilters.endDate);
       setAppliedGameModes(appliedFilters.gameModes);
+      setAppliedIncludeCardFilterMode(appliedFilters.includeCardFilterMode);
       if (showCardFilter) {
         setAppliedCards(appliedFilters.cards);
       }
@@ -118,12 +139,15 @@ export function FilterContainer({
     const cardsChanged = showCardFilter
       ? JSON.stringify(appliedCards) !== JSON.stringify(selectedCards)
       : false;
+    const cardFilterModeChanged =
+      appliedIncludeCardFilterMode !== selectedIncludeCardFilterMode;
 
     if (
       appliedStartDate !== selectedStartDate ||
       appliedEndDate !== selectedEndDate ||
       JSON.stringify(appliedGameModes) !== JSON.stringify(selectedGameModes) ||
-      cardsChanged
+      cardsChanged ||
+      cardFilterModeChanged
     ) {
       setApplyButtonDisabled(false);
     } else {
@@ -134,10 +158,12 @@ export function FilterContainer({
     appliedEndDate,
     appliedGameModes,
     appliedCards,
+    appliedIncludeCardFilterMode,
     selectedStartDate,
     selectedEndDate,
     selectedGameModes,
     selectedCards,
+    selectedIncludeCardFilterMode,
     showCardFilter,
   ]);
 
@@ -148,12 +174,14 @@ export function FilterContainer({
       endDate: selectedEndDate,
       gameModes: selectedGameModes,
       cards: showCardFilter ? selectedCards : [], // Only include cards if card filter is enabled
+      includeCardFilterMode: selectedIncludeCardFilterMode,
       timespanOption: selectedTimespanOption,
     };
 
     setAppliedStartDate(selectedStartDate);
     setAppliedEndDate(selectedEndDate);
     setAppliedGameModes(selectedGameModes);
+    setAppliedIncludeCardFilterMode(selectedIncludeCardFilterMode);
     if (showCardFilter) {
       setAppliedCards(selectedCards);
     }
@@ -184,7 +212,9 @@ export function FilterContainer({
         <CardFilter
           cards={cards}
           selected={selectedCards}
-          onChange={setSelectedCards}
+          onCardsChange={setSelectedCards}
+          includeCardFilterMode={selectedIncludeCardFilterMode}
+          onCardFilterModeChange={setSelectedIncludeCardFilterMode}
         />
       )}
       <button

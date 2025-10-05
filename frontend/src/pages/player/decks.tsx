@@ -13,7 +13,14 @@ import { useEffect, useState } from "react";
 import { StatCard } from "../../components/statCard/statCard";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
+import type { Card } from "../../types/cards";
+import type { Deck } from "../../types/deckStats";
 import "./decks.css";
+
+// Helper type to rate/score the decks when using the card filter match mode
+type DeckWithMatchScore = Deck & {
+  matchPercentage: number;
+};
 
 function calculateAndFormatUsageRate(
   battleCount: number,
@@ -96,28 +103,60 @@ export default function PlayerDecks() {
     gameModesInitialized ? appliedFilters.gameModes : null // Use applied filters for the query
   );
 
-  // TODO make card filtering toggle-able between modes (reset selection when swapping?):
-  // 1) decks HAVE to include ALL cards
-  // 2) decks have a percentage of how many cards of the selection are in them
-  //    and are sorted by that value, if it is bigger than zero
-  // Filter decks based on applied cards
-  const filteredDecks =
-    deckStats?.deck_statistics.decks?.filter((deck) => {
-      // If no cards are applied as filters, show all decks
-      if (!appliedFilters.cards || appliedFilters.cards.length === 0) {
-        return true;
-      }
+  // Helper function to check if a deck contains a specific card
+  const deckContainsCard = (deck: Deck, appliedCard: Card) => {
+    return deck.deck?.some(
+      (deckCard) =>
+        deckCard.id === appliedCard.id &&
+        (deckCard.evolutionLevel ?? 0) === (appliedCard.evolutionLevel ?? 0)
+    );
+  };
 
-      // Check if the deck contains all applied cards (matching both id and evolutionLevel)
-      return appliedFilters.cards.every((appliedCard) =>
-        deck.deck?.some(
-          (deckCard) =>
-            deckCard.id === appliedCard.id &&
-            // Non-evolution cards don't have that field, but need to match too
-            (deckCard.evolutionLevel ?? 0) === (appliedCard.evolutionLevel ?? 0)
-        )
-      );
-    }) ?? [];
+  // Helper function to calculate match percentage for a deck
+  const calculateMatchPercentage = (deck: Deck) => {
+    const matchingCards = appliedFilters.cards.filter((appliedCard) =>
+      deckContainsCard(deck, appliedCard)
+    );
+    return (matchingCards.length / appliedFilters.cards.length) * 100;
+  };
+
+  // Filter and sort decks based on applied cards with two modes:
+  // 1) Include mode: decks HAVE to include ALL selected cards
+  // 2) Match mode: decks are scored by percentage of selected cards they contain and sorted by match percentage
+  const filteredDecks = (() => {
+    if (!deckStats?.deck_statistics.decks) return [];
+
+    // If no cards are applied as filters, show all decks
+    if (!appliedFilters.cards || appliedFilters.cards.length === 0) {
+      return deckStats.deck_statistics.decks;
+    }
+
+    const decks = deckStats.deck_statistics.decks;
+
+    if (appliedFilters.includeCardFilterMode === true) {
+      // Include mode: deck must contain ALL selected cards
+      return decks.filter((deck) => {
+        return appliedFilters.cards.every((appliedCard) =>
+          deckContainsCard(deck, appliedCard)
+        );
+      });
+    } else {
+      // Match mode: calculate match percentage and sort by it
+      const decksWithMatchScore = decks.map((deck) => {
+        const matchPercentage = calculateMatchPercentage(deck);
+        return {
+          ...deck,
+          matchPercentage,
+        };
+      });
+
+      // Filter out decks with 0% match and sort by match percentage (highest first)
+      return decksWithMatchScore
+        .filter((deck) => deck.matchPercentage > 0)
+        .sort((a, b) => b.matchPercentage - a.matchPercentage);
+    }
+    // Either return the Deck (include mode) or the Deck and its score (match mode)
+  })() as (Deck | DeckWithMatchScore)[];
 
   // Create cache key from applied filters for loading state dependency
   const modesKey = appliedFilters.gameModes.join("|");
@@ -207,6 +246,20 @@ export default function PlayerDecks() {
                     {/* TODO add a deck name, by using the top x elixir cards 
                       or by using the win condition and the most expensive card */}
                     <div className="deck-section">
+                      {/* Show match percentage only in match mode */}
+                      {!appliedFilters.includeCardFilterMode &&
+                        appliedFilters.cards.length > 0 &&
+                        "matchPercentage" in d && (
+                          <div className="decks-card-match-header">
+                            <span className="decks-card-match-value">{`${round(
+                              d.matchPercentage,
+                              1
+                            )}%`}</span>
+                            <span className="decks-card-match-label">
+                              Card Match
+                            </span>
+                          </div>
+                        )}
                       <DeckComponent deck={d.deck} cards={cards ?? []} />
                     </div>
                     <div className="deck-stats-container">
