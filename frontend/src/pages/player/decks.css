@@ -236,9 +236,7 @@
 
 .no-decks-message {
   text-align: center;
-  margin: var(--spacing-2xl) 0;
-  padding: var(--spacing-2xl);
-  background-color: var(--bg-overlay-light);
-  border-radius: var(--radius-md);
   color: var(--text-secondary);
+  font-style: italic;
+  margin: var(--spacing-xl) 0;
 }
