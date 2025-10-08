@@ -4,7 +4,6 @@ from .connection import MongoConn
 from .validation_utils import ensure_connected
 
 
-# TODO upon inserting a new player, give them a dummy name like 'Player'
 async def insert_tracked_player(conn: MongoConn, player_tag: str) -> str:
     """
     Insert (or reactivate) a player in the `players` collection.
@@ -33,7 +32,8 @@ async def insert_tracked_player(conn: MongoConn, player_tag: str) -> str:
             {"playerTag": player_tag},
             {
                 "$set": {"playerTag": player_tag, "active": True, "updatedAt": now},
-                "$setOnInsert": {"insertedAt": now},
+                # Init player with dummy name that will be overwritten upon first data scraper run
+                "$setOnInsert": {"insertedAt": now, "playerName": "Player"},
             },
             upsert=True,
         )
