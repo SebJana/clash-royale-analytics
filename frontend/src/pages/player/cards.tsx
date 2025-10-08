@@ -190,7 +190,7 @@ export default function PlayerCards() {
             )}
 
             {/* Show message when no cards are found and not still loading */}
-            {!cardStats &&
+            {(!cardStats || cardStats.card_statistics.cards.length === 0) &&
               !cardsLoading &&
               !gameModesLoading &&
               !cardsLoading && (
