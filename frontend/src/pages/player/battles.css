@@ -134,7 +134,7 @@
   font-size: var(--font-base);
 }
 
-.battles-end-message {
+.battles-end-user-message {
   text-align: center;
   color: var(--text-secondary);
   font-style: italic;

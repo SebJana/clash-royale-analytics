@@ -39,6 +39,12 @@ export default function PlayerBattles() {
   // Ref for the load more trigger element (used for intersection observer)
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
+  // Amount of battles that can be loaded at once from a certain filter datetime
+  // NOTE: adjust this to handle load on server for users that scroll indefinitely instead of filtering (also effects rendering time)
+  const maxLoadedBattles = 100;
+  // State signaling that cap is reached
+  const [loadingCapReached, setLoadingCapReached] = useState(false);
+
   // Fetch card data (needed to display card information in battles)
   const {
     data: cards,
@@ -75,7 +81,13 @@ export default function PlayerBattles() {
   // Intersection Observer for auto-loading more battles when user scrolls near bottom
   useEffect(() => {
     const loadMoreElement = loadMoreRef.current;
-    if (!loadMoreElement || !hasNextPage || isFetchingNextPage) return;
+    if (
+      loadingCapReached ||
+      !loadMoreElement ||
+      !hasNextPage ||
+      isFetchingNextPage
+    )
+      return;
 
     // Set up intersection observer to trigger loading when element becomes visible
     const observer = new IntersectionObserver(
@@ -104,7 +116,13 @@ export default function PlayerBattles() {
     return () => {
       observer.disconnect();
     };
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isInitialLoad]);
+  }, [
+    fetchNextPage,
+    loadingCapReached,
+    hasNextPage,
+    isFetchingNextPage,
+    isInitialLoad,
+  ]);
 
   /**
    * Validates if a date string represents a valid date
@@ -123,6 +141,21 @@ export default function PlayerBattles() {
     // TODO add reasonable date range limits to prevent performance issues
     return !isNaN(selectedDate.getTime());
   }, []);
+
+  // Keep track of how many battles are currently loaded and set the flag
+  // Reset/Clear the flag if there are less
+  useEffect(() => {
+    const amountOfBattles = battlesList.length;
+    if (amountOfBattles >= maxLoadedBattles) {
+      setLoadingCapReached(true);
+    }
+    // Reset the flag if there are now less battles --> loaded page/filter/player changed
+    else {
+      if (loadingCapReached) {
+        setLoadingCapReached(false);
+      }
+    }
+  }, [battlesList, loadingCapReached, setLoadingCapReached]);
 
   // Validate date input and update filter validity state
   useEffect(() => {
@@ -162,7 +195,7 @@ export default function PlayerBattles() {
   /**
    * Clears the applied filter and resets the date input to today
    */
-  const handleClearFilter = () => {
+  const handleResetFilter = () => {
     setAppliedBeforeDate(undefined);
     setBeforeDate(getTodayDateTime());
   };
@@ -196,7 +229,7 @@ export default function PlayerBattles() {
         </button>
         <button
           className="battles-clear-filter-button"
-          onClick={handleClearFilter}
+          onClick={handleResetFilter}
         >
           Reset
         </button>
@@ -243,7 +276,7 @@ export default function PlayerBattles() {
 
                 {/* End of List Message - Show when all battles have been loaded */}
                 {!hasNextPage && (
-                  <div className="battles-end-message">
+                  <div className="battles-end-user-message">
                     <p>No more battles to load</p>
                   </div>
                 )}
@@ -251,10 +284,19 @@ export default function PlayerBattles() {
             )}
             <ScrollToTopButton />
 
-            {/* TODO add limit (max 100/200 battles?) and feedback message to filter if user wants to see more */}
+            {/* Show message when loading cap is reached */}
+            {battlesList.length !== 0 && loadingCapReached && (
+              <div className="battles-end-user-message">
+                <p>
+                  You’ve reached the maximum number of battles shown. Adjust the
+                  filter to view earlier ones.
+                </p>
+              </div>
+            )}
+
             {/* Show message when no battles are found and not loading */}
             {battlesList.length === 0 && !battlesLoading && !cardsLoading && (
-              <div className="no-battles-message">
+              <div className="battles-end-user-message">
                 <p>No battles found</p>
               </div>
             )}
