@@ -38,6 +38,8 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
         if status_insert == "already_tracked":
             return {"status": "Player is already being tracked", "tag": player_tag}
 
+        return {"status": "Player is being tracked", "tag": player_tag}
+
     except Exception:
         raise HTTPException(
             status_code=500, detail=f"Player {player_tag} could not be tracked"

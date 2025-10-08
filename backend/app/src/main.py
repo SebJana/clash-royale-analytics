@@ -11,9 +11,8 @@ from mongo import MongoConn
 
 # NOTE time response from Clash Royale/MongoDB is in UTC so frontend needs conversion logic
 # both for the query parameter time but also the times the user gets back, which needs to be displayed in their local time
-# TODO set headers for cache-duration for http clients
 # TODO (potentially) global error handling
-# TODO add internal for whole backedn via logger and don't send full error detail as HttpException
+# TODO add internal for whole backend via logger and don't send full error detail as HttpException
 # TODO timestamp based logging
 
 # TODO (potentially) add optional query param to tracked players

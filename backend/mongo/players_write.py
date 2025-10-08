@@ -4,7 +4,7 @@ from .connection import MongoConn
 from .validation_utils import ensure_connected
 
 
-# TODO upon inserting a new player, give them a dummy name like 'Unknown Player'
+# TODO upon inserting a new player, give them a dummy name like 'Player'
 async def insert_tracked_player(conn: MongoConn, player_tag: str) -> str:
     """
     Insert (or reactivate) a player in the `players` collection.
@@ -41,7 +41,7 @@ async def insert_tracked_player(conn: MongoConn, player_tag: str) -> str:
         if res.upserted_id is not None:
             return "created"
 
-        return "already_active"
+        return "already_tracked"
 
     except Exception as e:
         print(f"[DB] [ERROR] during insert/reactivate for player: {player_tag}", e)
