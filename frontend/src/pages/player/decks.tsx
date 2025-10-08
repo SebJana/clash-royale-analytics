@@ -11,6 +11,7 @@ import { getCurrentFilterState } from "../../utils/filter";
 import { datetimeToLocale } from "../../utils/datetime";
 import { useEffect, useState } from "react";
 import { StatCard } from "../../components/statCard/statCard";
+import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
 import type { Card } from "../../types/cards";
@@ -298,6 +299,7 @@ export default function PlayerDecks() {
                 ))}
               </div>
             )}
+            <ScrollToTopButton />
 
             {/* Show message when no decks are found and not still loading */}
             {(!filteredDecks || filteredDecks.length === 0) &&

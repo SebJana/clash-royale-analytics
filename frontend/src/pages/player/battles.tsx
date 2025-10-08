@@ -4,6 +4,7 @@ import { useCards } from "../../hooks/useCards";
 import { usePlayerBattlesInfinite } from "../../hooks/useLastBattles";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import { BattleComponent } from "../../components/battle/battle";
+import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import { localeToUTC, getTodayDateTime } from "../../utils/datetime";
 import CircularProgress from "@mui/material/CircularProgress";
 import "./battles.css";
@@ -248,7 +249,7 @@ export default function PlayerBattles() {
                 )}
               </>
             )}
-            {/* TODO add back to top button*/}
+            <ScrollToTopButton />
 
             {/* TODO add limit (max 100/200 battles?) and feedback message to filter if user wants to see more */}
             {/* Show message when no battles are found and not loading */}

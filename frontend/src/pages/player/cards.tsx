@@ -8,6 +8,7 @@ import { round } from "../../utils/round";
 import { pluralize } from "../../utils/plural";
 import { getCurrentFilterState } from "../../utils/filter";
 import { useEffect, useState } from "react";
+import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
 import { CardComponent } from "../../components/card/card";
@@ -188,6 +189,7 @@ export default function PlayerCards() {
                 ))}
               </div>
             )}
+            <ScrollToTopButton />
 
             {/* Show message when no cards are found and not still loading */}
             {(!cardStats || cardStats.card_statistics.cards.length === 0) &&
