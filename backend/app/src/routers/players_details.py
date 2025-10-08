@@ -143,8 +143,6 @@ async def deck_percentage_stats(
         )
         cached_decks = await get_redis_json(redis_conn, key)
 
-        print("Key", key)
-
         if cached_decks is not None:
             return {
                 "player_tag": player_tag,
