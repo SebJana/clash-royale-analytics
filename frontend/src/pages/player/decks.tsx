@@ -21,6 +21,7 @@ import "./decks.css";
 // Helper type to rate/score the decks when using the card filter match mode
 type DeckWithMatchScore = Deck & {
   matchPercentage: number;
+  matchCount: number;
 };
 
 function calculateAndFormatUsageRate(
@@ -114,10 +115,16 @@ export default function PlayerDecks() {
 
   // Helper function to calculate match percentage for a deck
   const calculateMatchPercentage = (deck: Deck) => {
+    const matchingCards = calculateMatchCount(deck);
+    return (matchingCards / appliedFilters.cards.length) * 100;
+  };
+
+  // Helper function to calculate amount of matched cards for a deck
+  const calculateMatchCount = (deck: Deck) => {
     const matchingCards = appliedFilters.cards.filter((appliedCard) =>
       deckContainsCard(deck, appliedCard)
     );
-    return (matchingCards.length / appliedFilters.cards.length) * 100;
+    return matchingCards.length;
   };
 
   // Filter and sort decks based on applied cards with two modes:
@@ -144,9 +151,11 @@ export default function PlayerDecks() {
       // Match mode: calculate match percentage and sort by it
       const decksWithMatchScore = decks.map((deck) => {
         const matchPercentage = calculateMatchPercentage(deck);
+        const matchCount = calculateMatchCount(deck);
         return {
           ...deck,
           matchPercentage,
+          matchCount,
         };
       });
 
@@ -254,7 +263,11 @@ export default function PlayerDecks() {
                             <span className="decks-card-match-value">{`${round(
                               d.matchPercentage,
                               1
-                            )}%`}</span>
+                            )}% (${d.matchCount} matching ${pluralize(
+                              d.matchCount,
+                              "Card",
+                              "Cards"
+                            )})`}</span>
                             <span className="decks-card-match-label">
                               Card Match
                             </span>
