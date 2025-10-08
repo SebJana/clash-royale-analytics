@@ -21,7 +21,9 @@ async def list_tracked_players(mongo_conn: DbConn):
 @router.post("/{player_tag}")
 async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi):
     try:
-        if not await cr_api.check_existing_player(player_tag):
+        player = await cr_api.check_existing_player(player_tag)
+        # Check if an empty string was returned --> player with that tag doesn't exist
+        if not player:
             raise HTTPException(
                 status_code=404, detail=f"Player with tag {player_tag} does not exist"
             )
@@ -29,7 +31,7 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
         raise HTTPException(status_code=e.code, detail=e.detail)
 
     try:
-        status_insert = await insert_tracked_player(mongo_conn, player_tag)
+        status_insert = await insert_tracked_player(mongo_conn, player_tag, player)
 
         if status_insert == "reactivated":
             return {"status": "Player is now being tracked again", "tag": player_tag}

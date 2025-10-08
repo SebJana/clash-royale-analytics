@@ -1,15 +1,21 @@
-from pymongo.errors import DuplicateKeyError
 from datetime import datetime
 from .connection import MongoConn
 from .validation_utils import ensure_connected
 
 
-async def insert_tracked_player(conn: MongoConn, player_tag: str) -> str:
+async def insert_tracked_player(
+    conn: MongoConn, player_tag: str, player_name: str = "Player"
+) -> str:
     """
     Insert (or reactivate) a player in the `players` collection.
 
     - If the player doesn't exist: create with active=True.
     - If the player exists: set active=True again (reactivate).
+
+    Args:
+        conn (MongoConn): Active MongoDB connection instance.
+        player_tag (str): The unique tag of the player (e.g., "#YYRJQY28").
+        player_name (str): The name to set for the player (default: "Player").
 
     Returns:
         str: "created", "reactivated", or "already_active"
@@ -32,8 +38,7 @@ async def insert_tracked_player(conn: MongoConn, player_tag: str) -> str:
             {"playerTag": player_tag},
             {
                 "$set": {"playerTag": player_tag, "active": True, "updatedAt": now},
-                # Init player with dummy name that will be overwritten upon first data scraper run
-                "$setOnInsert": {"insertedAt": now, "playerName": "Player"},
+                "$setOnInsert": {"insertedAt": now, "playerName": player_name},
             },
             upsert=True,
         )

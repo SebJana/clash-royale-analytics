@@ -160,18 +160,18 @@ class ClashRoyaleAPI:
             player_tag (str): The player tag starting with '#' (e.g., "#YYRJQY28")
 
         Returns:
-            bool: True if syntax is valid AND the API confirms the player exists; else False.
+            str: The players name if the tag syntax is valid AND the API confirms the player exists; else an empty string.
         """
 
         if not self.check_tag_syntax(player_tag):
-            return False
+            return ""
 
         # If no error on request --> player with that tag exists
         try:
-            _ = await self.get_player_info(player_tag)
-            return True
+            player_info = await self.get_player_info(player_tag)
+            return player_info.get("name")
         except Exception:
-            return False
+            return ""
 
     async def get_player_battle_logs(self, player_tag: str):
         """
