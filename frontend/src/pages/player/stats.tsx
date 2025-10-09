@@ -1,13 +1,62 @@
 import { useParams } from "react-router-dom";
+import type { DailyStats, Days } from "../../types/dailyStats";
 import { useDailyStats } from "../../hooks/useDailyStats";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { getCurrentFilterState } from "../../utils/filter";
 import { useEffect, useState } from "react";
+import type { ChartConfig } from "../../types/chart";
+import { LineChart } from "../../components/lineChart/lineChart";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
 import "./stats.css";
+
+/**
+ * Extracts an array of values for a specific field from daily statistics data.
+ *
+ * This generic function takes daily statistics and extracts all values for a given field
+ * across all days, returning them as a typed array. It's particularly useful for creating
+ * chart data where you need all values of a specific metric (like battles, winRate, etc.)
+ * from multiple days in a single array.
+ *
+ * @template T - The key type that extends the keys of the Days interface
+ * @param stats - The daily statistics data containing an array of daily records, or undefined if not loaded
+ * @param key - The specific field name to extract from each daily record (e.g., 'battles', 'winRate', 'date')
+ * @returns An array containing all values of the specified field from each day's data.
+ *          The return type matches the type of the field (e.g., number[] for 'battles', string[] for 'date')
+ *          Returns an empty array if stats is undefined or null.
+ *
+ * @example
+ * // Extract all battle counts across days
+ * const battleCounts = getDataArrayForKey(stats, 'battles'); // Returns number[]
+ *
+ * @example
+ * // Extract all dates across days
+ * const dates = getDataArrayForKey(stats, 'date'); // Returns string[]
+ */
+function getDataArrayForKey<T extends keyof Days>(
+  stats: DailyStats | undefined,
+  key: T
+): Days[T][] {
+  // Early return with empty array if stats is null/undefined to avoid runtime errors
+  if (!stats) return [];
+
+  // Extract the daily array from the nested statistics structure
+  const daily = stats.daily_statistics.daily;
+
+  // Initialize typed array to store extracted values - TypeScript infers the correct element type (string or number)
+  const data: Days[T][] = [];
+
+  // Iterate through each day's data to extract the specified field value
+  for (const day of daily) {
+    // Extract the value for the given key and add to results array
+    data.push(day[key]);
+  }
+
+  // Return the collected values as a typed array ready for chart consumption
+  return data;
+}
 
 export default function PlayerStats() {
   const { playerTag = "" } = useParams();
@@ -86,6 +135,26 @@ export default function PlayerStats() {
     resetDependency: `${playerTag}-${appliedFilters.startDate}-${appliedFilters.endDate}-${modesKey}`,
   });
 
+  const winRateChart: ChartConfig = {
+    data: getDataArrayForKey(stats, "winRate"),
+    labels: getDataArrayForKey(stats, "date"),
+    title: "Win Rate %",
+    yAxisTitle: "Win Rate %",
+    xAxisTitle: "Days",
+    chartColor: "#3778daff",
+    labelColor: "#c8c2c2e9",
+  };
+
+  const battlesChart: ChartConfig = {
+    data: getDataArrayForKey(stats, "battles"),
+    labels: getDataArrayForKey(stats, "date"),
+    title: "Battles",
+    yAxisTitle: "Amount of Battles",
+    xAxisTitle: "Days",
+    chartColor: "#b852e3ff",
+    labelColor: "#c8c2c2e9",
+  };
+
   return (
     <div className="stats-page">
       <div className="stats-content">
@@ -115,16 +184,10 @@ export default function PlayerStats() {
             />
 
             {/* Show stats if there is any data to display */}
-            {stats && (
-              <div className="stats-grid">
-                <p>{stats.daily_statistics.totalBattles}</p>
-                {stats.daily_statistics.daily.map((dailyData) => (
-                  <div className="stats-day-item" key={`${dailyData.date}`}>
-                    <p>{dailyData.date}</p>
-                    <p>{dailyData.battles}</p>
-                    <p>{dailyData.victories}</p>
-                  </div>
-                ))}
+            {stats && stats.daily_statistics.daily.length > 0 && (
+              <div className="stats-charts">
+                <LineChart config={winRateChart} />
+                <LineChart config={battlesChart} />
               </div>
             )}
 

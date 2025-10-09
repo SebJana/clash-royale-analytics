@@ -7,7 +7,7 @@ export type DailyStats = {
   };
 };
 
-type Days = {
+export type Days = {
   date: string;
   battles: number;
   victories: number;
