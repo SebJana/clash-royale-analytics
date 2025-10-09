@@ -4,6 +4,7 @@ import PlayerLayout from "./pages/player/layout";
 import PlayerDecks from "./pages/player/decks";
 import PlayerBattles from "./pages/player/battles";
 import PlayerCards from "./pages/player/cards";
+import PlayerStats from "./pages/player/stats";
 import "./App.css";
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
           <Route path="battles" element={<PlayerBattles />} />
           <Route path="decks" element={<PlayerDecks />} />
           <Route path="cards" element={<PlayerCards />} />
+          <Route path="stats" element={<PlayerStats />} />
         </Route>
       </Routes>
     </main>

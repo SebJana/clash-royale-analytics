@@ -69,6 +69,13 @@ export default function PlayerLayout() {
           >
             Cards
           </NavLink>
+          <NavLink
+            to={`/player/${encodedTag}/stats`}
+            className="nav-link"
+            role="menuitem"
+          >
+            Stats
+          </NavLink>
         </div>
       </nav>
       <header className="player-header">
