@@ -26,18 +26,29 @@
   margin-top: var(--spacing-2xl);
 }
 
-.search-section {
+.search-section,
+.adding-section {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
   align-items: center;
-  width: 90%;
-  max-width: 400px;
-  margin: 0 auto;
+  box-sizing: border-box;
+  margin-left: auto;
+  margin-right: auto;
   padding: var(--spacing-2xl) var(--spacing-xl);
   background-color: var(--bg-overlay-light);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
+  width: 90%;
+  max-width: 400px;
+}
+
+.search-section {
+  margin: 0 auto;
+}
+
+.adding-section {
+  margin: var(--spacing-3xl) auto 0;
 }
 
 .view-button {
@@ -45,22 +56,18 @@
   padding: var(--spacing-md) var(--spacing-2xl);
 }
 
-.adding-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  align-items: center;
-  margin: var(--spacing-3xl) auto 0;
-  padding: var(--spacing-2xl) var(--spacing-xl);
-  background-color: var(--bg-overlay-light);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  width: 90%;
-  max-width: 400px;
+.search-section input {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
 }
 
 .adding-section input {
+  display: block;
   width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
   padding: 0.6em 1.2em;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
@@ -70,6 +77,18 @@
   font-family: inherit;
   transition: all var(--transition-slow);
   box-sizing: border-box;
+}
+
+.search-section .MuiTextField-root {
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
+}
+
+.adding-section .MuiTextField-root {
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
 }
 
 .adding-section input:hover {
@@ -166,8 +185,17 @@
 
   .search-section,
   .adding-section {
-    padding: var(--spacing-lg) var(--spacing-md);
     width: 98%;
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+
+  .search-section input,
+  .adding-section input,
+  .search-section .MuiTextField-root,
+  .adding-section .MuiTextField-root {
+    width: 100%;
+    max-width: 320px;
+    margin-inline: auto;
   }
 
   .section-header {
