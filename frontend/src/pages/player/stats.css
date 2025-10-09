@@ -6,7 +6,7 @@
 }
 
 .stat-chart {
-  min-height: 500px;
+  min-height: 400px;
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.05) 0%,
