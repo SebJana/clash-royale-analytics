@@ -138,21 +138,21 @@ export default function PlayerStats() {
   const winRateChart: ChartConfig = {
     data: getDataArrayForKey(stats, "winRate"),
     labels: getDataArrayForKey(stats, "date"),
-    title: "Win Rate %",
-    yAxisTitle: "Win Rate %",
-    xAxisTitle: "Days",
-    chartColor: "#3778daff",
-    labelColor: "#c8c2c2e9",
+    title: "Win Rate Performance",
+    yAxisTitle: "Win Rate (%)",
+    xAxisTitle: "Date",
+    chartColor: "#00C9FF",
+    labelColor: "#e0e0e0",
   };
 
   const battlesChart: ChartConfig = {
     data: getDataArrayForKey(stats, "battles"),
     labels: getDataArrayForKey(stats, "date"),
-    title: "Battles",
-    yAxisTitle: "Amount of Battles",
-    xAxisTitle: "Days",
-    chartColor: "#b852e3ff",
-    labelColor: "#c8c2c2e9",
+    title: "⚔️ Battle Activity",
+    yAxisTitle: "Number of Battles",
+    xAxisTitle: "Date",
+    chartColor: "#FF6B6B",
+    labelColor: "#e0e0e0",
   };
 
   return (
@@ -186,12 +186,12 @@ export default function PlayerStats() {
             {/* Show stats if there is any data to display */}
             {stats && stats.daily_statistics.daily.length > 0 && (
               <div className="stats-charts">
-                <LineChart config={winRateChart} />
-                <LineChart config={battlesChart} />
+                <LineChart className="stat-chart" config={winRateChart} />
+                <LineChart className="stat-chart" config={battlesChart} />
               </div>
             )}
 
-            {/* Show message when no cards are found and not still loading */}
+            {/* Show message when no stats are found and not still loading */}
             {(!stats || stats.daily_statistics.daily.length === 0) &&
               !statsLoading &&
               !gameModesLoading &&
