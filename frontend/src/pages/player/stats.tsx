@@ -6,6 +6,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { getCurrentFilterState } from "../../utils/filter";
 import { useEffect, useState } from "react";
+import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import type { ChartConfig } from "../../types/chart";
 import { LineChart } from "../../components/lineChart/lineChart";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
@@ -56,6 +57,42 @@ function getDataArrayForKey<T extends keyof Days>(
 
   // Return the collected values as a typed array ready for chart consumption
   return data;
+}
+
+/**
+ * Calculates the average leaked elixir per battle for each day in the statistics data.
+ *
+ * @param stats - The daily statistics data containing an array of daily records, or undefined if not loaded
+ * @returns An array of numbers representing the average leaked elixir per battle for each given day.
+ *          Each element corresponds to one day's average leaked elixir efficiency.
+ *          Returns an empty array if stats is undefined or null.
+ *          If a day has 0 battles, returns the total leaked elixir value (not divided by zero).
+
+ */
+function getLeakedElixirPerMatch(stats: DailyStats | undefined): number[] {
+  if (!stats) return [];
+
+  const averageLeaked: number[] = [];
+
+  const daily = stats.daily_statistics.daily;
+
+  for (const day of daily) {
+    const battles = day.battles;
+    const leakedElixir = day.elixirLeaked;
+
+    let averageLeakedElixir = leakedElixir;
+
+    // Calculate average only if battles were played to avoid division by zero
+    // Should not happen, that there is an entry without a played battle, but fallback value is leakedElixir
+    if (battles > 0) {
+      averageLeakedElixir = leakedElixir / battles;
+    }
+
+    // Add the calculated average to the results array
+    averageLeaked.push(averageLeakedElixir);
+  }
+
+  return averageLeaked;
 }
 
 export default function PlayerStats() {
@@ -155,6 +192,16 @@ export default function PlayerStats() {
     labelColor: "#e0e0e0",
   };
 
+  const leakedElixirChart: ChartConfig = {
+    data: getLeakedElixirPerMatch(stats),
+    labels: getDataArrayForKey(stats, "date"),
+    title: "Average Leaked Elixir per Battle",
+    yAxisTitle: "Leaked Elixir",
+    xAxisTitle: "Date",
+    chartColor: "#C547DB",
+    labelColor: "#e0e0e0",
+  };
+
   return (
     <div className="stats-page">
       <div className="stats-content">
@@ -188,8 +235,10 @@ export default function PlayerStats() {
               <div className="stats-charts">
                 <LineChart className="stat-chart" config={winRateChart} />
                 <LineChart className="stat-chart" config={battlesChart} />
+                <LineChart className="stat-chart" config={leakedElixirChart} />
               </div>
             )}
+            <ScrollToTopButton />
 
             {/* Show message when no stats are found and not still loading */}
             {(!stats || stats.daily_statistics.daily.length === 0) &&

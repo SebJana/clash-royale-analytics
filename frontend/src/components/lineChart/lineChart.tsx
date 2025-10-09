@@ -7,7 +7,6 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend,
   Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
@@ -26,15 +25,22 @@ export function LineChart({
     LineElement,
     Title,
     Tooltip,
-    Legend,
     Filler
   );
 
   // Create gradient for better visual appeal
   const createGradient = (ctx: CanvasRenderingContext2D, color: string) => {
     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, color + "40"); // 25% opacity at top
-    gradient.addColorStop(1, color + "08"); // 3% opacity at bottom
+    // Convert hex to rgba format for proper gradient colors
+    const hexToRgba = (hex: string, alpha: number) => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    gradient.addColorStop(0, hexToRgba(color, 0.25)); // 25% opacity at top
+    gradient.addColorStop(1, hexToRgba(color, 0.03)); // 3% opacity at bottom
     return gradient;
   };
 
@@ -76,17 +82,7 @@ export function LineChart({
     },
     plugins: {
       legend: {
-        position: "top" as const,
-        labels: {
-          color: config.labelColor,
-          font: {
-            size: 14,
-            weight: "normal" as const,
-          },
-          usePointStyle: true,
-          pointStyle: "circle",
-          padding: 20,
-        },
+        display: false,
       },
       title: {
         display: true,
@@ -162,9 +158,15 @@ export function LineChart({
     },
   };
 
+  // Generate stable unique key to prevent canvas reuse issues
+  const chartKey = `${config.title.replace(
+    " ",
+    ""
+  )}-${config.yAxisTitle.replace(" ", "")}-${config.data[0]}`;
+
   return (
     <div className={className}>
-      <Line data={data} options={options} />
+      <Line key={chartKey} data={data} options={options} />
     </div>
   );
 }
