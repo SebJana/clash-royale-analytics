@@ -19,7 +19,7 @@ function saveExpandedInfoState(state: boolean): void {
  * Retrieves the saved expanded/collapsed state of the player info details section from localStorage.
  * Returns the user's previously saved preference, or defaults to expanded (true) if no preference exists.
  *
- * @returns {boolean} The saved expanded state (true = expanded, false = collapsed)
+ * @returns The saved expanded state (true = expanded, false = collapsed)
  */
 function getExpandedInfoState(): boolean {
   const state = localStorage.getItem("player-info-expanded");
@@ -34,11 +34,10 @@ function getExpandedInfoState(): boolean {
     if (state === "true") {
       return true;
     }
-    return false;
   }
 
-  // Default
-  return true;
+  // When stored value is not "true"
+  return false;
 }
 
 /**
