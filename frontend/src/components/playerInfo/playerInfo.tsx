@@ -1,7 +1,45 @@
+import { useState } from "react";
+import { ChevronUp } from "lucide-react";
 import type { Player } from "../../types/player";
 import { round } from "../../utils/round";
 import { StatCard } from "../statCard/statCard";
 import "./playerInfo.css";
+
+/**
+ * Saves the expanded/collapsed state of the player info details section to localStorage.
+ * This allows the component to remember the user's preference across page reloads.
+ *
+ * @param state - The expanded state to save (true = expanded, false = collapsed)
+ */
+function saveExpandedInfoState(state: boolean): void {
+  localStorage.setItem("player-info-expanded", String(state));
+}
+
+/**
+ * Retrieves the saved expanded/collapsed state of the player info details section from localStorage.
+ * Returns the user's previously saved preference, or defaults to expanded (true) if no preference exists.
+ *
+ * @returns {boolean} The saved expanded state (true = expanded, false = collapsed)
+ */
+function getExpandedInfoState(): boolean {
+  const state = localStorage.getItem("player-info-expanded");
+
+  // Return true (expanded) by default if no state is saved
+  if (state === null) {
+    return true;
+  }
+
+  // Convert string to boolean - only "true" string should return true
+  if (state) {
+    if (state === "true") {
+      return true;
+    }
+    return false;
+  }
+
+  // Default
+  return true;
+}
 
 /**
  * Get the account creation date given an account age in days.
@@ -47,6 +85,10 @@ export function PlayerInfo({
 }: Readonly<{
   player: Player;
 }>) {
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState(
+    getExpandedInfoState()
+  );
+
   const accountAgeDays =
     player?.badges?.find((b) => b.name === "YearsPlayed")?.progress ?? 0;
 
@@ -76,10 +118,25 @@ export function PlayerInfo({
             </p>
           )}
         </div>
+        <button
+          type="button"
+          className={`player-info-component-section-toggle ${
+            !isDetailsExpanded ? "collapsed" : ""
+          }`}
+          onClick={() => {
+            setIsDetailsExpanded(!isDetailsExpanded);
+            saveExpandedInfoState(!isDetailsExpanded);
+          }}
+        >
+          <ChevronUp />
+        </button>
       </div>
 
-      {/* TODO make player info collapsable and default to that when on mobile */}
-      <div className="player-info-component-details">
+      <div
+        className={`player-info-component-collapsible-content player-info-component-details ${
+          !isDetailsExpanded ? "collapsed" : ""
+        }`}
+      >
         <div className="player-info-component-account-info-section">
           <h3>Account Information</h3>
           <div className="player-info-component-info-grid">
