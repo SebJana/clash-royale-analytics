@@ -11,7 +11,7 @@ import type { ChartConfig } from "../../types/chart";
 import { LineChart } from "../../components/lineChart/lineChart";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
-import "./stats.css";
+import "./plots.css";
 
 /**
  * Extracts an array of values for a specific field from daily statistics data.
@@ -95,7 +95,7 @@ function getLeakedElixirPerMatch(stats: DailyStats | undefined): number[] {
   return averageLeaked;
 }
 
-export default function PlayerStats() {
+export default function PlayerPlots() {
   const { playerTag = "" } = useParams();
 
   // Filter state management maintains two sets of state for each filter type:
@@ -203,8 +203,8 @@ export default function PlayerStats() {
   };
 
   return (
-    <div className="stats-page">
-      <div className="stats-content">
+    <div className="plots-page">
+      <div className="plots-content">
         {isStatsError && <div>Error: {statsError?.message}</div>}
         {isGameModesError && <div>Error: {gameModesError?.message}</div>}
 
@@ -212,7 +212,7 @@ export default function PlayerStats() {
         {/* The loading spinner prevents users from seeing incomplete data during the initialization process */}
         {(isInitialLoad || statsLoading || gameModesLoading) && (
           <div>
-            <CircularProgress className="stats-loading-spinner" />
+            <CircularProgress className="plots-loading-spinner" />
             <p>Loading statistics...</p>
           </div>
         )}
@@ -232,7 +232,7 @@ export default function PlayerStats() {
 
             {/* Show stats if there is any data to display */}
             {stats && stats.daily_statistics.daily.length > 0 && (
-              <div className="stats-charts">
+              <div className="plots-charts">
                 <LineChart className="stat-chart" config={winRateChart} />
                 <LineChart className="stat-chart" config={battlesChart} />
                 <LineChart className="stat-chart" config={leakedElixirChart} />
@@ -245,7 +245,7 @@ export default function PlayerStats() {
               !statsLoading &&
               !gameModesLoading &&
               !statsLoading && (
-                <div className="no-stats-message">
+                <div className="no-plots-message">
                   <p>No statistics found with the current filters applied</p>
                 </div>
               )}

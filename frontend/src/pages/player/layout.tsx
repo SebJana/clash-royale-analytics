@@ -70,11 +70,11 @@ export default function PlayerLayout() {
             Cards
           </NavLink>
           <NavLink
-            to={`/player/${encodedTag}/stats`}
+            to={`/player/${encodedTag}/plots`}
             className="nav-link"
             role="menuitem"
           >
-            Stats
+            Plots
           </NavLink>
         </div>
       </nav>

@@ -60,7 +60,7 @@ export function LineChart({
         borderColor: config.chartColor,
         borderWidth: 3,
         fill: true,
-        tension: 0.4, // Smoother curves
+        tension: 0.2, // Smoother curves
         pointRadius: 6,
         pointHoverRadius: 8,
         pointBackgroundColor: config.chartColor,
