@@ -7,6 +7,7 @@ import {
   LineElement,
   Title,
   Tooltip,
+  Legend,
   Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
@@ -25,6 +26,7 @@ export function LineChart({
     LineElement,
     Title,
     Tooltip,
+    Legend,
     Filler
   );
 
@@ -46,31 +48,29 @@ export function LineChart({
 
   const data = {
     labels: config.labels,
-    datasets: [
-      {
-        label: config.yAxisTitle,
-        data: config.data,
-        backgroundColor: (context: {
-          chart: { ctx: CanvasRenderingContext2D };
-        }) => {
-          const chart = context.chart;
-          const { ctx } = chart;
-          return createGradient(ctx, config.chartColor);
-        },
-        borderColor: config.chartColor,
-        borderWidth: 3,
-        fill: true,
-        tension: 0.2, // Smoother curves
-        pointRadius: 6,
-        pointHoverRadius: 8,
-        pointBackgroundColor: config.chartColor,
-        pointBorderColor: "#ffffff",
-        pointBorderWidth: 2,
-        pointHoverBackgroundColor: config.chartColor,
-        pointHoverBorderColor: "#ffffff",
-        pointHoverBorderWidth: 3,
+    datasets: config.datasets.map((dataset) => ({
+      label: dataset.label,
+      data: dataset.data,
+      backgroundColor: (context: {
+        chart: { ctx: CanvasRenderingContext2D };
+      }) => {
+        const chart = context.chart;
+        const { ctx } = chart;
+        return createGradient(ctx, dataset.color);
       },
-    ],
+      borderColor: dataset.color,
+      borderWidth: 3,
+      fill: true,
+      tension: 0.2, // Smoother curves
+      pointRadius: 6,
+      pointHoverRadius: 8,
+      pointBackgroundColor: dataset.color,
+      pointBorderColor: "#ffffff",
+      pointBorderWidth: 2,
+      pointHoverBackgroundColor: dataset.color,
+      pointHoverBorderColor: "#ffffff",
+      pointHoverBorderWidth: 3,
+    })),
   };
 
   const options = {
@@ -82,7 +82,19 @@ export function LineChart({
     },
     plugins: {
       legend: {
-        display: false,
+        display: config.showLegend ?? false,
+        position: "top" as const,
+        align: "center" as const,
+        labels: {
+          color: config.labelColor,
+          font: {
+            size: 14,
+            weight: "normal" as const,
+          },
+          padding: 10,
+          usePointStyle: true,
+          pointStyle: "circle",
+        },
       },
       title: {
         display: true,
@@ -101,7 +113,7 @@ export function LineChart({
         backgroundColor: "rgba(0, 0, 0, 0.8)",
         titleColor: "#ffffff",
         bodyColor: "#ffffff",
-        borderColor: config.chartColor,
+        borderColor: config.datasets[0]?.color || "#ffffff",
         borderWidth: 1,
         cornerRadius: 8,
         displayColors: true,
@@ -159,10 +171,11 @@ export function LineChart({
   };
 
   // Generate stable unique key to prevent canvas reuse issues
+  const firstDataPoint = config.datasets[0]?.data[0] || 0;
   const chartKey = `${config.title.replace(
     " ",
     ""
-  )}-${config.yAxisTitle.replace(" ", "")}-${config.data[0]}`;
+  )}-${config.yAxisTitle.replace(" ", "")}-${firstDataPoint}`;
 
   return (
     <div className={className}>

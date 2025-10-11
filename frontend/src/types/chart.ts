@@ -1,9 +1,15 @@
-export type ChartConfig = {
+export type ChartDataset = {
   data: number[];
+  label: string;
+  color: string;
+};
+
+export type ChartConfig = {
+  datasets: ChartDataset[];
   labels: string[];
   title: string;
   labelColor: string;
-  chartColor: string;
   xAxisTitle: string;
   yAxisTitle: string;
+  showLegend?: boolean;
 };

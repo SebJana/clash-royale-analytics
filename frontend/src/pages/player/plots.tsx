@@ -173,33 +173,69 @@ export default function PlayerPlots() {
   });
 
   const winRateChart: ChartConfig = {
-    data: getDataArrayForKey(stats, "winRate"),
+    datasets: [
+      {
+        data: getDataArrayForKey(stats, "winRate"),
+        label: "Win Rate",
+        color: "#00C9FF",
+      },
+    ],
     labels: getDataArrayForKey(stats, "date"),
-    title: "Win Rate Performance",
+    title: "🏆 Win Rate Performance",
     yAxisTitle: "Win Rate (%)",
     xAxisTitle: "Date",
-    chartColor: "#00C9FF",
     labelColor: "#e0e0e0",
   };
 
   const battlesChart: ChartConfig = {
-    data: getDataArrayForKey(stats, "battles"),
+    datasets: [
+      {
+        data: getDataArrayForKey(stats, "battles"),
+        label: "Battles",
+        color: "#FF6B6B",
+      },
+    ],
     labels: getDataArrayForKey(stats, "date"),
     title: "⚔️ Battle Activity",
     yAxisTitle: "Number of Battles",
     xAxisTitle: "Date",
-    chartColor: "#FF6B6B",
     labelColor: "#e0e0e0",
   };
 
   const leakedElixirChart: ChartConfig = {
-    data: getLeakedElixirPerMatch(stats),
+    datasets: [
+      {
+        data: getLeakedElixirPerMatch(stats),
+        label: "Leaked Elixir",
+        color: "#C547DB",
+      },
+    ],
     labels: getDataArrayForKey(stats, "date"),
-    title: "Average Leaked Elixir per Battle",
+    title: "🩸 Average Leaked Elixir per Battle",
     yAxisTitle: "Leaked Elixir",
     xAxisTitle: "Date",
-    chartColor: "#C547DB",
     labelColor: "#e0e0e0",
+  };
+
+  const crownsChart: ChartConfig = {
+    datasets: [
+      {
+        data: getDataArrayForKey(stats, "crownsFor"),
+        label: "Crowns For",
+        color: "#00C9FF",
+      },
+      {
+        data: getDataArrayForKey(stats, "crownsAgainst"),
+        label: "Crowns Against",
+        color: "#FF6B6B",
+      },
+    ],
+    labels: getDataArrayForKey(stats, "date"),
+    title: "👑 Crowns For vs. Crowns Against",
+    yAxisTitle: "Crowns",
+    xAxisTitle: "Date",
+    labelColor: "#e0e0e0",
+    showLegend: true,
   };
 
   return (
@@ -235,6 +271,7 @@ export default function PlayerPlots() {
               <div className="plots-charts">
                 <LineChart className="stat-chart" config={winRateChart} />
                 <LineChart className="stat-chart" config={battlesChart} />
+                <LineChart className="stat-chart" config={crownsChart} />
                 <LineChart className="stat-chart" config={leakedElixirChart} />
               </div>
             )}
