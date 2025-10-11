@@ -37,12 +37,12 @@ export default function PlayerLayout() {
           </NavLink>
         </div>
 
-        {/* Hamburger Button nur auf Mobile sichtbar */}
+        {/* Only show on mobile */}
         <button className="nav-toggle" onClick={() => setMenuOpen((v) => !v)}>
           {menuOpen ? <X /> : <Menu />}
         </button>
 
-        {/* Menü: Desktop = inline, Mobile = Dropdown/Drawer */}
+        {/* Page menu: Desktop = inline, Mobile = Dropdown */}
         <div
           id="player-nav-menu"
           className={`nav-section nav-pages ${menuOpen ? "is-open" : ""}`}
