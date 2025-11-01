@@ -54,6 +54,9 @@ export function mapInternalNameToDisplayName(internalName: string): string {
   if (internalName.includes("Friendly")) {
     return "Friendly";
   }
+  if (internalName.startsWith("Challenge_AllCards_EventDeck_NoSet")) {
+    return "CRL 20-Win";
+  }
   // Add new mappings here
 
   // Fallback: underscores to spaces, split camel case, collapse and trim
