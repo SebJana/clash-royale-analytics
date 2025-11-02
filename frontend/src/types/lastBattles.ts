@@ -17,7 +17,7 @@ export type Battle = {
   gameMode: string;
   team: Player[];
   opponent: Player[];
-  gameResult: "Victory" | "Defeat" | "Draw" | string;
+  gameResult: "Victory" | "Defeat" | "Draw";
 };
 
 export type LastBattles = {

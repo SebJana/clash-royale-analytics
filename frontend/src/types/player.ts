@@ -1,4 +1,4 @@
-// Only type YearsPlayed for display of account age
+// Only type Badge for display of account age using the YearsPlayed Badge
 type Badge = {
   name: string;
   level: number;

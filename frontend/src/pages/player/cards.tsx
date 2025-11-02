@@ -11,7 +11,9 @@ import { useEffect, useState } from "react";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
+import { SortByContainer } from "../../components/sortByContainer/sortByContainer";
 import { CardComponent } from "../../components/card/card";
+import type { CardStats } from "../../types/cardStats";
 import "./cards.css";
 
 function calculateAndFormatUsageRate(
@@ -22,6 +24,14 @@ function calculateAndFormatUsageRate(
   const roundedUsageRate = round(usageRate, 1);
   return `${roundedUsageRate}%`;
 }
+
+// Type for card sorting that includes actual CardStat fields and computed fields
+type CardSortFields = {
+  usage: number; // Direct field from CardStat (battles)
+  wins: number; // Direct field from CardStat
+  winRate: number; // Direct field from CardStat
+  usageRate: number; // Computed field
+};
 
 export default function PlayerCards() {
   const { playerTag = "" } = useParams();
@@ -38,6 +48,12 @@ export default function PlayerCards() {
 
   // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
   const [gameModesInitialized, setGameModesInitialized] = useState(false);
+
+  // Sort state management
+  // Tracks which field to sort by and the sort direction
+  const [selectedSortOption, setSelectedSortOption] =
+    useState<keyof CardSortFields>("usage"); // Default: sort by battles (most relevant)
+  const [sortAscending, setSortAscending] = useState(false); // Default to descending (highest values first)
 
   const {
     data: cards,
@@ -77,6 +93,60 @@ export default function PlayerCards() {
     // The API queries will automatically re-run when appliedFilters changes
   };
 
+  // Sort handler function - manages sort option and direction state
+  // Clicking same option toggles direction, clicking different option resets to descending
+  const handleSortChange = (nextSortOption: keyof CardSortFields) => {
+    if (nextSortOption === selectedSortOption) {
+      // Same option clicked - toggle sort direction (ascending ↔ descending)
+      setSortAscending(!sortAscending);
+    } else {
+      // Different option selected - change sort field and reset to descending (most useful default)
+      setSelectedSortOption(nextSortOption);
+      setSortAscending(false);
+    }
+  };
+
+  // Available sort options for cards
+  const sortOptions: (keyof CardSortFields)[] = [
+    "usage",
+    "wins",
+    "winRate",
+    "usageRate",
+  ];
+
+  // Helper function to sort cards based on selected sort option
+  // Creates a new sorted array without mutating the original card statistics
+  const sortCards = (
+    cardsToSort: CardStats["card_statistics"]["cards"]
+  ): CardStats["card_statistics"]["cards"] => {
+    return [...cardsToSort].sort((a, b) => {
+      let valueA: number | string;
+      let valueB: number | string;
+
+      if (selectedSortOption === "usageRate") {
+        // Special case for computed field - calculate usage rate percentage on-the-fly
+        // Usage rate = (card battles / total battles) * 100
+        const totalBattles = cardStats?.card_statistics.totalBattles ?? 0;
+        valueA = (a.usage / totalBattles) * 100;
+        valueB = (b.usage / totalBattles) * 100;
+      } else {
+        // Direct field access using bracket notation
+        // Works for: usage (battles), wins, winRate
+        // TypeScript ensures selectedSortOption is a valid key of CardSortFields
+        valueA = a[selectedSortOption];
+        valueB = b[selectedSortOption];
+      }
+
+      // Convert to numbers for consistent comparison (all card stats are numeric)
+      const numA = Number(valueA);
+      const numB = Number(valueB);
+
+      // Sort direction: ascending (low to high) or descending (high to low)
+      // Default is descending to show highest values first (most used cards, highest win rates, etc.)
+      return sortAscending ? numA - numB : numB - numA;
+    });
+  };
+
   // Card statistics API call
   // Fetch card statistics only when game modes are properly initialized
   // Uses applied filter values (not selected ones) to ensure query stability
@@ -110,6 +180,12 @@ export default function PlayerCards() {
 
   const totalBattles = cardStats?.card_statistics.totalBattles ?? 0;
 
+  // Apply sorting to card statistics for display
+  // Only sort if card data exists, otherwise return empty array
+  const sortedCards = cardStats?.card_statistics.cards
+    ? sortCards(cardStats.card_statistics.cards)
+    : [];
+
   return (
     <div className="cards-page">
       <div className="cards-content">
@@ -142,11 +218,17 @@ export default function PlayerCards() {
               initialFilters={getCurrentFilterState()}
             />
 
+            <SortByContainer<CardSortFields>
+              options={sortOptions}
+              selectedOption={selectedSortOption}
+              ascending={sortAscending}
+              onSelectedOptionChange={handleSortChange}
+            />
+
             {/* Show cards if there is any data to display */}
-            {cardStats && (
+            {sortedCards.length > 0 && (
               <div className="cards-grid">
-                {/* TODO potentially(?) supply sort by options (battles, wins, win rate, usage rate) */}
-                {cardStats.card_statistics.cards.map((c) => (
+                {sortedCards.map((c) => (
                   <div
                     className="card-item"
                     key={`${c.card.id}-${c.card.evolutionLevel}`}
@@ -191,7 +273,7 @@ export default function PlayerCards() {
             <ScrollToTopButton />
 
             {/* Show message when no cards are found and not still loading */}
-            {(!cardStats || cardStats.card_statistics.cards.length === 0) &&
+            {(!cardStats || sortedCards.length === 0) &&
               !cardsLoading &&
               !gameModesLoading &&
               !cardsLoading && (

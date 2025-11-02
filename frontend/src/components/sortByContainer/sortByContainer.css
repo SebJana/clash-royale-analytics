@@ -1,0 +1,113 @@
+.sort-by-container {
+  background-color: var(--bg-overlay-medium);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+  margin: var(--spacing-lg) 0;
+}
+
+.sort-by-container-header {
+  margin: 0;
+  padding-left: 3px;
+  padding-bottom: 10px;
+  text-align: left;
+}
+
+.sort-by-container-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.sort-by-container-select {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  padding: var(--spacing-md) var(--spacing-md);
+  font-size: var(--font-base);
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  min-width: 250px;
+  transition: all var(--transition-fast);
+}
+
+.sort-by-container-select:hover {
+  border-color: var(--border-hover);
+  background-color: var(--bg-darker);
+}
+
+.sort-by-container-select:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.sort-by-container-select option {
+  font-size: var(--font-md);
+}
+
+.sort-by-container-direction-button {
+  position: relative;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  padding: var(--spacing-md) var(--spacing-md);
+  font-size: var(--font-base);
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  transition: all var(--transition-fast);
+}
+
+.sort-by-container-direction-button:hover {
+  border-color: var(--border-hover);
+  background-color: var(--bg-darker);
+}
+
+.sort-by-container-direction-button:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.sort-by-container-direction-button svg {
+  color: var(--text-primary);
+  transition: color var(--transition-fast);
+  stroke-width: 2.5;
+}
+
+.sort-by-container-direction-button:hover svg {
+  color: var(--color-primary);
+}
+
+.sort-by-container-direction-button.ascending svg,
+.sort-by-container-direction-button.descending svg {
+  color: var(--color-primary);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .sort-by-container-content {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .sort-by-container-select {
+    flex: 1;
+    min-width: auto;
+  }
+
+  .sort-by-container-direction-button {
+    flex-shrink: 0;
+  }
+}

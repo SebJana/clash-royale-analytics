@@ -14,6 +14,7 @@ import { StatCard } from "../../components/statCard/statCard";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
+import { SortByContainer } from "../../components/sortByContainer/sortByContainer";
 import type { Card } from "../../types/cards";
 import type { Deck } from "../../types/deckStats";
 import "./decks.css";
@@ -22,6 +23,15 @@ import "./decks.css";
 type DeckWithMatchScore = Deck & {
   matchPercentage: number;
   matchCount: number;
+};
+
+// Type for deck sorting that includes actual Deck fields and computed fields
+type DeckSortFields = {
+  count: number; // Direct field from Deck (battles)
+  wins: number; // Direct field from Deck
+  winRate: number; // Direct field from Deck
+  usageRate: number; // Computed field
+  lastSeen: string; // Direct field from Deck
 };
 
 function calculateAndFormatUsageRate(
@@ -49,6 +59,12 @@ export default function PlayerDecks() {
 
   // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
   const [gameModesInitialized, setGameModesInitialized] = useState(false);
+
+  // Sort state management
+  // Tracks which field to sort by and the sort direction
+  const [selectedSortOption, setSelectedSortOption] =
+    useState<keyof DeckSortFields>("count"); // Default: sort by battles (most relevant)
+  const [sortAscending, setSortAscending] = useState(false); // Default to descending (highest values first)
 
   const {
     data: cards,
@@ -87,6 +103,28 @@ export default function PlayerDecks() {
     setAppliedFilters(filters);
     // The API queries will automatically re-run when appliedFilters changes
   };
+
+  // Sort handler function - manages sort option and direction state
+  // Clicking same option toggles direction, clicking different option resets to descending
+  const handleSortChange = (nextSortOption: keyof DeckSortFields) => {
+    if (nextSortOption === selectedSortOption) {
+      // Same option clicked - toggle sort direction (ascending ↔ descending)
+      setSortAscending(!sortAscending);
+    } else {
+      // Different option selected - change sort field and reset to descending (most useful default)
+      setSelectedSortOption(nextSortOption);
+      setSortAscending(false);
+    }
+  };
+
+  // Available sort options for decks
+  const sortOptions: (keyof DeckSortFields)[] = [
+    "count",
+    "wins",
+    "winRate",
+    "usageRate",
+    "lastSeen",
+  ];
 
   // Deck statistics API call
   // Fetch deck statistics only when game modes are properly initialized
@@ -127,29 +165,73 @@ export default function PlayerDecks() {
     return matchingCards.length;
   };
 
+  // Helper function to sort decks based on selected sort option
+  // Creates a new sorted array without mutating the original deck statistics
+  const sortDecks = (decksToSort: Deck[]): Deck[] => {
+    return [...decksToSort].sort((a, b) => {
+      let valueA: number | string;
+      let valueB: number | string;
+
+      if (selectedSortOption === "usageRate") {
+        // Special case for computed field - calculate usage rate percentage on-the-fly
+        // Usage rate = (deck battles / total battles in this filtered set) * 100
+        const totalBattlesForSort = decksToSort.reduce(
+          (sum, deck) => sum + deck.count,
+          0
+        );
+        valueA = (a.count / totalBattlesForSort) * 100;
+        valueB = (b.count / totalBattlesForSort) * 100;
+      } else {
+        // Direct field access using bracket notation
+        // Works for: count (battles), wins, winRate, lastSeen
+        // TypeScript ensures selectedSortOption is a valid key of DeckSortFields
+        valueA = a[selectedSortOption];
+        valueB = b[selectedSortOption];
+      }
+
+      // Handle string comparison (specifically for lastSeen ISO date strings)
+      if (typeof valueA === "string" && typeof valueB === "string") {
+        const comparison = valueA.localeCompare(valueB);
+        return sortAscending ? comparison : -comparison;
+      }
+
+      // Handle numeric comparison for all other fields (count, wins, winRate, usageRate)
+      const numA = Number(valueA);
+      const numB = Number(valueB);
+
+      // Sort direction: ascending (low to high) or descending (high to low)
+      // Default is descending to show highest values first (most battles, highest win rates, etc.)
+      return sortAscending ? numA - numB : numB - numA;
+    });
+  };
+
   // Filter and sort decks based on applied cards with two modes:
   // 1) Include mode: decks HAVE to include ALL selected cards
   // 2) Match mode: decks are scored by percentage of selected cards they contain and sorted by match percentage
   const filteredDecks = (() => {
     if (!deckStats?.deck_statistics.decks) return [];
 
-    // If no cards are applied as filters, show all decks
+    const allDecks = deckStats.deck_statistics.decks;
+
+    // If no cards are applied as filters, show all decks with sorting applied
     if (!appliedFilters.cards || appliedFilters.cards.length === 0) {
-      return deckStats.deck_statistics.decks;
+      // Apply user-selected sorting to all available decks
+      return sortDecks(allDecks);
     }
 
-    const decks = deckStats.deck_statistics.decks;
-
     if (appliedFilters.includeCardFilterMode === true) {
-      // Include mode: deck must contain ALL selected cards
-      return decks.filter((deck) => {
+      // Include mode: deck must contain ALL selected cards (strict filtering)
+      const filteredDecks = allDecks.filter((deck) => {
         return appliedFilters.cards.every((appliedCard) =>
           deckContainsCard(deck, appliedCard)
         );
       });
+
+      // Apply user-selected sorting to the filtered decks
+      return sortDecks(filteredDecks);
     } else {
       // Match mode: calculate match percentage and sort by it
-      const decksWithMatchScore = decks.map((deck) => {
+      const decksWithMatchScore = allDecks.map((deck) => {
         const matchPercentage = calculateMatchPercentage(deck);
         const matchCount = calculateMatchCount(deck);
         return {
@@ -223,6 +305,18 @@ export default function PlayerDecks() {
               initialFilters={getCurrentFilterState()}
             />
 
+            <SortByContainer<DeckSortFields>
+              options={sortOptions}
+              selectedOption={selectedSortOption}
+              ascending={sortAscending}
+              // Only enable deck sorting in Include mode (when cards are filtered/selected with include mode)
+              disableSort={
+                appliedFilters.cards.length > 0 &&
+                !appliedFilters.includeCardFilterMode
+              }
+              onSelectedOptionChange={handleSortChange}
+            />
+
             {/* Show decks if there is any data to display */}
             {filteredDecks && filteredDecks.length > 0 && (
               <div className="decks-stats">
@@ -245,7 +339,6 @@ export default function PlayerDecks() {
                     value={`${round((totalWins / totalBattles) * 100, 1)}%`}
                   />
                 </div>
-                {/* TODO potentially(?) supply sort by options (battles, wins, win rate, usage rate, last seen) */}
                 {filteredDecks.map((d) => (
                   <div
                     className="decks-deck-row"
