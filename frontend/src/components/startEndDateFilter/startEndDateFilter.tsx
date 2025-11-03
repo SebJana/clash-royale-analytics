@@ -112,7 +112,6 @@ export function StartEndDateFilter({
           ))}
         </div>
 
-        {/* TODO add check for custom range, that start is on or before end date*/}
         {/* Only shown when "Custom" option is selected - allows manual date selection for precise control */}
         {selectedOption === "Custom" && (
           <div className="start-end-date-filter-component-custom-inputs">

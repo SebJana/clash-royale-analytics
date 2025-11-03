@@ -14,8 +14,6 @@ export async function fetchLastBattles(
     throw new Error("Invalid player tag");
   }
 
-  // TODO check valid before time
-
   const tag = encodeURIComponent(playerTag);
   const params = new URLSearchParams();
   params.set("limit", String(limit));

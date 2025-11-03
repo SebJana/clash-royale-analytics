@@ -8,6 +8,7 @@ import {
   getDefaultFilterState,
   setFilterStateToLocalStorage,
 } from "../../utils/filter";
+import { isValidDateRange } from "../../utils/datetime";
 import "./filterContainer.css";
 
 export type FilterState = {
@@ -146,12 +147,16 @@ export function FilterContainer({
     const cardFilterModeChanged =
       appliedIncludeCardFilterMode !== selectedIncludeCardFilterMode;
 
+    const validDateRange = isValidDateRange(selectedStartDate, selectedEndDate);
+
     if (
-      appliedStartDate !== selectedStartDate ||
-      appliedEndDate !== selectedEndDate ||
-      JSON.stringify(appliedGameModes) !== JSON.stringify(selectedGameModes) ||
-      cardsChanged ||
-      cardFilterModeChanged
+      (appliedStartDate !== selectedStartDate ||
+        appliedEndDate !== selectedEndDate ||
+        JSON.stringify(appliedGameModes) !==
+          JSON.stringify(selectedGameModes) ||
+        cardsChanged ||
+        cardFilterModeChanged) &&
+      validDateRange
     ) {
       setApplyButtonDisabled(false);
     } else {

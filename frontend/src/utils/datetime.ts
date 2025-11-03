@@ -59,3 +59,67 @@ export function getTodayDateTime(): string {
 export function formatDateForInput(date: Date): string {
   return date.toISOString().slice(0, 10); // Format as YYYY-MM-DD
 }
+
+/**
+ * Returns the release date of Clash Royale.
+ *
+ * @returns A `Date` object representing March 2, 2016.
+ */
+export function getClashRoyaleReleaseDate(): Date {
+  // Official launch date for Clash Royale
+  return new Date("2016-03-02");
+}
+
+/**
+ * Validates that a date range is valid within the allowed boundaries.
+ *
+ * @param startDateString - The start date string in a YYYY-MM-DD format.
+ * @param endDateString - The end date string in a YYYY-MM-DD format.
+ * @returns `true` if:
+ * - Both strings represent valid dates
+ * - The start date is not before the Clash Royale release date
+ * - The end date is not in the future
+ * - The end date is the same or after the start date
+ *
+ * Otherwise returns `false`.
+ */
+export function isValidDateRange(
+  startDateString: string,
+  endDateString: string
+) {
+  if (!startDateString || !endDateString) {
+    return false;
+  }
+
+  // Convert to dates
+  const startDate = new Date(startDateString);
+  const endDate = new Date(endDateString);
+
+  // When the given strings can't be converted into a valid date
+  if (
+    !startDate ||
+    Number.isNaN(startDate.getTime()) ||
+    !endDate ||
+    Number.isNaN(endDate.getTime())
+  ) {
+    return false;
+  }
+
+  const today = new Date();
+
+  // Upon selecting an end date in the future
+  if (endDate > today) {
+    return false;
+  }
+  // Upon selecting a start date too far in the past (before the Clash Royale launch)
+  if (startDate < getClashRoyaleReleaseDate()) {
+    return false;
+  }
+
+  // End date is before start date
+  if (endDate < startDate) {
+    return false;
+  }
+  // TODO possibly limit time range (max N years)?
+  return true;
+}

@@ -5,7 +5,11 @@ import { usePlayerBattlesInfinite } from "../../hooks/useLastBattles";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import { BattleComponent } from "../../components/battle/battle";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
-import { localeToUTC, getTodayDateTime } from "../../utils/datetime";
+import {
+  localeToUTC,
+  getTodayDateTime,
+  getClashRoyaleReleaseDate,
+} from "../../utils/datetime";
 import CircularProgress from "@mui/material/CircularProgress";
 import "./battles.css";
 
@@ -147,9 +151,9 @@ export default function PlayerBattles() {
     maxDate.setDate(maxDate.getDate() + 1);
     maxDate.setHours(0, 0, 0, 0);
 
-    // Official launch date for Clash Royale
     // Tracked battles will (most likely) not exist that far back, but set that as fixed range start
-    const clashRoyaleLaunchDate = new Date("2016-03-02T00:00:00Z");
+    const clashRoyaleLaunchDate = getClashRoyaleReleaseDate();
+    clashRoyaleLaunchDate.setHours(0, 0, 0, 0);
 
     // Upon inserting a date in the future
     if (selectedDate > maxDate) {
