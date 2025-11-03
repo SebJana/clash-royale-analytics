@@ -141,11 +141,18 @@ export default function PlayerBattles() {
       return false;
     }
 
-    const today = new Date();
+    // Set the max date to today + 1 (tomorrow at 00:00)
+    // Enables a little buffer space for users setting the filter date ever so slightly into the future
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 1);
+    maxDate.setHours(0, 0, 0, 0);
+
+    // Official launch date for Clash Royale
+    // Tracked Battles are will (most likely) not exist that far back, but set that as fixed range start
     const clashRoyaleLaunchDate = new Date("2016-03-02T00:00:00Z");
 
     // Upon inserting a date in the future
-    if (selectedDate > today) {
+    if (selectedDate > maxDate) {
       return false;
     }
     // Upon selecting a date too far in the past (before the Clash Royale launch)
