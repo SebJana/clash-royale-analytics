@@ -130,16 +130,30 @@ export default function PlayerBattles() {
    * @returns true if the date is valid, false otherwise
    */
   const validateFilterDate = useCallback((dateString: string): boolean => {
+    // When there is no given date
     if (!dateString) {
       return false;
     }
 
     const selectedDate = new Date(dateString);
+    // When the given string can't be converted into a valid date
+    if (!selectedDate || Number.isNaN(selectedDate.getTime())) {
+      return false;
+    }
 
-    // Check if the date is valid (not NaN)
-    // TODO add business logic validation - prevent dates before Clash Royale launch (2016-03-02) and future dates
-    // TODO add reasonable date range limits to prevent performance issues
-    return !isNaN(selectedDate.getTime());
+    const today = new Date();
+    const clashRoyaleLaunchDate = new Date("2016-03-02T00:00:00Z");
+
+    // Upon inserting a date in the future
+    if (selectedDate > today) {
+      return false;
+    }
+    // Upon selecting a date too far in the past (before the Clash Royale launch)
+    if (selectedDate < clashRoyaleLaunchDate) {
+      return false;
+    }
+
+    return true;
   }, []);
 
   // Keep track of how many battles are currently loaded and set the flag
@@ -150,10 +164,8 @@ export default function PlayerBattles() {
       setLoadingCapReached(true);
     }
     // Reset the flag if there are now less battles --> loaded page/filter/player changed
-    else {
-      if (loadingCapReached) {
-        setLoadingCapReached(false);
-      }
+    else if (loadingCapReached) {
+      setLoadingCapReached(false);
     }
   }, [battlesList, loadingCapReached, setLoadingCapReached]);
 
@@ -170,10 +182,10 @@ export default function PlayerBattles() {
       beforeDate && isValidFilterDate ? localeToUTC(beforeDate) : undefined;
 
     // If date is invalid it will differ from the applied date, but the button will be disabled via 'isValidFilterDate'
-    if (currentSelectedDateUTC !== appliedBeforeDate) {
-      setApplyButtonDisabled(false); // Enable button when there's a change
-    } else {
+    if (currentSelectedDateUTC === appliedBeforeDate) {
       setApplyButtonDisabled(true); // Disable button when no change
+    } else {
+      setApplyButtonDisabled(false); // Enable button when there's a change
     }
   }, [beforeDate, appliedBeforeDate, isValidFilterDate]);
 
@@ -212,7 +224,7 @@ export default function PlayerBattles() {
         </label>
         <input
           className={`battles-datetime-input${
-            !isValidFilterDate ? " invalid" : ""
+            isValidFilterDate ? "" : " invalid"
           }`}
           type="datetime-local"
           name="beforeDate"

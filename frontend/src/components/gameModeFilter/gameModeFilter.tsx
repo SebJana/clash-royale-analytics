@@ -29,6 +29,7 @@ export function GameModeFilter({
     [gameModesMap]
   );
 
+  // TODO upon all selected game modes, emit empty game modes array --> same result for the backend
   // Create options with display names and their corresponding internal names
   const options = useMemo(() => {
     return uniqueDisplayNames.map((display) => {
