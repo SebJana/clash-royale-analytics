@@ -20,7 +20,7 @@ class Settings:
     INIT_RETRY_DELAY: float = 3
 
     # Sleep time between the scraping cycles
-    REQUEST_CYCLE_DURATION: float = 15 * 60  # 15 minutes
+    REQUEST_CYCLE_DURATION: float = 5 * 60  # 5 minutes
 
     # Limitation to call the Clash Royale API
     REQUESTS_PER_SECOND: float = 0.5

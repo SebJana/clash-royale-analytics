@@ -5,6 +5,11 @@ import httpx
 
 from core.deps import DbConn, CrApi, RedConn, require_tracked_player
 from core.settings import settings
+from core.validate import (
+    validate_between_request,
+    validate_battles_request,
+    ParamsRequestError,
+)
 from models.schema import BetweenRequest, BattlesRequest
 from clash_royale_api import ClashRoyaleMaintenanceError
 from redis_service import get_redis_json, set_redis_json, build_redis_key
@@ -76,14 +81,8 @@ async def last_battles(
     redis_conn: RedConn,
     req: BattlesRequest = Depends(),
 ):
-    # TODO possibly add timezone?
     try:
-        # Cap the amount of battles a user can query at once
-        if req.limit < 1 or req.limit > 50:
-            raise HTTPException(
-                status_code=403, detail=f"Given limit is invalid: {req.limit}"
-            )
-
+        validate_battles_request(req)
         # Either use:
         # 1) the specified before datetime
         # 2) the current datetime, which equals the last req.limit battles, the last N battles
@@ -108,10 +107,8 @@ async def last_battles(
         await set_redis_json(redis_conn, key, battles, ttl=settings.CACHE_TTL_BATTLES)
         return {"player_tag": player_tag, "last_battles": battles}
 
-    except ValueError as e:
-        raise HTTPException(
-            status_code=403, detail=f"Given datetime is invalid: {cutoff.isoformat()}"
-        )
+    except ParamsRequestError as e:
+        raise HTTPException(status_code=e.code, detail=e.detail)
 
     except Exception as e:
         raise HTTPException(
@@ -129,6 +126,7 @@ async def deck_percentage_stats(
     req: BetweenRequest = Depends(),
 ):
     try:
+        validate_between_request(req)
         # TODO add game_modes validation - check if modes exist in database before processing
         # TODO add input sanitization for all user-provided parameters
         params = {
@@ -171,11 +169,8 @@ async def deck_percentage_stats(
             "deck_statistics": decks,
         }
 
-    except ValueError as e:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Given date range is invalid: {req.start_date} – {req.end_date}",
-        )
+    except ParamsRequestError as e:
+        raise HTTPException(status_code=e.code, detail=e.detail)
 
     except Exception as e:
         raise HTTPException(
@@ -193,6 +188,7 @@ async def card_percentage_stats(
     req: BetweenRequest = Depends(),
 ):
     try:
+        validate_between_request(req)
         params = {
             "playerTag": player_tag,
             "startDate": req.start_date,
@@ -233,11 +229,8 @@ async def card_percentage_stats(
             "card_statistics": cards,
         }
 
-    except ValueError as e:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Given date range is invalid: {req.start_date} – {req.end_date}",
-        )
+    except ParamsRequestError as e:
+        raise HTTPException(status_code=e.code, detail=e.detail)
 
     except Exception as e:
         raise HTTPException(
@@ -255,6 +248,7 @@ async def daily_player_statistics(
     req: BetweenRequest = Depends(),
 ):
     try:
+        validate_between_request(req)
         params = {
             "playerTag": player_tag,
             "startDate": req.start_date,
@@ -297,13 +291,8 @@ async def daily_player_statistics(
             "daily_statistics": stats,
         }
 
-    except ValueError as e:
-        # Value Errors: invalid date range and invalid timezone
-        # TODO differentiate between them in the error message of the HTTPException
-        raise HTTPException(
-            status_code=403,
-            detail=f"Given date range is invalid: {req.start_date} – {req.end_date}",
-        )
+    except ParamsRequestError as e:
+        raise HTTPException(status_code=e.code, detail=e.detail)
 
     except Exception as e:
         raise HTTPException(

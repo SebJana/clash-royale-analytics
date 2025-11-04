@@ -22,6 +22,13 @@ class Settings:
     # MongoDB Configuration
     MONGO_CLIENT_NAME: str = "cr-analytics-api"
 
+    # Maximum time interval that can be requested using a BetweenRequest for decks, cards, stats
+    # If none is wanted, just set the limit to an arbitrarily big number
+    MAX_TIME_RANGE_DAYS: int = 10 * 365
+    # Amount of battles that can be retrieved in one request
+    MIN_BATTLES: int = 1
+    MAX_BATTLES: int = 20
+
     # Cache TTL (Time To Live) in seconds
     # Cache is being invalidated in every data scraping cycle
     # Cache data is always as up-to-date as the most recently scraped data from MongoDB

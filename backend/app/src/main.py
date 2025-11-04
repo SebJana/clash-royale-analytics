@@ -11,7 +11,7 @@ from mongo import MongoConn
 
 # NOTE time response from Clash Royale/MongoDB is in UTC so frontend needs conversion logic
 # both for the query parameter time but also the times the user gets back, which needs to be displayed in their local time
-# TODO add ip- based request limitations for routes
+# TODO add ip-based request limitations for routes
 # TODO (potentially) global error handling
 # TODO add internal for whole backend via logger and don't send full error detail as HttpException
 # TODO timestamp based logging
