@@ -1,3 +1,4 @@
+import time
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, List
 from datetime import datetime
@@ -8,6 +9,7 @@ from core.settings import settings
 from core.validate import (
     validate_between_request,
     validate_battles_request,
+    validate_game_modes,
     ParamsRequestError,
 )
 from models.schema import BetweenRequest, BattlesRequest
@@ -127,14 +129,14 @@ async def deck_percentage_stats(
 ):
     try:
         validate_between_request(req)
-        # TODO add game_modes validation - check if modes exist in database before processing
+        validated_game_modes = await validate_game_modes(redis_conn, game_modes)
         # TODO add input sanitization for all user-provided parameters
         params = {
             "playerTag": player_tag,
             "startDate": req.start_date,
             "endDate": req.end_date,
             "timezone": req.timezone,
-            "gameModes": game_modes,
+            "gameModes": validated_game_modes,
         }
         key = await build_redis_key(
             conn=redis_conn, service="crApi", resource="playerDecks", params=params
@@ -144,7 +146,7 @@ async def deck_percentage_stats(
         if cached_decks is not None:
             return {
                 "player_tag": player_tag,
-                "game_modes": game_modes,
+                "game_modes": validated_game_modes,
                 "deck_statistics": cached_decks,
             }
 
@@ -153,7 +155,7 @@ async def deck_percentage_stats(
             player_tag,
             req.start_date,
             req.end_date,
-            game_modes,
+            validated_game_modes,
             req.timezone,
         )
 
@@ -165,7 +167,7 @@ async def deck_percentage_stats(
         await set_redis_json(redis_conn, key, decks, ttl=settings.CACHE_TTL_DECK_STATS)
         return {
             "player_tag": player_tag,
-            "game_modes": game_modes,
+            "game_modes": validated_game_modes,
             "deck_statistics": decks,
         }
 
@@ -189,12 +191,14 @@ async def card_percentage_stats(
 ):
     try:
         validate_between_request(req)
+        validated_game_modes = await validate_game_modes(redis_conn, game_modes)
+
         params = {
             "playerTag": player_tag,
             "startDate": req.start_date,
             "endDate": req.end_date,
             "timezone": req.timezone,
-            "gameModes": game_modes,
+            "gameModes": validated_game_modes,
         }
         key = await build_redis_key(
             conn=redis_conn, service="crApi", resource="playerCards", params=params
@@ -204,7 +208,7 @@ async def card_percentage_stats(
         if cached_cards is not None:
             return {
                 "player_tag": player_tag,
-                "game_modes": game_modes,
+                "game_modes": validated_game_modes,
                 "card_statistics": cached_cards,
             }
 
@@ -213,7 +217,7 @@ async def card_percentage_stats(
             player_tag,
             req.start_date,
             req.end_date,
-            game_modes,
+            validated_game_modes,
             req.timezone,
         )
 
@@ -225,7 +229,7 @@ async def card_percentage_stats(
         await set_redis_json(redis_conn, key, cards, ttl=settings.CACHE_TTL_CARD_STATS)
         return {
             "player_tag": player_tag,
-            "game_modes": game_modes,
+            "game_modes": validated_game_modes,
             "card_statistics": cards,
         }
 
@@ -249,12 +253,14 @@ async def daily_player_statistics(
 ):
     try:
         validate_between_request(req)
+        validated_game_modes = await validate_game_modes(redis_conn, game_modes)
+
         params = {
             "playerTag": player_tag,
             "startDate": req.start_date,
             "endDate": req.end_date,
             "timezone": req.timezone,
-            "gameModes": game_modes,
+            "gameModes": validated_game_modes,
         }
         key = await build_redis_key(
             conn=redis_conn, service="crApi", resource="dailyStats", params=params
@@ -264,7 +270,7 @@ async def daily_player_statistics(
         if cached_stats is not None:
             return {
                 "player_tag": player_tag,
-                "game_modes": game_modes,
+                "game_modes": validated_game_modes,
                 "daily_statistics": cached_stats,
             }
 
@@ -273,7 +279,7 @@ async def daily_player_statistics(
             player_tag,
             req.start_date,
             req.end_date,
-            game_modes,
+            validated_game_modes,
             req.timezone,
         )
 
@@ -287,7 +293,7 @@ async def daily_player_statistics(
         )
         return {
             "player_tag": player_tag,
-            "game_modes": game_modes,
+            "game_modes": validated_game_modes,
             "daily_statistics": stats,
         }
 

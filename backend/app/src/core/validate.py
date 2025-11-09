@@ -1,6 +1,9 @@
 from datetime import date, datetime, timedelta, time
 from zoneinfo import ZoneInfo
 from models.schema import BetweenRequest, BattlesRequest
+from core.deps import RedConn
+from redis_service import get_redis_json, build_redis_key
+from typing import Optional, List
 from .settings import settings
 
 
@@ -142,3 +145,61 @@ def validate_battles_request(request: BattlesRequest):
     # Check if end is on or after tomorrow
     if request.before >= tomorrow:
         raise ParamsRequestError("End date can not be after today")
+
+
+async def validate_game_modes(redis_conn: RedConn, game_modes: Optional[List[str]]):
+    """Validate and filter game modes against cached available game modes.
+
+    This async function validates a list of game modes by checking them against
+    the cached list of all available game modes stored in Redis. It performs
+    deduplication, filtering of invalid modes, and optimization for requests
+    that include all available game modes.
+
+    Args:
+        redis_conn (RedConn): Active Redis connection instance for accessing cached data.
+        game_modes (Optional[List[str]]): List of game mode names to validate.
+            Can be None or empty list.
+
+    Returns:
+        Optional[List[str]]: Validated and filtered list of game modes with the following behavior:
+            - Returns None/empty list unchanged if input is None/empty
+            - Returns original list unchanged if Redis cache is empty (no validation possible)
+            - Returns deduplicated list of valid game modes that exist in cache
+            - Returns empty list if all available game modes are requested (optimization)
+
+    """
+    # If there game modes is empty return unchanged
+    if not game_modes:
+        return game_modes
+
+    key = await build_redis_key(
+        conn=redis_conn, service="crApi", resource="allGameModes"
+    )
+    all_game_modes = await get_redis_json(redis_conn, key)
+
+    # If there are no game modes in the redis, don't validate the given game_modes
+    # and also simply return them unchanged
+    if not all_game_modes:
+        return game_modes
+
+    modes_set = set(all_game_modes.keys())
+
+    # Remove any game mode from the given ones that isn't found in the cache and therefore
+    # also not in the mongo --> reduces processing work AND eliminates the risk of query injection
+    # via game modes IF the game mode cache is not empty upon validating
+    seen = set()
+    filtered = []
+    for m in game_modes:
+        if m in modes_set and m not in seen:
+            filtered.append(m)
+            seen.add(m)
+
+    # If the length of the unique given game modes is equal to the length of all game modes
+    # then the request is equal to requesting all game modes
+    if len(filtered) == len(modes_set):
+        # The mongo filtering uses all game modes upon no game modes selected, so return
+        # empty game mode list to save resources, avoiding any game mode filtering
+        return []
+
+    # Return filtered game mode list
+    return filtered

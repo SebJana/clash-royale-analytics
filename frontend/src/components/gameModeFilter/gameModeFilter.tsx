@@ -78,14 +78,14 @@ export function GameModeFilter({
         <span className="game-mode-filter-component-title">Game Modes</span>
         <ChevronUp
           className={`game-mode-filter-component-toggle ${
-            !isExpanded ? "collapsed" : ""
+            isExpanded ? "" : "collapsed"
           }`}
         />
       </button>
       <div
         id="game-mode-filter-grid"
         className={`game-mode-filter-component-grid ${
-          !isExpanded ? "hidden" : ""
+          isExpanded ? "" : "hidden"
         }`}
       >
         {options.map(({ internals, display }) => (
