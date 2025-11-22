@@ -11,6 +11,7 @@ import {
 import { isValidDateRange } from "../../utils/datetime";
 import "./filterContainer.css";
 
+// TODO add visualSelectedGameModes here to selectedGameModes
 export type FilterState = {
   startDate: string;
   endDate: string;

@@ -87,7 +87,14 @@ function HomePage() {
   return (
     <div className="home-page">
       <div className="home-container">
-        <h1 className="home-title">Clash Royale Analytics</h1>
+        <div className="home-header">
+          <img
+            src="/crown.png"
+            alt="Clash Royale Crown"
+            className="home-icon"
+          />
+          <h1 className="home-title">Clash Royale Analytics</h1>
+        </div>
         <div className="player-selection">
           <div className="search-section">
             <h2 className="section-header">View Players</h2>

@@ -18,9 +18,8 @@ export function validatePlayerTagSyntax(playerTag: string): boolean {
 
   const core = tag.slice(1); // Part without the leading '#'
 
-  // TODO add sanitization to prevent injection attacks
-
   // Every char must be in the possible alphabet
+  // Also minimizes injection risk, because special characters won't pass the check
   for (const ch of core) {
     if (!ALPHABET.has(ch)) {
       return false;
