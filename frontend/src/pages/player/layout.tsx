@@ -32,9 +32,12 @@ export default function PlayerLayout() {
     console.log(playerError);
 
     // Check if it's a 403 error (player not found/isn't being tracked)
+    // Both by the api backend (403) OR the frontend tag syntax check ("Invalid player tag")
     const errorMessage = playerError?.message || String(playerError);
     const is403Error =
-      errorMessage.includes("status code 403") || errorMessage.includes("403");
+      errorMessage.includes("status code 403") ||
+      errorMessage.includes("403") ||
+      errorMessage.includes("Invalid player tag");
 
     const displayMessage = is403Error
       ? "We searched everywhere, but couldn't find the player you were looking for in our system"
