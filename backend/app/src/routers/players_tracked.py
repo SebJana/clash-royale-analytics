@@ -18,6 +18,17 @@ async def list_tracked_players(mongo_conn: DbConn):
         )
 
 
+@router.get("/count")
+async def fetch_tracked_player_count(mongo_conn: DbConn):
+    try:
+        players = await get_tracked_players(mongo_conn)
+        return {"activePlayerCount": len(players)}
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch the count of all tracked players"
+        )
+
+
 @router.post("/{player_tag}")
 async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi):
     try:
@@ -48,6 +59,7 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
         )
 
 
+# TODO add auth method if this route should be used
 @router.delete("/{player_tag}")
 async def remove_tracked_player(
     mongo_conn: DbConn, player_tag: str = Depends(require_tracked_player)
