@@ -2,7 +2,12 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from core.deps import DbConn, CrApi, require_tracked_player
 from clash_royale_api import ClashRoyaleMaintenanceError
-from mongo import get_tracked_players, insert_tracked_player, deactivate_tracked_player
+from mongo import (
+    get_tracked_players,
+    insert_tracked_player,
+    deactivate_tracked_player,
+    get_players_count,
+)
 
 router = APIRouter(prefix="/players", tags=["Tracked Players"])
 
@@ -21,8 +26,8 @@ async def list_tracked_players(mongo_conn: DbConn):
 @router.get("/count")
 async def fetch_tracked_player_count(mongo_conn: DbConn):
     try:
-        players = await get_tracked_players(mongo_conn)
-        return {"activePlayerCount": len(players)}
+        players_count = await get_players_count(mongo_conn)
+        return {"activePlayerCount": players_count}
     except Exception:
         raise HTTPException(
             status_code=500, detail="Failed to fetch the count of all tracked players"

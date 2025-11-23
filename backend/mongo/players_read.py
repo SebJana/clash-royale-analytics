@@ -105,3 +105,26 @@ async def get_tracked_players(conn: MongoConn):
     except Exception as e:
         print(f"[DB] [ERROR] trying to fetch the tracked players: {e}")
         raise
+
+
+async def get_players_count(conn: MongoConn):
+    """
+    Gets the total count of documents in the players collection.
+
+    Args:
+        conn (MongoConn): Active connection to the mongo database
+
+    Returns:
+        int: Number of documents in the collection
+
+    Raises:
+        Exception: If query fails
+    """
+
+    try:
+        await ensure_connected(conn)
+        count = await conn.db.players.count_documents({})
+        return count
+    except Exception as e:
+        print(f"[DB] [ERROR] fetching document count: {e}")
+        raise

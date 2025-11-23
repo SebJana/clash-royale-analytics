@@ -13,6 +13,7 @@ from .players_read import (
     get_tracked_player_tags,
     get_tracked_players,
     check_player_tracked,
+    get_players_count,
 )
 from .players_write import (
     insert_tracked_player,
@@ -40,6 +41,7 @@ __all__ = [
     "get_tracked_player_tags",
     "get_tracked_players",
     "check_player_tracked",
+    "get_players_count",
     ## write
     "insert_tracked_player",
     "set_player_name",
