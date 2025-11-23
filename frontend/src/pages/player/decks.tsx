@@ -5,7 +5,7 @@ import { DeckComponent } from "../../components/deck/deck";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
-import { round } from "../../utils/round";
+import { round } from "../../utils/number";
 import { pluralize } from "../../utils/plural";
 import { getCurrentFilterState } from "../../utils/filter";
 import { datetimeToLocale } from "../../utils/datetime";

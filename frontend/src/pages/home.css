@@ -54,6 +54,14 @@
   line-height: 1.2;
 }
 
+.home-stat-cards-container {
+  display: flex;
+  gap: var(--spacing-lg);
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .player-selection {
   margin-top: var(--spacing-2xl);
 }

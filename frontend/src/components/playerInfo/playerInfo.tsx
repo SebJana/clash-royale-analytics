@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronUp } from "lucide-react";
 import type { Player } from "../../types/player";
-import { round } from "../../utils/round";
+import { round } from "../../utils/number";
 import { StatCard } from "../statCard/statCard";
 import "./playerInfo.css";
 

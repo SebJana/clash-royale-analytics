@@ -2,15 +2,21 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
   fetchAllTrackedPlayers,
+  fetchAllTrackedPlayersCount,
   trackPlayer,
 } from "../services/api/trackedPlayers";
+import { fetchTotalBattleCount } from "../services/api/battles";
+import { pluralize } from "../utils/plural";
+import { formatNumberWithSuffix } from "../utils/number";
 import { validatePlayerTagSyntax } from "../utils/playerTag";
 import { useFetch } from "../hooks/useFetch";
-import type { Players } from "../types/players";
+import type { Players, PlayerCount } from "../types/players";
+import type { TotalBattleCount } from "../types/battles";
 import { PlayerSearch } from "../components/playerSearch/playerSearch";
 import Lottie from "lottie-react";
 import construction from "../assets/animations/construction.json";
 import CircularProgress from "@mui/material/CircularProgress";
+import { StatCard } from "../components/statCard/statCard";
 import "./home.css";
 
 function HomePage() {
@@ -20,6 +26,18 @@ function HomePage() {
     error: playersError,
   } = useFetch<Players>(fetchAllTrackedPlayers, []);
 
+  const {
+    data: playerCount,
+    loading: playerCountLoading,
+    error: playerCountError,
+  } = useFetch<PlayerCount>(fetchAllTrackedPlayersCount, []);
+
+  const {
+    data: battleCount,
+    loading: battleCountLoading,
+    error: battleCountError,
+  } = useFetch<TotalBattleCount>(fetchTotalBattleCount, []);
+
   const [selectedPlayerTag, setSelectedPlayerTag] = useState("");
   const [addedPlayerTag, setAddedPlayerTag] = useState("");
   const [trackingPlayer, setTrackingPlayer] = useState(false);
@@ -27,9 +45,9 @@ function HomePage() {
   const [trackingSuccess, setTrackingSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  if (playersLoading)
+  if (playersLoading || playerCountLoading || battleCountLoading)
     return <CircularProgress className="home-loading-spinner" />;
-  if (playersError)
+  if (playersError || playerCountError || battleCountError)
     return (
       <>
         <Lottie
@@ -110,6 +128,26 @@ function HomePage() {
             className="home-icon"
           />
           <h1 className="home-title">Clash Royale Analytics</h1>
+          <div className="home-stat-cards-container">
+            <StatCard
+              value={formatNumberWithSuffix(
+                playerCount?.activePlayerCount ?? 0
+              )}
+              label={`Tracked ${pluralize(
+                playerCount?.activePlayerCount ?? 0,
+                "Player",
+                "Players"
+              )}`}
+            />
+            <StatCard
+              value={formatNumberWithSuffix(battleCount?.totalBattleCount ?? 0)}
+              label={`${pluralize(
+                playerCount?.activePlayerCount ?? 0,
+                "Battle",
+                "Battles"
+              )} on record`}
+            />
+          </div>
         </div>
         <div className="player-selection">
           <div className="search-section">

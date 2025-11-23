@@ -1,9 +1,14 @@
 import api from "./axios";
 import { validatePlayerTagSyntax } from "../../utils/playerTag";
-import type { Players } from "../../types/players";
+import type { Players, PlayerCount } from "../../types/players";
 
 export async function fetchAllTrackedPlayers(): Promise<Players> {
   const response = await api.get<Players>("/players");
+  return response.data;
+}
+
+export async function fetchAllTrackedPlayersCount(): Promise<PlayerCount> {
+  const response = await api.get<PlayerCount>("/players/count");
   return response.data;
 }
 
