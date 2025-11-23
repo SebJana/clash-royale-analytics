@@ -24,6 +24,7 @@ function HomePage() {
   const [trackingSuccess, setTrackingSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  // TODO add loading circle and proper error page
   if (playersLoading) return <p>Loading…</p>;
   if (playersError) return <p>Error loading</p>;
 
