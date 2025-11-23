@@ -8,6 +8,9 @@ import { validatePlayerTagSyntax } from "../utils/playerTag";
 import { useFetch } from "../hooks/useFetch";
 import type { Players } from "../types/players";
 import { PlayerSearch } from "../components/playerSearch/playerSearch";
+import Lottie from "lottie-react";
+import construction from "../assets/animations/construction.json";
+import CircularProgress from "@mui/material/CircularProgress";
 import "./home.css";
 
 function HomePage() {
@@ -24,9 +27,21 @@ function HomePage() {
   const [trackingSuccess, setTrackingSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // TODO add loading circle and proper error page
-  if (playersLoading) return <p>Loading…</p>;
-  if (playersError) return <p>Error loading</p>;
+  if (playersLoading)
+    return <CircularProgress className="home-loading-spinner" />;
+  if (playersError)
+    return (
+      <>
+        <Lottie
+          animationData={construction}
+          loop={true}
+          className="lottie-animation"
+        />
+        <h2 className="home-error-message">
+          We're having trouble right now. Please try again shortly.
+        </h2>
+      </>
+    );
 
   const playerList = players
     ? Object.entries(players.activePlayers).map(([tag, name]) => ({

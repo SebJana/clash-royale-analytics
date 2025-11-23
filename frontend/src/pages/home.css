@@ -28,6 +28,19 @@
   transition: transform var(--transition-slow);
 }
 
+.home-loading-spinner .MuiCircularProgress-circle {
+  stroke: var(--color-accent);
+}
+
+.home-error-message {
+  max-width: 750px;
+  margin: var(--spacing-lg) auto var(--spacing-lg) auto;
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+  font-size: 1.5rem;
+}
+
 .home-icon:hover {
   transform: scale(1.05);
 }

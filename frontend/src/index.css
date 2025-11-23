@@ -158,3 +158,11 @@ button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+
+/* Define the default size and position of the used lottie animations across all pages */
+.lottie-animation {
+  width: min(600px, 70%);
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}

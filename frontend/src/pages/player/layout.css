@@ -82,13 +82,6 @@
   height: 22px;
 }
 
-.lottie-animation {
-  width: min(600px, 70%);
-  height: auto;
-  display: block;
-  margin: 0 auto;
-}
-
 .layout-error-container {
   display: flex;
   flex-direction: column;
