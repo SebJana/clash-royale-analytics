@@ -9,32 +9,50 @@ const DEFAULT_DAY_RANGE = 7;
 /**
  * Saves filter state to localStorage.
  * Serializes the FilterState object to JSON and stores it under the "filterState" key.
+ * Also saves the current timestamp of the last filter save to local storage under the "filterStateLastUpdated" key.
  *
  * @param filters - The filter state object to persist
  */
 export function setFilterStateToLocalStorage(filters: FilterState) {
-  // TODO add TTL/maxAge till filter resets to default values
   localStorage.setItem("filterState", JSON.stringify(filters));
+  localStorage.setItem("filterStateLastUpdated", JSON.stringify(Date.now()));
 }
 
 /**
  * Retrieves and parses filter state from localStorage.
  * Attempts to parse the stored JSON data back into a FilterState object.
  *
- * @returns The parsed FilterState object if found and valid, null otherwise
+ * @returns The parsed FilterState object if found and valid and not older than the defined TTL, null otherwise
  * @throws Logs an error to console if JSON parsing fails, but returns null instead of throwing
  */
 export function getFilterStateFromLocalStorage(): FilterState | null {
+  // TTL of the filter state in seconds (7 days)
+  const FILTER_TTL_SECONDS = 7 * 24 * 60 * 60;
+
   try {
-    const filters = localStorage.getItem("filterState");
-    if (filters) {
-      return JSON.parse(filters);
+    // Read raw filter state from localStorage
+    const rawFilters = localStorage.getItem("filterState");
+    if (!rawFilters) return null;
+
+    // Read last updated timestamp
+    const lastUpdated = Number(localStorage.getItem("filterStateLastUpdated"));
+    if (!lastUpdated) return null;
+
+    // Compute how many seconds have passed since last update
+    const now = Date.now();
+    const diffSeconds = (now - lastUpdated) / 1000;
+
+    // If within the TTL, return the parsed filter state
+    if (diffSeconds <= FILTER_TTL_SECONDS) {
+      return JSON.parse(rawFilters) as FilterState;
     }
+
+    // Otherwise treat as expired
+    return null;
   } catch (error) {
     console.error("Failed to parse filter state from localStorage:", error);
     return null;
   }
-  return null;
 }
 
 /**
@@ -68,7 +86,7 @@ function extractFirstNumber(str: string): number | null {
     return null;
   }
 
-  const numberValue = parseInt(numberMatch[0], 10);
+  const numberValue = Number.parseInt(numberMatch[0], 10);
   return numberValue;
 }
 
