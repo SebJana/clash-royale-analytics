@@ -4,7 +4,6 @@ from rapidfuzz import fuzz
 from core.deps import DbConn, CrApi, require_tracked_player, extract_admin_token
 from core.jwt import create_admin_token, validate_admin_token
 from clash_royale_api import ClashRoyaleMaintenanceError
-from models.schema import SecurityQuestionsRequest
 from mongo import (
     get_tracked_players,
     insert_tracked_player,
@@ -41,15 +40,13 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
 # NOTE: this is in no way, shape or form a secure protection for the admin access
 # mostly implemented as a fun way to have SOME sort of access denial
 # For a more secure protection one of the answers could be an actual password tho, instead of a card
-@router.post("/admin_token")
-async def get_admin_token(answers: SecurityQuestionsRequest):
-    q1 = fuzz.ratio(
-        settings.MOST_ANNOYING_CARD.lower(), answers.most_annoying_card.lower()
-    )
-    q2 = fuzz.ratio(
-        settings.MOST_SKILLFUL_CARD.lower(), answers.most_skillful_card.lower()
-    )
-    q3 = fuzz.ratio(settings.MOST_MOUSEY_CARD.lower(), answers.most_mousey_card.lower())
+@router.get("/admin_token")
+async def get_admin_token(
+    most_annoying_card: str, most_skillful_card: str, most_mousey_card: str
+):
+    q1 = fuzz.ratio(settings.MOST_ANNOYING_CARD.lower(), most_annoying_card.lower())
+    q2 = fuzz.ratio(settings.MOST_SKILLFUL_CARD.lower(), most_skillful_card.lower())
+    q3 = fuzz.ratio(settings.MOST_MOUSEY_CARD.lower(), most_mousey_card.lower())
 
     # Allow slight typos by using fuzzy matching
     if min(q1, q2, q3) >= settings.SECURITY_FUZZY_THRESHOLD:

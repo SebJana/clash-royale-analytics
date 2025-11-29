@@ -44,5 +44,5 @@ def validate_admin_token(token: str):
     """
     try:
         return jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
-    except JWTError as e:
+    except JWTError:
         return None
