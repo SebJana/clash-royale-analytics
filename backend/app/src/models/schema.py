@@ -22,3 +22,16 @@ class BattlesRequest(BaseModel):
         ...,
         description=f"Max battles to fetch ({settings.MIN_BATTLES}–{settings.MAX_BATTLES})",
     )
+
+
+class SecurityQuestionsRequest(BaseModel):
+    most_annoying_card: str = Field(
+        ..., description="What is the single most annoying card in Clash Royale?"
+    )
+    most_skillful_card: str = Field(
+        ..., description="What is the single most skillful card in Clash Royale?"
+    )
+    most_mousey_card: str = Field(
+        ...,
+        description="What is the most 'mausig (english: sweetie)' card in Clash Royale?",
+    )

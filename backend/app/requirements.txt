@@ -4,3 +4,5 @@ motor
 httpx
 python-dotenv
 redis
+python-jose
+rapidfuzz

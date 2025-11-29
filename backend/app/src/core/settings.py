@@ -15,6 +15,17 @@ class Settings:
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
 
+    # JWT Secret for Admin tokens
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "")
+
+    # Security Question Answers
+    MOST_ANNOYING_CARD: str = os.getenv("MOST_ANNOYING_CARD", "")
+    MOST_SKILLFUL_CARD: str = os.getenv("MOST_SKILLFUL_CARD", "")
+    MOST_MOUSEY_CARD: str = os.getenv("MOST_MOUSEY_CARD", "")
+
+    # How close does the given security question answer need to be to the actual one from .env?
+    SECURITY_FUZZY_THRESHOLD: int = 95  # Keep in high 90s to let cards with typos pass
+
     # Application Configuration
     INIT_RETRIES: int = 3
     INIT_RETRY_DELAY: float = 3

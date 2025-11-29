@@ -1,4 +1,4 @@
-from fastapi import Depends, Request, HTTPException
+from fastapi import Depends, Request, HTTPException, Query
 from typing import Annotated
 
 from redis_service import RedisConn
@@ -67,3 +67,22 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
         )
 
     return player_tag  # When its a valid and tracked player, return the tag
+
+
+# Dependency that extracts admin token from query parameters
+def extract_admin_token(
+    admin_token: str = Query(..., description="Admin JWT token for authentication")
+):
+    """
+    FastAPI dependency that extracts admin token from query parameters.
+
+    Args:
+        admin_token (str): JWT token from query parameter for admin authentication.
+
+    Returns:
+        str: The admin token when provided.
+
+    Raises:
+        HTTPException 422 if the admin_token query parameter is missing.
+    """
+    return admin_token
