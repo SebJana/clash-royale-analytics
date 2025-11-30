@@ -6,3 +6,4 @@ python-dotenv
 redis
 python-jose
 rapidfuzz
+captcha

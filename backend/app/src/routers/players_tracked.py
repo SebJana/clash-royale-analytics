@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import Response
 from rapidfuzz import fuzz
 from datetime import datetime
 from enum import StrEnum
 from zoneinfo import ZoneInfo
-
+import uuid
 
 from core.deps import (
     DbConn,
@@ -12,11 +13,13 @@ from core.deps import (
     require_tracked_player,
     extract_security_token,
     extract_wordle_token,
+    extract_captcha_token,
 )
 from redis_service import get_redis_json, set_redis_json, build_redis_key
 from core.jwt import create_access_token, validate_access_token
 from core.wordle import get_todays_wordle
 from core.validate import valid_timezone
+from core.generate_captcha import generate_captcha_string, generate_captcha_image
 from clash_royale_api import ClashRoyaleMaintenanceError
 from mongo import (
     get_tracked_players,
@@ -51,10 +54,90 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
         )
 
 
+# TODO Move token and auth logic out of tracked players
+
+
 # Types of tokens the api can give out and validate
 class AvailableTokenTypes(StrEnum):
+    CAPTCHA = "captcha"
     SECURITY = "security"
     WORDLE = "wordle"
+
+
+@router.get("/captcha_id")
+async def get_captcha_id(redis_conn: RedConn):
+    text = generate_captcha_string(settings.CAPTCHA_CHAR_LENGTH)
+    captcha_id = str(uuid.uuid4())
+
+    key = await build_redis_key(
+        conn=redis_conn,
+        service="crApi",
+        resource="captchaText",
+        version_ahead=True,
+        params={"captcha_id": captcha_id},
+    )
+
+    await set_redis_json(
+        redis_conn, key, value=text, ttl=settings.CACHE_TTL_CAPTCHA_CHALLENGE
+    )
+
+    return {"captcha_id": captcha_id}
+
+
+async def get_captcha_text_from_cache(redis_conn, captcha_id: str):
+    # Check the redis cache for both the current and ahead version
+    key = await build_redis_key(
+        conn=redis_conn,
+        service="crApi",
+        resource="captchaText",
+        params={"captcha_id": captcha_id},
+    )
+
+    key_ahead = await build_redis_key(
+        conn=redis_conn,
+        service="crApi",
+        resource="captchaText",
+        version_ahead=True,
+        params={"captcha_id": captcha_id},
+    )
+
+    text = await get_redis_json(redis_conn, key_ahead) or await get_redis_json(
+        redis_conn, key
+    )
+
+    return text
+
+
+@router.get("/captcha_image/{captcha_id}")
+async def get_captcha_image(redis_conn: RedConn, captcha_id: str):
+
+    # Check the redis cache for both the current and ahead version
+    text = await get_captcha_text_from_cache(redis_conn, captcha_id=captcha_id)
+
+    image = generate_captcha_image(text)
+
+    # Return the image with the session ID in headers
+    return Response(
+        content=image,
+        media_type="image/png",
+    )
+
+
+@router.get("/captcha_token/{captcha_id}")
+async def get_captcha_token(redis_conn: RedConn, captcha_id: str, answer: str):
+
+    # Check the redis cache for both the current and ahead version
+    text = await get_captcha_text_from_cache(redis_conn, captcha_id=captcha_id)
+
+    # Check if stored and given answer match
+    if answer == text:
+        return {
+            "captcha_token": create_access_token(type=AvailableTokenTypes.CAPTCHA.value)
+        }
+
+    raise HTTPException(
+        status_code=403, detail="No captcha token generated, incorrect answer given."
+    )
 
 
 # NOTE: this is in no way, shape or form a secure protection for the admin access
@@ -169,15 +252,23 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
 @router.delete("/{player_tag}")
 async def remove_tracked_player(
     mongo_conn: DbConn,
+    captcha_token: str = Depends(extract_captcha_token),
     security_token: str = Depends(extract_security_token),
     wordle_token: str = Depends(extract_wordle_token),
     player_tag: str = Depends(require_tracked_player),
 ):
     try:
-        # Require both security questions AND wordle tokens for admin operations
-        if not validate_access_token(
-            security_token, AvailableTokenTypes.SECURITY.value
-        ) or not validate_access_token(wordle_token, AvailableTokenTypes.WORDLE.value):
+        # TODO rework to admin token, that user gets with these three
+        # Require captcha token AND security token AND wordle tokens for admin operations
+        if (
+            not validate_access_token(
+                security_token, AvailableTokenTypes.SECURITY.value
+            )
+            or not validate_access_token(wordle_token, AvailableTokenTypes.WORDLE.value)
+            or not validate_access_token(
+                captcha_token, AvailableTokenTypes.CAPTCHA.value
+            )
+        ):
             raise HTTPException(
                 status_code=403,
                 detail="No admin access granted to un-track players",

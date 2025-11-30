@@ -26,6 +26,11 @@ class Settings:
     # How close does the given security question answer need to be to the actual one from .env?
     SECURITY_FUZZY_THRESHOLD: int = 95  # Keep in high 90s to let cards with typos pass
 
+    CAPTCHA_CHAR_LENGTH: int = 6  # Adjust how difficult the captcha is (default: 4-6)
+    CAPTCHA_DIGIT_PERCENTAGE: float = (
+        0.33  # Adjust what share of the captcha is digits (range: 0-1)
+    )
+
     # Application Configuration
     INIT_RETRIES: int = 3
     INIT_RETRY_DELAY: float = 3
@@ -56,6 +61,7 @@ class Settings:
     )  # 1 minutes (short cache time, query params likely to change often with before timestamp. Also no real calculation effort needed for retrieving last battles)
     CACHE_TTL_DECK_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_CARD_STATS: int = 10 * 60  # 10 minutes
+    CACHE_TTL_CAPTCHA_CHALLENGE: int = 5 * 60  # 5 minutes
     CACHE_TTL_WORDLE_ANSWER: int = 6 * 60 * 60  # 6 hours
 
 

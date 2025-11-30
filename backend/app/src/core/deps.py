@@ -69,10 +69,29 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
     return player_tag  # When its a valid and tracked player, return the tag
 
 
+# Dependency that extracts captcha token from query parameters
+def extract_captcha_token(
+    captcha_token: str = Query(..., description="Captcha JWT token for authentication")
+):
+    """
+    FastAPI dependency that extracts captcha token from query parameters.
+
+    Args:
+        captcha_token (str): JWT token from query parameter for authentication.
+
+    Returns:
+        str: The captcha token when provided.
+
+    Raises:
+        HTTPException 422 if the captcha_token query parameter is missing.
+    """
+    return captcha_token
+
+
 # Dependency that extracts security token from query parameters
 def extract_security_token(
     security_token: str = Query(
-        ..., description="Securtiy JWT token for authentication"
+        ..., description="Security JWT token for authentication"
     )
 ):
     """
