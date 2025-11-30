@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from rapidfuzz import fuzz
-from datetime import date, datetime
+from datetime import datetime
+from enum import StrEnum
 from zoneinfo import ZoneInfo
 
 
@@ -50,6 +51,12 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
         )
 
 
+# Types of tokens the api can give out and validate
+class AvailableTokenTypes(StrEnum):
+    SECURITY = "security"
+    WORDLE = "wordle"
+
+
 # NOTE: this is in no way, shape or form a secure protection for the admin access
 # mostly implemented as a fun way to have SOME sort of access denial
 # For a more secure protection one of the answers could be an actual password tho, instead of a card
@@ -65,7 +72,11 @@ async def get_security_token(
     # Allow slight typos by using fuzzy matching
     if min(q1, q2, q3) >= settings.SECURITY_FUZZY_THRESHOLD:
         # Generate and return a valid token upon matching answers
-        return {"security_token": create_access_token(type="security")}
+        return {
+            "security_token": create_access_token(
+                type=AvailableTokenTypes.SECURITY.value
+            )
+        }
 
     raise HTTPException(
         status_code=403, detail="No security token generated, incorrect answers given."
@@ -115,7 +126,9 @@ async def get_wordle_token(wordle_guess: str, timezone: str, redis_conn: RedConn
 
     # If the guess and answer are the matching, generate the wordle token
     if todays_wordle.lower() == wordle_guess.lower():
-        return {"wordle_token": create_access_token(type="wordle")}
+        return {
+            "wordle_token": create_access_token(type=AvailableTokenTypes.WORDLE.value)
+        }
 
     raise HTTPException(
         status_code=403,
@@ -163,8 +176,8 @@ async def remove_tracked_player(
     try:
         # Require both security questions AND wordle tokens for admin operations
         if not validate_access_token(
-            security_token, "security"
-        ) or not validate_access_token(wordle_token, "wordle"):
+            security_token, AvailableTokenTypes.SECURITY.value
+        ) or not validate_access_token(wordle_token, AvailableTokenTypes.WORDLE.value):
             raise HTTPException(
                 status_code=403,
                 detail="No admin access granted to un-track players",
@@ -173,6 +186,8 @@ async def remove_tracked_player(
         affected_player_count = await deactivate_tracked_player(mongo_conn, player_tag)
 
         # Database operation returns 0 if no matching records were modified
+        # Tracked player is verified with every given player tag, but handle async untrack issues
+        # with this catch here
         if affected_player_count == 0:
             raise HTTPException(
                 status_code=404,
