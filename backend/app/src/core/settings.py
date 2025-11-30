@@ -56,6 +56,7 @@ class Settings:
     )  # 1 minutes (short cache time, query params likely to change often with before timestamp. Also no real calculation effort needed for retrieving last battles)
     CACHE_TTL_DECK_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_CARD_STATS: int = 10 * 60  # 10 minutes
+    CACHE_TTL_WORDLE_ANSWER: int = 6 * 60 * 60  # 6 hours
 
 
 # Global settings instance

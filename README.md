@@ -25,6 +25,14 @@ BACKUP_RETENTION_DAYS=7
 # Redis credentials
 REDIS_PASSWORD=YOUR_SECURE_REDIS_PASSWORD
 
+# JWT Secret for Admin Authentication
+JWT_SECRET=YOUR_SECURE_JWT_SECRET_KEY
+
+# Security Question Answers for Admin Access
+MOST_ANNOYING_CARD="Card1"
+MOST_SKILLFUL_CARD="Card2"
+MOST_MOUSEY_CARD="Card3"
+
 # Clash Royale API Keys
 DATA_SCRAPER_API_KEY = ey31asd23...
 APP_API_KEY = ey41eas...
@@ -52,6 +60,18 @@ APP_API_KEY = ey41eas...
 #### Redis credentials
 
 - `REDIS_PASSWORD`: Secure password for the redis database
+
+#### JWT Authentication
+
+- `JWT_SECRET`: Secret key used for signing JWT tokens for admin authentication. Should be a long, random string for security.
+
+#### Security Questions
+
+- `MOST_ANNOYING_CARD`: Answer to the first security question for admin access (Most annoying card in Clash Royale)
+- `MOST_SKILLFUL_CARD`: Answer to the second security question for admin access (Most skillful card in Clash Royale)
+- `MOST_MOUSEY_CARD`: Answer to the third security question for admin access (Most 'mousey/cutie/sweet' card in Clash Royale)
+
+**Note**: These security questions are used as a fun authentication method for admin operations like un-tracking players. They don't provide any real security, unless an actual non-guessable string is chosen for any of those answers.
 
 #### Clash Royale API Keys
 

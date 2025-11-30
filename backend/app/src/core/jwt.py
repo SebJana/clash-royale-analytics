@@ -4,14 +4,15 @@ import uuid
 from .settings import settings
 
 
-def create_admin_token(expires_minutes: int = 5):
+def create_access_token(type: str, expires_minutes: int = 5):
     """
     Create a JWT token with admin scope and expiration time.
 
-    This function generates a JSON Web Token (JWT) that grants admin privileges
+    This function generates a JSON Web Token (JWT) that grants privileges
     for the specified duration. The token includes an expiration time and admin scope.
 
     Args:
+        type (str): The type/role the token should be and enable.
         expires_minutes (int, optional): Token expiration time in minutes.
             Defaults to 5 minutes for security purposes.
 
@@ -20,29 +21,34 @@ def create_admin_token(expires_minutes: int = 5):
     """
     expire = datetime.now() + timedelta(minutes=expires_minutes)
 
-    payload = {"sub": "admin", "jti": str(uuid.uuid4()), "exp": expire}
+    payload = {
+        "sub": "admin",
+        "type": type,
+        "jti": str(uuid.uuid4()),
+        "exp": expire,
+    }
 
     return jwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
 
 
-def validate_admin_token(token: str):
+def validate_access_token(token: str, type: str):
     """
-    Validate and decode a JWT admin token.
+    Validate and decode a JWT access token.
 
     This function attempts to decode and validate a JWT token to ensure it's
-    valid, not expired, and properly signed. Used for authenticating admin requests.
+    valid, not expired, and properly signed. Returns True if the token is valid
+    and has the given type.
 
     Args:
+        type (str): The type/role the token should be.
         token (str): The JWT token string to validate and decode.
 
     Returns:
-        dict or None:
-            - If valid: Dictionary containing the decoded token payload with keys:
-                - exp: Expiration timestamp
-                - scope: Token scope (should be "admin")
-            - If invalid: None (token is malformed, expired, or improperly signed)
+        bool: True if the token is valid and has the specified type,
+              False otherwise (token is malformed, expired, or improperly signed).
     """
     try:
-        return jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+        return payload.get("type") == type
     except JWTError:
-        return None
+        return False

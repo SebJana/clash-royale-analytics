@@ -69,20 +69,41 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
     return player_tag  # When its a valid and tracked player, return the tag
 
 
-# Dependency that extracts admin token from query parameters
-def extract_admin_token(
-    admin_token: str = Query(..., description="Admin JWT token for authentication")
+# Dependency that extracts security token from query parameters
+def extract_security_token(
+    security_token: str = Query(
+        ..., description="Securtiy JWT token for authentication"
+    )
 ):
     """
-    FastAPI dependency that extracts admin token from query parameters.
+    FastAPI dependency that extracts security token from query parameters.
 
     Args:
-        admin_token (str): JWT token from query parameter for admin authentication.
+        security_token (str): JWT token from query parameter for authentication.
 
     Returns:
-        str: The admin token when provided.
+        str: The security token when provided.
 
     Raises:
-        HTTPException 422 if the admin_token query parameter is missing.
+        HTTPException 422 if the security_token query parameter is missing.
     """
-    return admin_token
+    return security_token
+
+
+# Dependency that extracts wordle token from query parameters
+def extract_wordle_token(
+    wordle_token: str = Query(..., description="Wordle JWT token for authentication")
+):
+    """wordle
+    FastAPI dependency that extracts wordle token from query parameters.
+
+    Args:
+        wordle_token (str): JWT token from query parameter for authentication.
+
+    Returns:
+        str: The wordle token when provided.
+
+    Raises:
+        HTTPException 422 if the wordle_token query parameter is missing.
+    """
+    return wordle_token

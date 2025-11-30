@@ -45,6 +45,26 @@ def get_clash_royale_release_date() -> date:
     return str_to_date("2016-03-02")
 
 
+def valid_timezone(timezone: str):
+    """ "
+    Checks if a given timezone exists and is valid.
+
+    Args:
+        timezone (str): timezone
+
+    Return:
+        bool: True if it is valid, false otherwise.
+
+    """
+
+    # Check if timezone exists
+    try:
+        _ = ZoneInfo(timezone)
+        return True
+    except Exception:
+        return False
+
+
 def validate_between_request(request: BetweenRequest):
     """Validate a BetweenRequest for date range and timezone constraints.
 
@@ -86,9 +106,7 @@ def validate_between_request(request: BetweenRequest):
         )
 
     # Check if timezone exists
-    try:
-        _ = ZoneInfo(request.timezone)
-    except Exception:
+    if not valid_timezone(request.timezone):
         raise ParamsRequestError(f"Timezone {request.timezone} does not exist")
 
 
