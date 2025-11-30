@@ -67,11 +67,11 @@ APP_API_KEY = ey41eas...
 
 #### Security Questions
 
-- `MOST_ANNOYING_CARD`: Answer to the first security question for admin access (Most annoying card in Clash Royale)
-- `MOST_SKILLFUL_CARD`: Answer to the second security question for admin access (Most skillful card in Clash Royale)
-- `MOST_MOUSEY_CARD`: Answer to the third security question for admin access (Most 'mousey/cutie/sweet' card in Clash Royale)
+- `MOST_ANNOYING_CARD`: Answer to the first security question for admin access (Most annoying card in Clash Royale?)
+- `MOST_SKILLFUL_CARD`: Answer to the second security question for admin access (Most skillful card in Clash Royale?)
+- `MOST_MOUSEY_CARD`: Answer to the third security question for admin access (Most 'mousey/cutie/sweet' card in Clash Royale?)
 
-**Note**: These security questions are used as a fun authentication method for admin operations like un-tracking players. They don't provide any real security, unless an actual non-guessable string is chosen for any of those answers.
+**Note**: These security questions are used as a fun authentication method for admin operations like un-tracking players. They don't provide any real security, unless an actual non-guessable string is chosen for any of those answers, instead of a Clash Royale Card.
 
 #### Clash Royale API Keys
 
@@ -121,7 +121,7 @@ Start all required docker services for the backend (api, mongo, redis)
 
    The frontend will be available at `http://localhost:5173`
 
-**Note**: The Vite development server is configured to proxy `/api` requests to `http://localhost:8000`, so both services need to be running for local development.
+**Note**: The Vite development server is configured to proxy `/api` requests to `http://localhost:8000`, so all services (backend, mongo and redis) need to be running for local development.
 
 ### 3. Restoring Data
 
