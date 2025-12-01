@@ -4,6 +4,9 @@ import { CardComponent } from "../card/card";
 import { ChevronUp } from "lucide-react";
 import "./cardFilter.css";
 
+// TODO evolutionLevel = 1 if evo, = 2 if hero and = 3 if both
+// implement all possible cards to be shown in the correct order
+
 /**
  * Sorts cards by rarity (common, rare, epic, legendary, champion) and then by elixir cost within the same rarity.
  * @param cards - Array of card metadata to sort

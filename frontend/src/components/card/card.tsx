@@ -16,6 +16,7 @@ export const CardComponent = memo(function CardComponent({
   showTooltip = true,
 }: Readonly<{
   card: Card;
+  // TODO evolutionLevel = 1 if evo, = 2 if hero and = 3 if both
   cards: CardMeta[];
   showTooltip?: boolean;
 }>) {
@@ -27,7 +28,9 @@ export const CardComponent = memo(function CardComponent({
     ? rarity.charAt(0).toUpperCase() + rarity.slice(1)
     : "";
   const evoLvl = card.evolutionLevel ?? 0; // If it's not an evolution, the evolutionLevel field is missing
-  const isEvo = evoLvl > 0;
+  const isEvo = evoLvl === 1; // Only 'regular' evolution, if it is level 1
+  // TODO adapt to heroes, they have evolutionLevel = 2
+  // Currently just use the regular pic for heroes till Clash Royale provides the hero versions
   const icon = getCardIcon(card.id, isEvo, cards);
 
   const outlineImg = getCardOutline(rarity);
