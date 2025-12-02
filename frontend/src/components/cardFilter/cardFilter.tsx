@@ -4,9 +4,6 @@ import { CardComponent } from "../card/card";
 import { ChevronUp } from "lucide-react";
 import "./cardFilter.css";
 
-// TODO evolutionLevel = 1 if evo, = 2 if hero and = 3 if both
-// implement all possible cards to be shown in the correct order
-
 /**
  * Sorts cards by rarity (common, rare, epic, legendary, champion) and then by elixir cost within the same rarity.
  * @param cards - Array of card metadata to sort
@@ -54,6 +51,7 @@ function createCard(
   return card;
 }
 
+// TODO create lookup interface/type for evolution types and their corresponding maxEvolutionLevel
 /**
  * Creates a list of Card objects from card metadata, including both evolution and regular versions.
  * Evolution cards are added first, followed by regular versions of all cards.
@@ -63,13 +61,27 @@ function createCard(
 function createCardList(cards: CardMeta[]): Card[] {
   const cardList: Card[] = [];
 
-  // All cards that have an evolution
+  // NOTE if evolutions ever end up getting another level, this has to be adjusted
+  // maxEvolutionLevel = 1 if evo, = 2 if hero and = 3 if both
+
+  // Add in multiple loops, so that order of cards stays how it was previously sorted
+
+  // All cards that have a regular evolution
   for (const card of cards) {
     const maxEvoLvl = card.maxEvolutionLevel ?? 0;
-    if (maxEvoLvl > 0) {
-      // NOTE if evolutions ever end up getting another level, this has to be changed
-      // TODO now they have 1 (evo), 2 (hero) and 3 (both)
+    if (maxEvoLvl === 1 || maxEvoLvl === 3) {
+      // Regular Evolution (Level 1)
       const c = createCard(card.id, card.name, 1);
+      cardList.push(c);
+    }
+  }
+
+  // All cards that have a hero evolution
+  for (const card of cards) {
+    const maxEvoLvl = card.maxEvolutionLevel ?? 0;
+    if (maxEvoLvl === 2 || maxEvoLvl === 3) {
+      // Regular Evolution (Level 1)
+      const c = createCard(card.id, card.name, 2);
       cardList.push(c);
     }
   }
