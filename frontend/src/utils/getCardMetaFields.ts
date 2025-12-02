@@ -12,6 +12,7 @@ export function getCardElixirCost(cardID: number, cards: CardMeta[]): number {
   return cards.find((c) => c.id === cardID)?.elixirCost ?? 0;
 }
 
+// TODO adjust for evolutionLevel = 2, use number instead of boolean
 export function getCardIcon(
   cardID: number,
   evolution: boolean,

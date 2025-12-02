@@ -7,13 +7,21 @@ import uuid
 
 from core.deps import RedConn
 from redis_service import get_redis_json, set_redis_json, build_redis_key
+from helpers.auth import get_captcha_text_from_cache, get_wordle_challenge_from_cache
 from models.schema import (
     SecurityQuestionsRequest,
     CaptchaAnswerRequest,
+    NYTWordleAnswerRequest,
     WordleAnswerRequest,
 )
 from core.jwt import create_access_token, validate_access_token, AvailableTokenTypes
-from core.wordle import get_todays_wordle
+from core.wordle import (
+    get_todays_nyt_wordle,
+    pick_random_wordle_solution,
+    is_valid_guess,
+    evaluate_guess,
+    is_guess_solution,
+)
 from core.validate import valid_timezone
 from core.generate_captcha import generate_captcha_string, generate_captcha_image
 
@@ -27,12 +35,12 @@ router = APIRouter(prefix="/auth", tags=["Authorization"])
 #    1.2) Client fetches the captcha image using that id
 #    1.3) Client submits the solution → receives a captcha_token
 #
-# 2) Security Questions:
-#    Requires captcha_token; correct answers → security_token
+# 2) Wordle:
+#    Requires captcha_token; correct Wordle answer → wordle_token
 #
-# 3) Wordle:
-#    Requires security_token; correct Wordle answer → wordle_token
-#
+# 3) Security Questions:
+#    Requires wordle_token; correct answers → security_token
+
 # 4) Auth Token:
 #    Client exchanges wordle_token for final auth token (grants access)
 
@@ -69,47 +77,17 @@ async def get_captcha_id(redis_conn: RedConn):
     return {"captcha_id": captcha_id}
 
 
-async def get_captcha_text_from_cache(redis_conn, captcha_id: str):
-    """Retrieve captcha text from Redis cache using the captcha ID.
-
-    Checks both current and ahead versions of the cache key to find
-    the stored captcha text associated with the given captcha ID.
-
-    Args:
-        redis_conn: Redis connection instance.
-        captcha_id (str): Unique identifier for the captcha challenge.
-
-    Returns:
-        str or None: The stored captcha text if found, None otherwise.
-    """
-    # Check the redis cache for both the current and ahead version
-    key = await build_redis_key(
-        conn=redis_conn,
-        service="crApi",
-        resource="captchaText",
-        params={"captcha_id": captcha_id},
-    )
-
-    key_ahead = await build_redis_key(
-        conn=redis_conn,
-        service="crApi",
-        resource="captchaText",
-        version_ahead=True,
-        params={"captcha_id": captcha_id},
-    )
-
-    text = await get_redis_json(redis_conn, key_ahead) or await get_redis_json(
-        redis_conn, key
-    )
-
-    return text
-
-
 @router.get("/captcha_image/{captcha_id}")
 async def get_captcha_image(redis_conn: RedConn, captcha_id: str):
 
     # Check the redis cache for both the current and ahead version
     text = await get_captcha_text_from_cache(redis_conn, captcha_id=captcha_id)
+
+    if not text:
+        raise HTTPException(
+            status_code=404,
+            detail="No captcha image generated, no valid captcha id given or expired.",
+        )
 
     image = generate_captcha_image(text)
 
@@ -126,6 +104,12 @@ async def get_captcha_token(redis_conn: RedConn, req: CaptchaAnswerRequest):
     # Check the redis cache for both the current and ahead version
     text = await get_captcha_text_from_cache(redis_conn, captcha_id=req.captcha_id)
 
+    if not text:
+        raise HTTPException(
+            status_code=404,
+            detail="No captcha generated, no valid captcha id given or expired.",
+        )
+
     # Check if stored and given answer match
     if req.answer == text:
         return {
@@ -133,48 +117,133 @@ async def get_captcha_token(redis_conn: RedConn, req: CaptchaAnswerRequest):
         }
 
     raise HTTPException(
-        status_code=403, detail="No captcha token generated, incorrect answer given."
+        status_code=401, detail="No captcha token generated, incorrect answer given."
     )
 
 
-# NOTE: this is in no way, shape or form a secure protection for the authentication access
-# mostly implemented as a fun way to have SOME sort of access denial
-# For a more secure protection one of the answers could be an actual password instead of a card, in that
-# case fuzzy matching and the .lower() comparison should be adjusted (set settings.SECURITY_FUZZY_THRESHOLD to 100)
-@router.post("/verify_security_questions")
-async def get_security_token(req: SecurityQuestionsRequest):
+@router.get("/wordle_id")
+async def get_wordle_id(redis_conn: RedConn):
 
-    if not validate_access_token(req.captcha_token, AvailableTokenTypes.CAPTCHA.value):
-        raise HTTPException(
-            status_code=403,
-            detail="No access granted to answer security questions",
-        )
+    wordle = pick_random_wordle_solution()
+    wordle_id = str(uuid.uuid4())
 
-    # Calculate similarity ratios for all three security questions using fuzzy matching
-    q1 = fuzz.ratio(settings.MOST_ANNOYING_CARD.lower(), req.most_annoying_card.lower())
-    q2 = fuzz.ratio(settings.MOST_SKILLFUL_CARD.lower(), req.most_skillful_card.lower())
-    q3 = fuzz.ratio(settings.MOST_MOUSEY_CARD.lower(), req.most_mousey_card.lower())
-
-    # Allow slight typos by using fuzzy matching
-    if min(q1, q2, q3) >= settings.SECURITY_FUZZY_THRESHOLD:
-        # Generate and return a valid token upon matching answers
-        return {
-            "security_token": create_access_token(
-                type=AvailableTokenTypes.SECURITY.value
-            )
-        }
-
-    raise HTTPException(
-        status_code=403, detail="No security token generated, incorrect answers given."
+    key = await build_redis_key(
+        conn=redis_conn,
+        service="crApi",
+        resource="wordleSolution",
+        version_ahead=True,
+        params={"wordle_id": wordle_id},
     )
+
+    await set_redis_json(
+        redis_conn,
+        key,
+        value={"solution": wordle, "guesses": 0},
+        ttl=settings.CACHE_TTL_CAPTCHA_CHALLENGE,
+    )
+
+    return {"wordle_id": wordle_id}
 
 
 @router.post("/verify_wordle")
 async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
 
-    if not valid_timezone(req.timezone):
+    if not validate_access_token(req.captcha_token, AvailableTokenTypes.CAPTCHA.value):
         raise HTTPException(
             status_code=403,
+            detail="No authorization token generated, invalid captcha token given",
+        )
+
+    # Extract the wordle session to the given wordle_id
+    wordle_session, key = await get_wordle_challenge_from_cache(
+        redis_conn, req.wordle_id
+    )
+
+    # Session not found (either expired or non existent id given)
+    if not wordle_session:
+        raise HTTPException(
+            status_code=404,
+            detail="No valid wordle id given or the wordle challenge expired.",
+        )
+
+    # The session JSON is corrupted, abort session to not give up token on empty solution or similar problems
+    if "guesses" not in wordle_session or "solution" not in wordle_session:
+        raise HTTPException(
+            status_code=500,
+            detail="Something went wrong, try again with a new wordle challenge.",
+        )
+
+    # Extract all needed fields
+    solution = wordle_session.get("solution")
+    guesses = wordle_session.get("guesses")
+    guess = req.wordle_guess.lower()
+
+    # Check if all guesses have been used up
+    if guesses >= settings.MAX_WORDLE_GUESSES:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Maximum amount of guesses reached, the word was {solution}, try again with a new wordle challenge.",
+        )
+
+    # Upon a non valid guess, reject guess and don't charge a guess
+    if not is_valid_guess(guess):
+        raise HTTPException(
+            status_code=422,
+            detail=f"{guess} is not a valid guess, try again with a different word",
+        )
+
+    # Check the guess and if it is the solution
+    evaluation = evaluate_guess(solution, guess)
+    is_solution = is_guess_solution(solution, guess)
+    wordle_token = ""
+
+    # If it is, generate a wordle token
+    if is_solution:
+        wordle_token = create_access_token(type=AvailableTokenTypes.WORDLE.value)
+
+    # Update the 'guesses' count
+    updated_challenge = {"solution": solution, "guesses": guesses + 1}
+    # Calculate the remaining ones, always 0 or bigger upon any issue
+    remaining_guesses = max(settings.MAX_WORDLE_GUESSES - (guesses + 1), 0)
+
+    # Save the updated session again
+    # NOTE: resets the previous TTL
+    await set_redis_json(
+        redis_conn, key, updated_challenge, settings.CACHE_TTL_WORDLE_CHALLENGE
+    )
+
+    result = {
+        "evaluation": evaluation,
+        "remaining_guesses": remaining_guesses,
+        "is_solution": is_solution,
+        "wordle_token": wordle_token,
+    }
+
+    # Reveal the answer upon no more guesses left
+    if remaining_guesses == 0:
+        result["solution"] = solution
+
+    return result
+
+
+# NOTE: DEPRECATED Wordle token endpoint
+# This route requires users to solve the actual New York Times daily Wordle.
+# While simpler to implement, it is much easier to bypass (the answer can be looked up
+# or brute-retrieved after the 6 allowed attempts). The custom Wordle challenge endpoint
+# is preferred, as it is more secure and more engaging for human users [and definitely more frustrating too ;)].
+"""
+@router.post("/verify_wordle_nyt")
+async def get_nyt_wordle_token(redis_conn: RedConn, req: NYTWordleAnswerRequest):
+
+    if not validate_access_token(req.captcha_token, AvailableTokenTypes.CAPTCHA.value):
+        raise HTTPException(
+            status_code=403,
+            detail="No authorization token generated, invalid captcha token given",
+        )
+
+    if not valid_timezone(req.timezone):
+        raise HTTPException(
+            status_code=422,
             detail=f"No wordle token generated, timezone {req.timezone} doesn't exist.",
         )
 
@@ -196,7 +265,7 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
     # If not get todays answer from the Wordle-API
     else:
         try:
-            response = await get_todays_wordle(req.timezone)
+            response = await get_todays_nyt_wordle(req.timezone)
         # Prevent authentication if we can't verify the correct answer
         except Exception:
             raise HTTPException(
@@ -207,7 +276,7 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
             todays_wordle = response.get("solution", "").lower()
             # Store in cache to avoid repeated API calls throughout the day
             await set_redis_json(
-                redis_conn, key, response, ttl=settings.CACHE_TTL_WORDLE_ANSWER
+                redis_conn, key, response, ttl=settings.CACHE_TTL_NYT_WORDLE_ANSWER
             )
 
     # If the guess and answer are the matching, generate the wordle token
@@ -217,17 +286,50 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
         }
 
     raise HTTPException(
-        status_code=403,
+        status_code=401,
         detail="No wordle token generated, incorrect answer given.",
+    )
+"""
+
+
+# NOTE: this is in no way, shape or form a secure protection for the authentication access
+# mostly implemented as a fun way to have SOME sort of access denial
+# For a more secure protection one of the answers could be an actual password instead of a card, in that
+# case fuzzy matching and the .lower() comparison should be adjusted (set settings.SECURITY_FUZZY_THRESHOLD to 100)
+@router.post("/verify_security_questions")
+async def get_security_token(req: SecurityQuestionsRequest):
+
+    if not validate_access_token(req.wordle_token, AvailableTokenTypes.WORDLE.value):
+        raise HTTPException(
+            status_code=401,
+            detail="No access granted to answer security questions",
+        )
+
+    # Calculate similarity ratios for all three security questions using fuzzy matching
+    q1 = fuzz.ratio(settings.MOST_ANNOYING_CARD.lower(), req.most_annoying_card.lower())
+    q2 = fuzz.ratio(settings.MOST_SKILLFUL_CARD.lower(), req.most_skillful_card.lower())
+    q3 = fuzz.ratio(settings.MOST_MOUSEY_CARD.lower(), req.most_mousey_card.lower())
+
+    # Allow slight typos by using fuzzy matching
+    if min(q1, q2, q3) >= settings.SECURITY_FUZZY_THRESHOLD:
+        # Generate and return a valid token upon matching answers
+        return {
+            "security_token": create_access_token(
+                type=AvailableTokenTypes.SECURITY.value
+            )
+        }
+
+    raise HTTPException(
+        status_code=401, detail="No security token generated, incorrect answers given."
     )
 
 
 @router.post("/token")
-async def get_auth_token(wordle_token: str):
+async def get_auth_token(security_token: str):
 
-    if not validate_access_token(wordle_token, AvailableTokenTypes.WORDLE.value):
+    if not validate_access_token(security_token, AvailableTokenTypes.SECURITY.value):
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail="No authorization token generated, invalid token given",
         )
 

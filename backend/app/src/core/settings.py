@@ -31,6 +31,9 @@ class Settings:
         0.33  # Adjust what share of the captcha is digits (range: 0-1)
     )
 
+    # Amount of guesses a user has to solve a wordle
+    MAX_WORDLE_GUESSES: int = 6
+
     # Application Configuration
     INIT_RETRIES: int = 3
     INIT_RETRY_DELAY: float = 3
@@ -62,7 +65,9 @@ class Settings:
     CACHE_TTL_DECK_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_CARD_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_CAPTCHA_CHALLENGE: int = 5 * 60  # 5 minutes
-    CACHE_TTL_WORDLE_ANSWER: int = 6 * 60 * 60  # 6 hours
+    # Time PER VALID GUESS on the wordle challenge, as every new guess resets the redis json and ttl
+    CACHE_TTL_WORDLE_CHALLENGE: int = 10 * 60  # 10 minutes
+    CACHE_TTL_NYT_WORDLE_ANSWER: int = 6 * 60 * 60  # 6 hours
 
 
 # Global settings instance

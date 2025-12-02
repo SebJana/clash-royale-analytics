@@ -13,7 +13,7 @@ class AvailableTokenTypes(StrEnum):
     AUTH = "auth"
 
 
-def create_access_token(type: str, expires_minutes: int = 5):
+def create_access_token(type: str, expires_minutes: int = 30):
     """
     Create a JWT token with admin scope and expiration time.
 
