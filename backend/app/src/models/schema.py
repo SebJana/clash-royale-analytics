@@ -24,14 +24,32 @@ class BattlesRequest(BaseModel):
     )
 
 
+class CaptchaAnswerRequest(BaseModel):
+    captcha_id: str = Field(..., description="Id of the captcha session")
+    answer: str = Field(..., description="Visible text from the captcha image")
+
+
 class SecurityQuestionsRequest(BaseModel):
+    captcha_token: str = Field(
+        ..., description="Token received by correctly solving a captcha challenge"
+    )
     most_annoying_card: str = Field(
-        ..., description="What is the single most annoying card in Clash Royale?"
+        ...,
+        description="Answer to what is the single most annoying card in Clash Royale?",
     )
     most_skillful_card: str = Field(
-        ..., description="What is the single most skillful card in Clash Royale?"
+        ...,
+        description="Answer to what is the single most skillful card in Clash Royale?",
     )
     most_mousey_card: str = Field(
         ...,
-        description="What is the most 'mausig (english: sweetie)' card in Clash Royale?",
+        description="Answer to what is the most 'mausig (english: sweetie/cutie)' card in Clash Royale?",
     )
+
+
+class WordleAnswerRequest(BaseModel):
+    security_token: str = Field(
+        ..., description="Token received by correctly answering the security questions"
+    )
+    wordle_guess: str = Field(..., description="Answer to todays Wordle challenge")
+    timezone: str = Field(..., description="Timezone of the user")

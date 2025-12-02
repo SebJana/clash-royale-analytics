@@ -1,7 +1,16 @@
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 import uuid
+from enum import StrEnum
 from .settings import settings
+
+
+# Types of tokens the api gives out and validates
+class AvailableTokenTypes(StrEnum):
+    CAPTCHA = "captcha"
+    SECURITY = "security"
+    WORDLE = "wordle"
+    AUTH = "auth"
 
 
 def create_access_token(type: str, expires_minutes: int = 5):

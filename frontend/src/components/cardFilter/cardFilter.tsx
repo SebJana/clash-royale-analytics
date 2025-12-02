@@ -68,6 +68,7 @@ function createCardList(cards: CardMeta[]): Card[] {
     const maxEvoLvl = card.maxEvolutionLevel ?? 0;
     if (maxEvoLvl > 0) {
       // NOTE if evolutions ever end up getting another level, this has to be changed
+      // TODO now they have 1 (evo), 2 (hero) and 3 (both)
       const c = createCard(card.id, card.name, 1);
       cardList.push(c);
     }

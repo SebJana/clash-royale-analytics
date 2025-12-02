@@ -3,7 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from contextlib import asynccontextmanager
 
-from routers import players_details, players_tracked, cards, game_modes, total_battles
+from routers import (
+    players_details,
+    players_tracked,
+    cards,
+    game_modes,
+    total_battles,
+    auth,
+)
 from core.settings import settings
 from redis_service import RedisConn
 from clash_royale_api import ClashRoyaleAPI
@@ -113,6 +120,7 @@ app.include_router(players_details.router, prefix="/api")
 app.include_router(cards.router, prefix="/api")
 app.include_router(game_modes.router, prefix="/api")
 app.include_router(total_battles.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 
 
 @app.get("/api/ping")

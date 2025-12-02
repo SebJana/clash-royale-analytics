@@ -1,6 +1,7 @@
-from fastapi import Depends, Request, HTTPException, Query
+from fastapi import Depends, Request, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Annotated
-
+from core.jwt import validate_access_token, AvailableTokenTypes
 from redis_service import RedisConn
 from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn, check_player_tracked
@@ -69,60 +70,22 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
     return player_tag  # When its a valid and tracked player, return the tag
 
 
-# Dependency that extracts captcha token from query parameters
-def extract_captcha_token(
-    captcha_token: str = Query(..., description="Captcha JWT token for authentication")
-):
+# OAuth2 scheme used only for extracting "Authorization: Bearer <token>"
+# FastAPI automatically parses the header and provides the raw token.
+auth_scheme = HTTPBearer()
+
+
+# Dependency that ensures authorization token is received and validated
+def require_auth(credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)):
     """
-    FastAPI dependency that extracts captcha token from query parameters.
-
-    Args:
-        captcha_token (str): JWT token from query parameter for authentication.
-
-    Returns:
-        str: The captcha token when provided.
-
-    Raises:
-        HTTPException 422 if the captcha_token query parameter is missing.
+    Validates a Bearer token provided via the Authorization header.
     """
-    return captcha_token
+    token = credentials.credentials
 
+    if not validate_access_token(token, AvailableTokenTypes.AUTH.value):
+        raise HTTPException(
+            status_code=403,
+            detail="No authorization, invalid or expired auth token.",
+        )
 
-# Dependency that extracts security token from query parameters
-def extract_security_token(
-    security_token: str = Query(
-        ..., description="Security JWT token for authentication"
-    )
-):
-    """
-    FastAPI dependency that extracts security token from query parameters.
-
-    Args:
-        security_token (str): JWT token from query parameter for authentication.
-
-    Returns:
-        str: The security token when provided.
-
-    Raises:
-        HTTPException 422 if the security_token query parameter is missing.
-    """
-    return security_token
-
-
-# Dependency that extracts wordle token from query parameters
-def extract_wordle_token(
-    wordle_token: str = Query(..., description="Wordle JWT token for authentication")
-):
-    """wordle
-    FastAPI dependency that extracts wordle token from query parameters.
-
-    Args:
-        wordle_token (str): JWT token from query parameter for authentication.
-
-    Returns:
-        str: The wordle token when provided.
-
-    Raises:
-        HTTPException 422 if the wordle_token query parameter is missing.
-    """
-    return wordle_token
+    return token
