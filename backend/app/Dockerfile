@@ -6,16 +6,19 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY app/requirements.txt /app/requirements.txt
+COPY backend/app/requirements.txt /app/requirements.txt
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy shared mongo connection + redis connection + cr api client + api source 
-COPY mongo/ /app/mongo/
-COPY clash_royale_api/ /app/clash_royale_api/
-COPY redis_service/ /app/redis_service/
-COPY app/src/ /app/src/
+COPY backend/mongo/ /app/mongo/
+COPY backend/clash_royale_api/ /app/clash_royale_api/
+COPY backend/redis_service/ /app/redis_service/
+COPY backend/app/src/ /app/src/
+
+# Copy shared resources for wordle
+COPY shared_resources/ /app/shared_resources/
 
 # Make the package importable
 ENV PYTHONPATH=/app
