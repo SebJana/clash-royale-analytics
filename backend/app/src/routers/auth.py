@@ -13,6 +13,7 @@ from models.schema import (
     CaptchaAnswerRequest,
     NYTWordleAnswerRequest,
     WordleAnswerRequest,
+    AuthTokenRequest,
 )
 from core.jwt import create_access_token, validate_access_token, AvailableTokenTypes
 from core.wordle import (
@@ -328,9 +329,11 @@ async def get_security_token(req: SecurityQuestionsRequest):
 
 
 @router.post("/token")
-async def get_auth_token(security_token: str):
+async def get_auth_token(req: AuthTokenRequest):
 
-    if not validate_access_token(security_token, AvailableTokenTypes.SECURITY.value):
+    if not validate_access_token(
+        req.security_token, AvailableTokenTypes.SECURITY.value
+    ):
         raise HTTPException(
             status_code=401,
             detail="No authorization token generated, invalid token given",

@@ -61,3 +61,9 @@ class NYTWordleAnswerRequest(BaseModel):
     )
     wordle_guess: str = Field(..., description="Answer to todays Wordle challenge")
     timezone: str = Field(..., description="Timezone of the user")
+
+
+class AuthTokenRequest(BaseModel):
+    security_token: str = Field(
+        ..., description="Token received by correctly answering security questions"
+    )
