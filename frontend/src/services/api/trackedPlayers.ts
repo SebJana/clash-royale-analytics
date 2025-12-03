@@ -23,3 +23,15 @@ export async function trackPlayer(
   const response = await api.post(`/players/${tag}`);
   return response.data;
 }
+
+export async function untrackPlayer(
+  playerTag: string
+): Promise<{ status: string; tag: string }> {
+  if (!validatePlayerTagSyntax(playerTag)) {
+    throw new Error(`Player with tag ${playerTag} does not exist`);
+  }
+
+  const tag = encodeURIComponent(playerTag);
+  const response = await api.delete(`/players/${tag}`);
+  return response.data;
+}

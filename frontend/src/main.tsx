@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
 import App from "./App.tsx";
 
@@ -47,7 +48,9 @@ createRoot(document.getElementById("root")!).render(
           },
         }}
       >
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </PersistQueryClientProvider>
     </BrowserRouter>
   </StrictMode>

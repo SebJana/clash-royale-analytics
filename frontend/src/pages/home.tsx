@@ -4,15 +4,18 @@ import {
   fetchAllTrackedPlayers,
   fetchAllTrackedPlayersCount,
   trackPlayer,
+  untrackPlayer,
 } from "../services/api/trackedPlayers";
 import { fetchTotalBattleCount } from "../services/api/battles";
 import { pluralize } from "../utils/plural";
 import { formatNumberWithSuffix } from "../utils/number";
 import { validatePlayerTagSyntax } from "../utils/playerTag";
 import { useFetch } from "../hooks/useFetch";
+import { useAuth } from "../hooks/useAuthHook";
 import type { Players, PlayerCount } from "../types/players";
 import type { TotalBattleCount } from "../types/battles";
 import { PlayerSearch } from "../components/playerSearch/playerSearch";
+import { AuthModal } from "../components/auth/authModal";
 import Lottie from "lottie-react";
 import construction from "../assets/animations/construction.json";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -40,10 +43,18 @@ function HomePage() {
 
   const [selectedPlayerTag, setSelectedPlayerTag] = useState("");
   const [addedPlayerTag, setAddedPlayerTag] = useState("");
+  const [untrackedPlayerTag, setUntrackedPlayerTag] = useState("");
   const [trackingPlayer, setTrackingPlayer] = useState(false);
+  const [untrackingPlayer, setUntrackingPlayer] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [untrackingError, setUntrackingError] = useState<string | null>(null);
   const [trackingSuccess, setTrackingSuccess] = useState<string | null>(null);
+  const [untrackingSuccess, setUntrackingSuccess] = useState<string | null>(
+    null
+  );
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const navigate = useNavigate();
+  const { checkAuthStatus } = useAuth();
 
   if (playersLoading || playerCountLoading || battleCountLoading)
     return <CircularProgress className="home-loading-spinner" />;
@@ -55,7 +66,7 @@ function HomePage() {
           loop={true}
           className="lottie-animation"
         />
-        <h2 className="home-error-message">
+        <h2 className="home-fatal-error-message">
           We're having trouble right now. Please try again shortly.
         </h2>
       </>
@@ -115,6 +126,49 @@ function HomePage() {
       setTrackingError(errorDetail);
     } finally {
       setTrackingPlayer(false);
+    }
+  };
+
+  const handleUntrackPlayerClick = async () => {
+    if (!untrackedPlayerTag) return;
+
+    // Check if user is authenticated
+    if (!checkAuthStatus()) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    setUntrackingPlayer(true);
+    setUntrackingError(null);
+    setUntrackingSuccess(null);
+
+    try {
+      const result = await untrackPlayer(untrackedPlayerTag);
+      setUntrackingSuccess(`${result.status}: ${result.tag}`);
+
+      // Clear the input field
+      setUntrackedPlayerTag("");
+    } catch (error) {
+      // Extract error message using structural typing
+      type ErrorLike = {
+        response?: { data?: { detail?: string } };
+        message?: string;
+      };
+
+      const err = error as ErrorLike;
+      const errorDetail =
+        err.response?.data?.detail || err.message || "An error occurred";
+      setUntrackingError(errorDetail);
+    } finally {
+      setUntrackingPlayer(false);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    // Retry the untrack operation after successful authentication
+    if (untrackedPlayerTag) {
+      handleUntrackPlayerClick();
     }
   };
 
@@ -190,14 +244,49 @@ function HomePage() {
             </button>
 
             {trackingError && (
-              <div className="error-message">{trackingError}</div>
+              <div className="home-error-message">{trackingError}</div>
             )}
 
             {trackingSuccess && (
-              <div className="success-message">{trackingSuccess}</div>
+              <div className="home-success-message">{trackingSuccess}</div>
+            )}
+          </div>
+          <div className="untrack-section">
+            <h2 className="section-header">Remove Tracked Player</h2>
+            <p className="section-description">
+              Enter a player tag to stop tracking their activity. Previously
+              stored data won't be deleted by this, you can always add the
+              player back.
+            </p>
+            <input
+              type="text"
+              placeholder="Enter player tag... (e.g. #YYRJQY28)"
+              value={untrackedPlayerTag}
+              onChange={(e) => setUntrackedPlayerTag(e.target.value)}
+            />
+            <button
+              className="remove-button"
+              onClick={handleUntrackPlayerClick}
+              disabled={!untrackedPlayerTag || untrackingPlayer}
+            >
+              {untrackingPlayer ? "Removing Player..." : "Remove Player"}
+            </button>
+
+            {untrackingError && (
+              <div className="home-error-message">{untrackingError}</div>
+            )}
+
+            {untrackingSuccess && (
+              <div className="home-success-message">{untrackingSuccess}</div>
             )}
           </div>
         </div>
+
+        <AuthModal
+          open={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleAuthSuccess}
+        />
       </div>
     </div>
   );

@@ -32,7 +32,7 @@
   stroke: var(--color-accent);
 }
 
-.home-error-message {
+.home-fatal-error-message {
   max-width: 750px;
   margin: var(--spacing-lg) auto var(--spacing-lg) auto;
   color: var(--text-secondary);
@@ -67,6 +67,7 @@
 }
 
 .search-section,
+.untrack-section,
 .adding-section {
   display: flex;
   flex-direction: column;
@@ -87,7 +88,8 @@
   margin: 0 auto;
 }
 
-.adding-section {
+.adding-section,
+.untrack-section {
   margin: var(--spacing-3xl) auto 0;
 }
 
@@ -119,6 +121,22 @@
   box-sizing: border-box;
 }
 
+.untrack-section input {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
+  padding: 0.6em 1.2em;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-overlay-light);
+  color: var(--text-primary);
+  font-size: var(--font-md);
+  font-family: inherit;
+  transition: all var(--transition-slow);
+  box-sizing: border-box;
+}
+
 .search-section .MuiTextField-root {
   width: 100%;
   max-width: 320px;
@@ -131,7 +149,18 @@
   margin-inline: auto;
 }
 
+.untrack-section .MuiTextField-root {
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
+}
+
 .adding-section input:hover {
+  background-color: var(--bg-overlay-medium);
+  border-color: var(--border-medium);
+}
+
+.untrack-section input:hover {
   background-color: var(--bg-overlay-medium);
   border-color: var(--border-medium);
 }
@@ -142,13 +171,47 @@
   background-color: var(--bg-overlay-medium);
 }
 
+.untrack-section input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background-color: var(--bg-overlay-medium);
+}
+
 .adding-section input::placeholder {
+  color: var(--text-secondary);
+}
+
+.untrack-section input::placeholder {
   color: var(--text-secondary);
 }
 
 .add-button {
   min-width: 100px;
   padding: var(--spacing-md) var(--spacing-2xl);
+}
+
+.remove-button {
+  min-width: 100px;
+  padding: var(--spacing-md) var(--spacing-2xl);
+  background-color: var(--color-error);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.remove-button:hover:not(:disabled) {
+  background-color: var(--color-error-dark);
+  transform: translateY(-1px);
+}
+
+.remove-button:disabled {
+  background-color: var(--text-secondary);
+  cursor: not-allowed;
+  transform: none;
 }
 
 .section-header {
@@ -173,7 +236,7 @@
   align-self: flex-start;
 }
 
-.error-message {
+.home-error-message {
   text-align: center;
   margin-top: var(--spacing-md);
   color: var(--color-error);
@@ -182,7 +245,7 @@
   width: 100%;
 }
 
-.success-message {
+.home-success-message {
   text-align: center;
   margin-top: var(--spacing-md);
   color: var(--color-success);
@@ -202,12 +265,14 @@
   }
 
   .search-section,
-  .adding-section {
+  .adding-section,
+  .untrack-section {
     padding: var(--spacing-lg);
     width: 95%;
   }
 
-  .adding-section {
+  .adding-section,
+  .untrack-section {
     margin-top: var(--spacing-xl);
   }
 
@@ -223,21 +288,25 @@
   }
 
   .view-button,
-  .add-button {
+  .add-button,
+  .remove-button {
     width: 80%;
     min-width: auto;
   }
 
   .search-section,
-  .adding-section {
+  .adding-section,
+  .untrack-section {
     width: 98%;
     padding: var(--spacing-lg) var(--spacing-md);
   }
 
   .search-section input,
   .adding-section input,
+  .untrack-section input,
   .search-section .MuiTextField-root,
-  .adding-section .MuiTextField-root {
+  .adding-section .MuiTextField-root,
+  .untrack-section .MuiTextField-root {
     width: 100%;
     max-width: 320px;
     margin-inline: auto;
