@@ -42,7 +42,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-xl);
+  font-size: var(--font-3xl);
   font-weight: var(--font-weight-bold);
   border: 2px solid var(--border-medium);
   border-radius: var(--radius-md);
@@ -179,7 +179,7 @@
     max-height: 70px;
     min-width: 55px;
     min-height: 55px;
-    font-size: var(--font-lg);
+    font-size: var(--font-2xl);
   }
 
   .wordle-grid {
@@ -215,7 +215,7 @@
     max-height: 65px;
     min-width: 45px;
     min-height: 45px;
-    font-size: var(--font-lg);
+    font-size: var(--font-xl);
     border-width: 2px;
   }
 
