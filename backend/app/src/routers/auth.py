@@ -110,8 +110,10 @@ async def get_captcha_token(redis_conn: RedConn, req: CaptchaAnswerRequest):
             detail="No captcha generated, no valid captcha id given or expired.",
         )
 
+    # NOTE: compare with lowercase answer and text, otherwise the captcha is very hard to solve
+    # even for a human
     # Check if stored and given answer match
-    if req.answer == text:
+    if req.answer.lower() == text.lower():
         return {
             "captcha_token": create_access_token(type=AvailableTokenTypes.CAPTCHA.value)
         }
@@ -150,7 +152,7 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
 
     if not validate_access_token(req.captcha_token, AvailableTokenTypes.CAPTCHA.value):
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail="No authorization token generated, invalid captcha token given",
         )
 
@@ -185,6 +187,7 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
             detail=f"Maximum amount of guesses reached, the word was {solution}, try again with a new wordle challenge.",
         )
 
+    # TODO potentially implement hard mode? ;)
     # Upon a non valid guess, reject guess and don't charge a guess
     if not is_valid_guess(guess):
         raise HTTPException(
@@ -237,7 +240,7 @@ async def get_nyt_wordle_token(redis_conn: RedConn, req: NYTWordleAnswerRequest)
 
     if not validate_access_token(req.captcha_token, AvailableTokenTypes.CAPTCHA.value):
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail="No authorization token generated, invalid captcha token given",
         )
 
