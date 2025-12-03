@@ -12,7 +12,7 @@ def load_wordle_guesses():
     Returns:
         list[str]: List of all valid Wordle guesses.
     """
-    # Path works both locally and in Docker
+    # Path works ONLY in docker
     file_path = Path("/app/shared_resources/wordle/valid-guesses.txt")
 
     with open(file_path, "r", encoding="utf-8") as f:

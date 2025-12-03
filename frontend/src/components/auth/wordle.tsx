@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { isValidGuess } from "../../utils/wordle";
 import "./wordle.css";
 
 // Props for Wordle game component
@@ -32,6 +33,18 @@ export function WordleGame({
   // Handle guess submission and evaluation
   const handleSubmit = useCallback(async () => {
     if (currentGuess.length !== WORDLE_WORD_LENGTH || isSubmitting) return;
+
+    // Validate guess before submitting - silently block if invalid
+    // TODO add not in word list pop up and letter boxes shake animation?
+    try {
+      const isValid = await isValidGuess(currentGuess);
+      if (!isValid) {
+        return; // Simply block the submission of the invalid guess
+      }
+    } catch (error) {
+      console.error("Error validating guess:", error);
+      return; // Block submission on validation error
+    }
 
     setIsSubmitting(true);
     try {
@@ -124,7 +137,6 @@ export function WordleGame({
       </h3>
       <p>You have {guessesAllowed} attempts.</p>
 
-      {/* TODO add valid guess check in frontend */}
       {/* TODO better visual feedback for invalid guess and one by one filling of letters */}
 
       <div className="wordle-grid">
