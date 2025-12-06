@@ -3,7 +3,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-lg);
-  max-width: 500px;
+  max-width: 600px;
   width: 100%;
 }
 
@@ -52,7 +52,6 @@
 .wordle-cell.filled {
   background-color: var(--bg-overlay-medium);
   color: var(--text-primary);
-  border-color: var(--color-primary);
 }
 
 /* Wordle feedback colors */
@@ -65,7 +64,6 @@
 .wordle-cell.present {
   background-color: var(--wordle-present);
   color: var(--text-primary);
-  border-color: var(--wordle-present);
 }
 
 .wordle-cell.absent {
@@ -77,23 +75,12 @@
 .wordle-cell.current {
   background-color: var(--bg-overlay-light);
   color: var(--text-primary);
-  border-color: var(--color-accent);
-  animation: pulse 1s ease-in-out infinite alternate;
 }
 
 .wordle-cell.empty {
   background-color: transparent;
   color: var(--text-secondary);
   border-color: var(--border-light);
-}
-
-@keyframes pulse {
-  from {
-    border-color: var(--color-accent);
-  }
-  to {
-    border-color: var(--color-primary);
-  }
 }
 
 /* Shake animation for current row */
@@ -118,6 +105,25 @@
   60%,
   80% {
     transform: translateX(5px);
+  }
+}
+
+/* Flip animation for letter reveal */
+.wordle-cell.flip {
+  animation: letterFlip 0.8s ease-in-out;
+  animation-fill-mode: forwards;
+}
+
+@keyframes letterFlip {
+  0% {
+    transform: rotateX(0deg);
+  }
+  50% {
+    transform: rotateX(-90deg);
+    background-color: var(--bg-overlay-medium);
+  }
+  100% {
+    transform: rotateX(0deg);
   }
 }
 
@@ -149,20 +155,6 @@
   background-color: var(--text-secondary);
   cursor: not-allowed;
   transform: none;
-}
-
-.wordle-status {
-  text-align: center;
-}
-
-.wordle-status .success {
-  color: var(--color-success);
-  font-weight: var(--font-weight-bold);
-}
-
-.wordle-status .error {
-  color: var(--color-error);
-  font-weight: var(--font-weight-bold);
 }
 
 /* Responsive design */
@@ -291,6 +283,7 @@
   transition: all var(--transition-fast);
   padding: 0;
   user-select: none;
+  outline: none;
 }
 
 .keyboard-key.wide {
@@ -400,7 +393,7 @@
   border: 3px solid var(--color-primary);
   text-align: center;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  max-width: 400px;
+  max-width: 300px;
   width: 90%;
   animation: popupSlideIn 0.4s ease-out;
 }
@@ -426,6 +419,7 @@
   cursor: pointer;
   transition: all var(--transition-fast);
   min-width: 120px;
+  outline: none;
 }
 
 .continue-button {

@@ -14,6 +14,8 @@ interface WordleGameProps {
 }
 
 const WORDLE_WORD_LENGTH = 5;
+const FLIP_DURATION_MS = 800; // Individual letter flip animation duration
+const FLIP_DELAY_LETTER_MS = 400; // Stagger delay between letter flips
 
 // Keyboard layout for Wordle (always use American 'QWERTY' layout)
 const KEYBOARD_ROWS = [
@@ -31,37 +33,97 @@ export function WordleGame({
   onFailure,
   onSuccess,
 }: WordleGameProps) {
-  const [guesses, setGuesses] = useState<string[]>([]); // All submitted guesses
-  const [evaluations, setEvaluations] = useState<string[][]>([]); // Color feedback for each guess
-  const [currentGuess, setCurrentGuess] = useState(""); // Current input being typed
+  const [guesses, setGuesses] = useState<string[]>([]);
+  const [evaluations, setEvaluations] = useState<string[][]>([]);
+  const [currentGuess, setCurrentGuess] = useState("");
   const [gameStatus, setGameStatus] = useState<"playing" | "won" | "lost">(
     "playing"
   );
-  const [solution, setSolution] = useState(""); // Keep track of solution, to display correct answer when the game is lost
-  const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for API calls
-  const [letterStates, setLetterStates] = useState<Record<string, string>>({}); // Track state of each letter
-  const [shakeCurrentRow, setShakeCurrentRow] = useState(false); // Trigger shake animation on current row
-  const [showGameEndPopup, setShowGameEndPopup] = useState(false); // Show win/lose popup
+  const [solution, setSolution] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [letterStates, setLetterStates] = useState<Record<string, string>>({});
+  const [shakeCurrentRow, setShakeCurrentRow] = useState(false); // Invalid guess animation
+  const [showGameEndPopup, setShowGameEndPopup] = useState(false);
 
-  // Handle guess submission and evaluation
+  // Animation state management for flip reveal
+  const [animatingRowIndex, setAnimatingRowIndex] = useState<number | null>(
+    null
+  );
+  const [animatingLetterIndex, setAnimatingLetterIndex] = useState(-1);
+  const [completedLetterIndex, setCompletedLetterIndex] = useState(-1); // Controls when colors show
+  const [isAnimationRunning, setIsAnimationRunning] = useState(false); // Prevents input during animations
+
+  // Orchestrates staggered flip animations for guess feedback
+  const animateLetterReveal = useCallback((rowIndex: number) => {
+    setAnimatingRowIndex(rowIndex);
+    setAnimatingLetterIndex(0);
+    setCompletedLetterIndex(-1);
+    setIsAnimationRunning(true);
+
+    // Stagger each letter's flip animation
+    for (let i = 0; i < WORDLE_WORD_LENGTH; i++) {
+      // Start flip - Each letter starts after previous letter's delay
+      // Letter 0: 0ms, Letter 1: 400ms, Letter 2: 800ms, etc.
+      setTimeout(() => {
+        setAnimatingLetterIndex(i);
+      }, i * FLIP_DELAY_LETTER_MS);
+
+      // Show color before flip completes (80% through the animation)
+      // Calculation: (letter_index * delay) + (80% of flip_duration)
+      // This reveals color while card is rotating back to face, creating smooth reveal
+      // Example: Letter 2 shows color at 800ms + 640ms = 1440ms
+      setTimeout(() => {
+        setCompletedLetterIndex(i);
+      }, i * FLIP_DELAY_LETTER_MS + FLIP_DURATION_MS * 0.8);
+    }
+
+    // Clean up after all animations finish
+    // Calculation: (5 letters * 400ms delay) + 5000ms buffer = 7000ms total
+    // Buffer ensures all flip animations (800ms each) complete before cleanup
+    setTimeout(() => {
+      setAnimatingRowIndex(null);
+      setAnimatingLetterIndex(-1);
+      setCompletedLetterIndex(-1);
+      setIsAnimationRunning(false);
+    }, WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 5000);
+
+    // Safety unlock - Shorter timeout to prevent stuck input if main cleanup fails
+    // Uses 1000ms buffer instead of 5000ms as emergency fallback
+    setTimeout(() => {
+      setIsAnimationRunning(false);
+    }, WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 1000);
+  }, []);
+
+  // Emergency timeout to prevent permanent input lock
+  useEffect(() => {
+    if (isAnimationRunning) {
+      const emergencyTimeout = setTimeout(() => {
+        setIsAnimationRunning(false);
+      }, 5000);
+      return () => clearTimeout(emergencyTimeout);
+    }
+  }, [isAnimationRunning]);
+
+  // Validates guess, submits to API, and triggers animations
   const handleSubmit = useCallback(async () => {
-    if (currentGuess.length !== WORDLE_WORD_LENGTH || isSubmitting) return;
+    if (
+      currentGuess.length !== WORDLE_WORD_LENGTH ||
+      isSubmitting ||
+      isAnimationRunning
+    )
+      return;
 
-    // Validate guess before submitting - show popup and shake on invalid guess
+    // Block invalid guesses with shake animation
     try {
       const isValid = await isValidGuess(currentGuess);
       if (!isValid) {
-        // Show invalid popup and trigger shake animation
         setShakeCurrentRow(true);
-
-        // Stop shake animation after 500ms
         setTimeout(() => setShakeCurrentRow(false), 500);
-
-        return; // Block the submission of the invalid guess
+        return;
       }
     } catch (error) {
       console.error("Error validating guess:", error);
-      return; // Block submission on validation error
+      return;
     }
 
     setIsSubmitting(true);
@@ -73,61 +135,87 @@ export function WordleGame({
 
       // Convert backend evaluation to CSS classes for visual feedback
       if (result.feedback?.evaluation) {
-        // Convert evaluation object to array and map backend values to CSS classes
+        // Transform backend response format to frontend array structure
+        // Backend: {0: "correct", 1: "in word", 2: "wrong"}
+        // Frontend: ["correct", "present", "absent"]
         const evaluationArray: string[] = [];
         for (let i = 0; i < WORDLE_WORD_LENGTH; i++) {
           const backendValue = result.feedback.evaluation[i];
           let cssClass = "";
 
+          // Map backend terminology to CSS class names that match our styles
+          // "in word" becomes "present" to align with Wordle conventions
           switch (backendValue) {
             case "correct":
-              cssClass = "correct";
+              cssClass = "correct"; // Green - letter in correct position
               break;
             case "in word":
-              cssClass = "present";
+              cssClass = "present"; // Yellow - letter in word but wrong position
               break;
             case "wrong":
-              cssClass = "absent";
+              cssClass = "absent"; // Gray - letter not in word at all
               break;
             default:
-              cssClass = "filled";
+              cssClass = "filled"; // Fallback for unexpected values
           }
 
           evaluationArray.push(cssClass);
         }
 
         const newEvaluations = [...evaluations, evaluationArray];
+
+        // Start the flip animation for the current row
+        const currentRowIndex = newGuesses.length - 1;
+        animateLetterReveal(currentRowIndex);
+
+        // Set evaluations immediately but animation will control visual reveal
         setEvaluations(newEvaluations);
 
-        // Update letter states for keyboard
-        const newLetterStates = { ...letterStates };
-        for (let i = 0; i < WORDLE_WORD_LENGTH; i++) {
-          const letter = currentGuess[i];
-          const state = evaluationArray[i];
+        // Update letter states for keyboard after animation completes
+        // Wait for all flip animations to finish before updating keyboard colors
+        // Timeout matches the last letter's completion: (4 * 400ms) + (800ms * 0.8) = 2240ms
+        setTimeout(() => {
+          const newLetterStates = { ...letterStates };
+          for (let i = 0; i < WORDLE_WORD_LENGTH; i++) {
+            const letter = currentGuess[i];
+            const state = evaluationArray[i];
 
-          // Only update if the new state is "better" than the existing one
-          // Priority: correct > present > absent > unused
-          if (
-            !newLetterStates[letter] ||
-            state === "correct" ||
-            (state === "present" && newLetterStates[letter] === "absent")
-          ) {
-            newLetterStates[letter] = state;
+            // Implement letter state priority system to handle repeated letters
+            // Priority hierarchy: correct > present > absent > unused
+            // Example: If 'A' was 'absent' before but now 'correct', upgrade to 'correct'
+            // But if 'A' was 'correct' before and now 'present', keep 'correct'
+            if (
+              !newLetterStates[letter] || // First time seeing this letter
+              state === "correct" || // Always upgrade to correct
+              (state === "present" && newLetterStates[letter] === "absent") // Upgrade absent to present
+            ) {
+              newLetterStates[letter] = state;
+            }
           }
-        }
-        setLetterStates(newLetterStates);
+          setLetterStates(newLetterStates);
+        }, WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS);
       }
 
-      // Check win/lose conditions
+      // Check win/lose conditions and schedule popup display
       if (result.correct) {
         setGameStatus("won");
-        // Show popup after a short delay to let user see the colored (fully green) row
+        // Calculate when to show popup: wait for all flips to start + buffer for user to see result
+        // Formula: (5 letters * 400ms stagger) + 1000ms buffer = 3000ms total
+        // This ensures user sees the final letter flip and has time to process the win
+        const animationDuration =
+          WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 1000;
         setTimeout(() => {
           setShowGameEndPopup(true);
-        }, 500);
+        }, animationDuration);
       } else if (newGuesses.length >= guessesAllowed) {
         setGameStatus("lost");
-        setShowGameEndPopup(true);
+        // Use same timing calculation for consistency in user experience
+        // Player gets to see their final guess result before failure message
+        const animationDuration =
+          WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 1000;
+        setTimeout(() => {
+          setShowGameEndPopup(true);
+        }, animationDuration);
         onFailure();
       }
 
@@ -140,18 +228,20 @@ export function WordleGame({
   }, [
     currentGuess,
     isSubmitting,
+    isAnimationRunning,
     onGuess,
     guesses,
     evaluations,
     guessesAllowed,
     onFailure,
     letterStates,
+    animateLetterReveal,
   ]);
 
   // Handle displayed keyboard input
   const handleKeyboardInput = useCallback(
     (key: string) => {
-      if (gameStatus !== "playing") return;
+      if (gameStatus !== "playing" || isAnimationRunning) return;
 
       if (key === "ENTER") {
         if (currentGuess.length === WORDLE_WORD_LENGTH && !isSubmitting) {
@@ -165,13 +255,19 @@ export function WordleGame({
         }
       }
     },
-    [gameStatus, handleSubmit, currentGuess.length, isSubmitting]
+    [
+      gameStatus,
+      handleSubmit,
+      currentGuess.length,
+      isSubmitting,
+      isAnimationRunning,
+    ]
   );
 
   // Handle actual keyboard input for typing letters, backspace, and enter
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (gameStatus === "playing") {
+      if (gameStatus === "playing" && !isAnimationRunning) {
         if (event.key === "Enter") {
           // Submit guess when Enter is pressed
           if (currentGuess.length === WORDLE_WORD_LENGTH && !isSubmitting) {
@@ -191,7 +287,13 @@ export function WordleGame({
 
     globalThis.addEventListener("keydown", handleKeyDown);
     return () => globalThis.removeEventListener("keydown", handleKeyDown);
-  }, [gameStatus, handleSubmit, currentGuess.length, isSubmitting]);
+  }, [
+    gameStatus,
+    handleSubmit,
+    currentGuess.length,
+    isSubmitting,
+    isAnimationRunning,
+  ]);
 
   return (
     <div className="wordle-game">
@@ -216,19 +318,46 @@ export function WordleGame({
                 letter = currentGuess[j] || "";
               }
 
-              // Apply appropriate CSS class based on evaluation state
+              // Determine cell styling based on animation state
               let cellClass = "wordle-cell ";
+
+              // Animation logic: controls flip timing and color reveal
+              // Complex state machine that determines when each letter should animate and show colors
+
+              // shouldStartFlip: Has this letter's animation been triggered?
+              // True when: we're animating this row AND the animation has reached or passed this letter
+              // Example: Row 2, Letter 3 starts flipping when animatingLetterIndex >= 3
+              const shouldStartFlip =
+                animatingRowIndex === i && animatingLetterIndex >= j;
+
+              // hasCompletedFlip: Should this letter show its final color?
+              // For animating rows: True when completedLetterIndex has reached this letter
+              // For non-animating rows: Always true (they show colors immediately)
+              // This creates the delayed color reveal effect during animations
+              const hasCompletedFlip =
+                animatingRowIndex === i ? completedLetterIndex >= j : true;
+
+              // isCurrentlyFlipping: Is this letter actively in its flip animation?
+              // True when: animation started for this letter BUT color hasn't been revealed yet
+              // This triggers the CSS flip class for the visual rotation effect
+              const isCurrentlyFlipping = shouldStartFlip && !hasCompletedFlip;
+
               if (i < guesses.length) {
-                // Apply evaluation-based colors for completed guesses
-                if (evaluations[i]?.[j]) {
+                // Colors only show after flip animation reaches completion point
+                if (evaluations[i]?.[j] && hasCompletedFlip) {
                   cellClass += evaluations[i][j]; // 'correct', 'present', or 'absent'
                 } else {
                   cellClass += "filled";
                 }
+
+                // Active flip animation class
+                if (isCurrentlyFlipping) {
+                  cellClass += " flip";
+                }
               } else if (i === guesses.length) {
-                cellClass += "current";
+                cellClass += "current"; // Currently typing row
               } else {
-                cellClass += "empty";
+                cellClass += "empty"; // Future guess rows
               }
 
               return (
@@ -251,7 +380,9 @@ export function WordleGame({
                   key === "ENTER" || key === "BACKSPACE" ? "wide" : ""
                 } ${letterStates[key] || ""}`}
                 onClick={() => handleKeyboardInput(key)}
-                disabled={gameStatus !== "playing" || isSubmitting}
+                disabled={
+                  gameStatus !== "playing" || isSubmitting || isAnimationRunning
+                }
               >
                 {key === "BACKSPACE" ? "⌫" : key}
               </button>
