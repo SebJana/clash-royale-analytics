@@ -124,8 +124,15 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
       // If the guess was correct, we get a wordle_token
       if (result.is_solution && result.wordle_token) {
         setWordleToken(result.wordle_token);
-        setCurrentStep("security");
-        return { correct: true };
+        // Don't transition immediately - let the Wordle component show success popup
+        // setCurrentStep("security"); // This will be called by handleWordleSuccess [upon user clicking continue]
+        return {
+          correct: true,
+          feedback: {
+            evaluation: result.evaluation as Record<number, string>,
+            solution: result.solution ?? "",
+          },
+        };
       }
 
       // Return feedback for incorrect guesses
@@ -134,6 +141,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
         feedback: {
           evaluation: result.evaluation as Record<number, string>,
           remaining_guesses: result.remaining_guesses,
+          solution: result.solution ?? "",
         },
       };
     } catch (err) {
@@ -142,11 +150,21 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     }
   };
 
-  const handleWordleFailure = () => {
-    // TODO let user retry with a new wordle challenge, don't reset to captcha instantly
-    setError("Failed to solve the wordle puzzle. Please try again.");
-    // Reset the auth flow
-    resetAuthFlow();
+  const handleWordleFailure = async () => {
+    // Reset the Wordle challenge to allow retry --> request new id
+    try {
+      const { wordle_id } = await getWordleId();
+      setWordleId(wordle_id);
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      setError("Failed to load new wordle challenge. Please refresh the page.");
+      console.error("Wordle retry initialization error:", err);
+    }
+  };
+
+  const handleWordleSuccess = () => {
+    // Move to the next step (security questions)
+    setCurrentStep("security");
   };
 
   const handleSecuritySubmit = async () => {
@@ -249,6 +267,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
           guessesAllowed={MAX_WORDLE_GUESSES_ALLOWED}
           onGuess={handleWordleGuess}
           onFailure={handleWordleFailure}
+          onSuccess={handleWordleSuccess}
         />
       )}
     </div>

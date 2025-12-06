@@ -19,6 +19,7 @@ export type WordleVerifyRequest = {
   captcha_token: string;
   wordle_id: string;
   wordle_guess: string;
+  solution?: string;
 };
 
 export type SecurityQuestionsRequest = {

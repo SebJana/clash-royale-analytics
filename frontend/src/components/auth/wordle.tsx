@@ -7,9 +7,10 @@ interface WordleGameProps {
   readonly guessesAllowed: number; // Maximum number of guesses
   readonly onGuess: (guess: string) => Promise<{
     correct: boolean;
-    feedback?: { evaluation: Record<number, string> };
+    feedback?: { evaluation: Record<number, string>; solution: string };
   }>; // Callback to validate guess and get feedback
   readonly onFailure: () => void; // Callback when all guesses are exhausted
+  readonly onSuccess?: () => void; // Callback when the wordle is solved
 }
 
 const WORDLE_WORD_LENGTH = 5;
@@ -28,6 +29,7 @@ export function WordleGame({
   guessesAllowed,
   onGuess,
   onFailure,
+  onSuccess,
 }: WordleGameProps) {
   const [guesses, setGuesses] = useState<string[]>([]); // All submitted guesses
   const [evaluations, setEvaluations] = useState<string[][]>([]); // Color feedback for each guess
@@ -35,9 +37,11 @@ export function WordleGame({
   const [gameStatus, setGameStatus] = useState<"playing" | "won" | "lost">(
     "playing"
   );
+  const [solution, setSolution] = useState(""); // Keep track of solution, to display correct answer when the game is lost
   const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for API calls
   const [letterStates, setLetterStates] = useState<Record<string, string>>({}); // Track state of each letter
   const [shakeCurrentRow, setShakeCurrentRow] = useState(false); // Trigger shake animation on current row
+  const [showGameEndPopup, setShowGameEndPopup] = useState(false); // Show win/lose popup
 
   // Handle guess submission and evaluation
   const handleSubmit = useCallback(async () => {
@@ -63,6 +67,7 @@ export function WordleGame({
     setIsSubmitting(true);
     try {
       const result = await onGuess(currentGuess);
+      setSolution(result.feedback?.solution ?? ""); // Save solution, if it is present in result
       const newGuesses = [...guesses, currentGuess];
       setGuesses(newGuesses);
 
@@ -116,8 +121,13 @@ export function WordleGame({
       // Check win/lose conditions
       if (result.correct) {
         setGameStatus("won");
+        // Show popup after a short delay to let user see the colored (fully green) row
+        setTimeout(() => {
+          setShowGameEndPopup(true);
+        }, 500);
       } else if (newGuesses.length >= guessesAllowed) {
         setGameStatus("lost");
+        setShowGameEndPopup(true);
         onFailure();
       }
 
@@ -230,7 +240,6 @@ export function WordleGame({
           </div>
         ))}
       </div>
-
       {/* Wordle keyboard */}
       <div className="wordle-keyboard">
         {KEYBOARD_ROWS.map((row) => (
@@ -251,12 +260,52 @@ export function WordleGame({
         ))}
       </div>
 
-      <div className="wordle-status">
-        <p>
-          Guesses used: {guesses.length} / {guessesAllowed}
-        </p>
-        {/* TODO upon game end show screen with continue (win) or restart and answer (loss)  */}
-      </div>
+      {/* Game end popup for win/loss */}
+      {showGameEndPopup && (
+        <div className="game-end-popup">
+          <div className="popup-content">
+            {gameStatus === "won" ? (
+              <>
+                <h2>🎉 Solved! 🎉</h2>
+                <p>Congratulations! You've proven your worth!</p>
+                <button
+                  className="popup-button continue-button"
+                  onClick={() => {
+                    setShowGameEndPopup(false);
+                    onSuccess?.();
+                  }}
+                >
+                  Continue
+                </button>
+              </>
+            ) : (
+              <>
+                <h2>Game Over</h2>
+                <p>
+                  The correct solution was:{" "}
+                  <strong>{solution.toUpperCase()}</strong>
+                </p>
+                <button
+                  className="popup-button retry-button"
+                  onClick={() => {
+                    setShowGameEndPopup(false);
+                    // Reset game state for retry
+                    setGuesses([]);
+                    setEvaluations([]);
+                    setCurrentGuess("");
+                    setGameStatus("playing");
+                    setLetterStates({});
+                    // Call onFailure to restart challenge
+                    onFailure();
+                  }}
+                >
+                  Try Again
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -217,7 +217,7 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
     remaining_guesses = max(settings.MAX_WORDLE_GUESSES - (guesses + 1), 0)
 
     # Save the updated session again
-    # NOTE: resets the previous TTL
+    # NOTE: resets the previous TTL, so the TTL is a PER GUESS TTL
     await set_redis_json(
         redis_conn, key, updated_challenge, settings.CACHE_TTL_WORDLE_CHALLENGE
     )
