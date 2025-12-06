@@ -14,6 +14,13 @@ interface WordleGameProps {
 
 const WORDLE_WORD_LENGTH = 5;
 
+// Keyboard layout for Wordle (always use American 'QWERTY' layout)
+const KEYBOARD_ROWS = [
+  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+  ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+  ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "BACKSPACE"],
+];
+
 /**
  * Wordle game component for authentication challenge
  */
@@ -29,6 +36,7 @@ export function WordleGame({
     "playing"
   );
   const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for API calls
+  const [letterStates, setLetterStates] = useState<Record<string, string>>({}); // Track state of each letter
 
   // Handle guess submission and evaluation
   const handleSubmit = useCallback(async () => {
@@ -79,6 +87,24 @@ export function WordleGame({
 
         const newEvaluations = [...evaluations, evaluationArray];
         setEvaluations(newEvaluations);
+
+        // Update letter states for keyboard
+        const newLetterStates = { ...letterStates };
+        for (let i = 0; i < WORDLE_WORD_LENGTH; i++) {
+          const letter = currentGuess[i];
+          const state = evaluationArray[i];
+
+          // Only update if the new state is "better" than the existing one
+          // Priority: correct > present > absent > unused
+          if (
+            !newLetterStates[letter] ||
+            state === "correct" ||
+            (state === "present" && newLetterStates[letter] === "absent")
+          ) {
+            newLetterStates[letter] = state;
+          }
+        }
+        setLetterStates(newLetterStates);
       }
 
       // Check win/lose conditions
@@ -103,9 +129,30 @@ export function WordleGame({
     evaluations,
     guessesAllowed,
     onFailure,
+    letterStates,
   ]);
 
-  // Handle keyboard input for typing letters, backspace, and enter
+  // Handle displayed keyboard input
+  const handleKeyboardInput = useCallback(
+    (key: string) => {
+      if (gameStatus !== "playing") return;
+
+      if (key === "ENTER") {
+        if (currentGuess.length === WORDLE_WORD_LENGTH && !isSubmitting) {
+          handleSubmit();
+        }
+      } else if (key === "BACKSPACE") {
+        setCurrentGuess((prev) => prev.slice(0, -1));
+      } else if (/^[A-Z]$/.test(key)) {
+        if (currentGuess.length < WORDLE_WORD_LENGTH) {
+          setCurrentGuess((prev) => prev + key);
+        }
+      }
+    },
+    [gameStatus, handleSubmit, currentGuess.length, isSubmitting]
+  );
+
+  // Handle actual keyboard input for typing letters, backspace, and enter
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (gameStatus === "playing") {
@@ -135,7 +182,6 @@ export function WordleGame({
       <h3>
         Solve the Wordle to prove you're worthy of managing player tracking
       </h3>
-      <p>You have {guessesAllowed} attempts.</p>
 
       {/* TODO better visual feedback for invalid guess and one by one filling of letters */}
 
@@ -176,29 +222,24 @@ export function WordleGame({
         ))}
       </div>
 
-      {/* TODO add keyboard layout showing the remaining letters and their colors 
-          Keyboard would have to mirror local layout of the user tho, as long as it is english compatible*/}
-
-      <div className="wordle-input-area">
-        <input
-          type="text"
-          value={currentGuess}
-          readOnly
-          maxLength={WORDLE_WORD_LENGTH}
-          placeholder={`Enter ${WORDLE_WORD_LENGTH}-letter word`}
-          disabled={gameStatus !== "playing" || isSubmitting}
-          autoFocus
-        />
-        <button
-          onClick={handleSubmit}
-          disabled={
-            currentGuess.length !== WORDLE_WORD_LENGTH ||
-            gameStatus !== "playing" ||
-            isSubmitting
-          }
-        >
-          {isSubmitting ? "Submitting..." : "Submit"}
-        </button>
+      {/* Wordle keyboard */}
+      <div className="wordle-keyboard">
+        {KEYBOARD_ROWS.map((row) => (
+          <div key={row.join("")} className="keyboard-row">
+            {row.map((key) => (
+              <button
+                key={key}
+                className={`keyboard-key ${
+                  key === "ENTER" || key === "BACKSPACE" ? "wide" : ""
+                } ${letterStates[key] || ""}`}
+                onClick={() => handleKeyboardInput(key)}
+                disabled={gameStatus !== "playing" || isSubmitting}
+              >
+                {key === "BACKSPACE" ? "⌫" : key}
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
 
       <div className="wordle-status">

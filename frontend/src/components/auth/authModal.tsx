@@ -143,7 +143,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   };
 
   const handleWordleFailure = () => {
-    // TODO let user retry with a new wordle challenge, don't reset to captcha
+    // TODO let user retry with a new wordle challenge, don't reset to captcha instantly
     setError("Failed to solve the wordle puzzle. Please try again.");
     // Reset the auth flow
     resetAuthFlow();
@@ -208,7 +208,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
 
   const renderCaptchaStep = () => (
     <div className="auth-step">
-      <h3>Solve the Captcha to prove that you are not a robot</h3>
+      <h3>Prove that you are not a robot</h3>
       {captchaImageUrl && (
         <div className="captcha-container">
           <img src={captchaImageUrl} alt="Captcha" className="captcha-image" />
@@ -257,7 +257,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   const renderSecurityStep = () => (
     <div className="auth-step">
       <h3>
-        Solve the Security Questions to prove that you have elite Clash Royale
+        Answer these questions to prove that you have elite Clash Royale
         Knowledge
       </h3>
       <div className="security-questions">
