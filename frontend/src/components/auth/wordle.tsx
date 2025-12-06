@@ -37,17 +37,23 @@ export function WordleGame({
   );
   const [isSubmitting, setIsSubmitting] = useState(false); // Loading state for API calls
   const [letterStates, setLetterStates] = useState<Record<string, string>>({}); // Track state of each letter
+  const [shakeCurrentRow, setShakeCurrentRow] = useState(false); // Trigger shake animation on current row
 
   // Handle guess submission and evaluation
   const handleSubmit = useCallback(async () => {
     if (currentGuess.length !== WORDLE_WORD_LENGTH || isSubmitting) return;
 
-    // Validate guess before submitting - silently block if invalid
-    // TODO add not in word list pop up and letter boxes shake animation?
+    // Validate guess before submitting - show popup and shake on invalid guess
     try {
       const isValid = await isValidGuess(currentGuess);
       if (!isValid) {
-        return; // Simply block the submission of the invalid guess
+        // Show invalid popup and trigger shake animation
+        setShakeCurrentRow(true);
+
+        // Stop shake animation after 500ms
+        setTimeout(() => setShakeCurrentRow(false), 500);
+
+        return; // Block the submission of the invalid guess
       }
     } catch (error) {
       console.error("Error validating guess:", error);
@@ -183,12 +189,15 @@ export function WordleGame({
         Solve the Wordle to prove you're worthy of managing player tracking
       </h3>
 
-      {/* TODO better visual feedback for invalid guess and one by one filling of letters */}
-
       <div className="wordle-grid">
         {/* Render game grid with rows for each guess attempt */}
         {Array.from({ length: guessesAllowed }, (_, i) => (
-          <div key={i} className="wordle-row">
+          <div
+            key={i}
+            className={`wordle-row ${
+              i === guesses.length && shakeCurrentRow ? "shake" : ""
+            }`}
+          >
             {Array.from({ length: WORDLE_WORD_LENGTH }, (_, j) => {
               let letter = "";
               if (i < guesses.length) {
