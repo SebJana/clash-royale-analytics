@@ -146,6 +146,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
       };
     } catch (err) {
       console.error("Wordle guess error:", err);
+      setError("Something went wrong, couldn't submit guess.");
       throw err;
     }
   };
