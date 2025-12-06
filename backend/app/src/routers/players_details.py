@@ -7,7 +7,7 @@ import httpx
 
 from core.deps import DbConn, CrApi, RedConn, require_tracked_player
 from core.settings import settings
-from core.validate import (
+from helpers.validate import (
     validate_between_request,
     validate_battles_request,
     validate_game_modes,

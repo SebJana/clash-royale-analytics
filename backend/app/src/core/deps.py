@@ -1,7 +1,7 @@
 from fastapi import Depends, Request, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Annotated
-from core.jwt import validate_access_token, AvailableTokenTypes
+from helpers.jwt import validate_access_token, AvailableTokenTypes
 from redis_service import RedisConn
 from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn, check_player_tracked

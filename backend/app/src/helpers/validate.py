@@ -4,7 +4,7 @@ from models.schema import BetweenRequest, BattlesRequest
 from core.deps import RedConn
 from redis_service import get_redis_json, build_redis_key
 from typing import Optional, List
-from .settings import settings
+from core.settings import settings
 
 
 class ParamsRequestError(Exception):

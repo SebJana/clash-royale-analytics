@@ -95,7 +95,7 @@ export const DeckComponent = memo(function DeckComponent({
 }>) {
   const cardsPerRow = 4;
   const rows: React.ReactElement[] = [];
-  // TODO sort cards here: regular evolutions (evoLevel = 1), the heroes (evoLevel = 2, so ascending) then regular cards
+  // TODO sort cards here: regular evolutions (evoLevel = 1), the heroes (evoLevel = 2, so ascending evoLevel), champions and then regular cards
   for (let i = 0; i < deck.length; i += cardsPerRow) {
     const group = deck.slice(i, i + cardsPerRow); // put the cards into one row of display
     rows.push(

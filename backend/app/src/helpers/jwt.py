@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 import uuid
 from enum import StrEnum
-from .settings import settings
+from core.settings import settings
 
 
 # Types of tokens the api gives out and validates

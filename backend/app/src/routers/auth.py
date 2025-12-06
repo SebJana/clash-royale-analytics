@@ -15,16 +15,16 @@ from models.schema import (
     WordleAnswerRequest,
     AuthTokenRequest,
 )
-from core.jwt import create_access_token, validate_access_token, AvailableTokenTypes
-from core.wordle import (
+from helpers.jwt import create_access_token, validate_access_token, AvailableTokenTypes
+from helpers.wordle import (
     get_todays_nyt_wordle,
     pick_random_wordle_solution,
     is_valid_guess,
     evaluate_guess,
     is_guess_solution,
 )
-from core.validate import valid_timezone
-from core.generate_captcha import generate_captcha_string, generate_captcha_image
+from helpers.validate import valid_timezone
+from helpers.generate_captcha import generate_captcha_string, generate_captcha_image
 
 from core.settings import settings
 

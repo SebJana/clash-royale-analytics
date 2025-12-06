@@ -2,7 +2,7 @@ import random
 import string
 from captcha.image import ImageCaptcha
 from io import BytesIO
-from .settings import settings
+from core.settings import settings
 
 # Captcha alphabet is all letters and numbers
 # Remove letters and digits that are prone to confusion
