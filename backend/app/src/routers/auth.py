@@ -116,7 +116,10 @@ async def get_captcha_token(redis_conn: RedConn, req: CaptchaAnswerRequest):
     # Check if stored and given answer match
     if req.answer.lower() == text.lower():
         return {
-            "captcha_token": create_access_token(type=AvailableTokenTypes.CAPTCHA.value)
+            "captcha_token": create_access_token(
+                type=AvailableTokenTypes.CAPTCHA.value,
+                expires_minutes=settings.CAPTCHA_TOKEN_EXPIRES_IN,
+            )
         }
 
     raise HTTPException(
@@ -203,7 +206,10 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
 
     # If it is, generate a wordle token
     if is_solution:
-        wordle_token = create_access_token(type=AvailableTokenTypes.WORDLE.value)
+        wordle_token = create_access_token(
+            type=AvailableTokenTypes.WORDLE.value,
+            expires_minutes=settings.WORDLE_TOKEN_EXPIRES_IN,
+        )
 
     # Update the 'guesses' count
     updated_challenge = {"solution": solution, "guesses": guesses + 1}
@@ -286,7 +292,10 @@ async def get_nyt_wordle_token(redis_conn: RedConn, req: NYTWordleAnswerRequest)
     # If the guess and answer are the matching, generate the wordle token
     if todays_wordle.lower() == req.wordle_guess.lower():
         return {
-            "wordle_token": create_access_token(type=AvailableTokenTypes.WORDLE.value)
+            "wordle_token": create_access_token(
+            type=AvailableTokenTypes.WORDLE.value,
+            expires_minutes=settings.WORDLE_TOKEN_EXPIRES_IN,
+            )
         }
 
     raise HTTPException(
@@ -319,7 +328,8 @@ async def get_security_token(req: SecurityQuestionsRequest):
         # Generate and return a valid token upon matching answers
         return {
             "security_token": create_access_token(
-                type=AvailableTokenTypes.SECURITY.value
+                type=AvailableTokenTypes.SECURITY.value,
+                expires_minutes=settings.SECURITY_TOKEN_EXPIRES_IN,
             )
         }
 
@@ -339,4 +349,9 @@ async def get_auth_token(req: AuthTokenRequest):
             detail="No authorization token generated, invalid token given",
         )
 
-    return {"auth_token": create_access_token(type=AvailableTokenTypes.AUTH.value)}
+    return {
+        "auth_token": create_access_token(
+            type=AvailableTokenTypes.AUTH.value,
+            expires_minutes=settings.AUTH_TOKEN_EXPIRES_IN,
+        )
+    }

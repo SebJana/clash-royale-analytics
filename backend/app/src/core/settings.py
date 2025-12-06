@@ -31,6 +31,21 @@ class Settings:
         0.33  # Adjust what share of the captcha is digits (range: 0-1)
     )
 
+    # Token Expiry Minutes
+    CAPTCHA_TOKEN_EXPIRES_IN: int = (
+        30  # How long does the user have access to try wordle?
+    )
+    # Keep this one short, to minimize brute force attacks on the answers (+ rate limiting on verify route)
+    WORDLE_TOKEN_EXPIRES_IN: int = (
+        5  # How long does the user have access to try the security questions?
+    )
+    SECURITY_TOKEN_EXPIRES_IN: int = (
+        3  # How long does the user have access to the auth token request?
+    )
+    AUTH_TOKEN_EXPIRES_IN: int = (
+        15  # How long does the user have access to protected routes?
+    )
+
     # Amount of guesses a user has to solve a wordle
     MAX_WORDLE_GUESSES: int = 6
 
@@ -42,7 +57,7 @@ class Settings:
     MONGO_CLIENT_NAME: str = "cr-analytics-api"
 
     # Maximum time interval that can be requested using a BetweenRequest for decks, cards, stats
-    # If none is wanted, just set the limit to an arbitrarily big number
+    # NOTE: If none is wanted, just set the limit to an arbitrarily big number
     MAX_TIME_RANGE_DAYS: int = 10 * 365
     # Amount of battles that can be retrieved in one request
     MIN_BATTLES: int = 1
@@ -61,10 +76,14 @@ class Settings:
     CACHE_TTL_PLAYER_BATTLE_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_BATTLES: int = (
         1 * 60
-    )  # 1 minutes (short cache time, query params likely to change often with before timestamp. Also no real calculation effort needed for retrieving last battles)
+    )  # 1 minute (short cache time, query params likely to change often with before timestamp. Also no real calculation effort needed for retrieving last battles)
     CACHE_TTL_DECK_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_CARD_STATS: int = 10 * 60  # 10 minutes
-    CACHE_TTL_CAPTCHA_CHALLENGE: int = 5 * 60  # 5 minutes
+
+    # Get set both in current and ahead version of the cache, and therefore not invalidated with every cycle
+    CACHE_TTL_CAPTCHA_CHALLENGE: int = (
+        5 * 60
+    )  # 5 minutes (how long does a captcha challenge stay valid in cache)
     # Time PER VALID GUESS on the wordle challenge, as every new guess resets the redis json and ttl
     CACHE_TTL_WORDLE_CHALLENGE: int = 10 * 60  # 10 minutes
     CACHE_TTL_NYT_WORDLE_ANSWER: int = 6 * 60 * 60  # 6 hours
