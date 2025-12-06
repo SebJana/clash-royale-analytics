@@ -7,6 +7,7 @@ export type CardMeta = {
   iconUrls: {
     medium: string;
     evolutionMedium?: string;
+    heroMedium?: string;
   };
   rarity: "common" | "rare" | "epic" | "legendary" | "champion";
 };

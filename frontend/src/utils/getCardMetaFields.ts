@@ -12,18 +12,24 @@ export function getCardElixirCost(cardID: number, cards: CardMeta[]): number {
   return cards.find((c) => c.id === cardID)?.elixirCost ?? 0;
 }
 
-// TODO adjust for evolutionLevel = 2, use number instead of boolean
 export function getCardIcon(
   cardID: number,
-  evolution: boolean,
+  evolutionLevel: number,
   cards: CardMeta[]
 ): string {
   // Return the evolution icon version for the specified card
-  if (evolution) {
+  if (evolutionLevel === 2) {
+    return (
+      cards.find((c) => c.id === cardID)?.iconUrls.heroMedium ?? `#${cardID}`
+    );
+  }
+  // Return the evolution icon version for the specified card
+  if (evolutionLevel === 1) {
     return (
       cards.find((c) => c.id === cardID)?.iconUrls.evolutionMedium ??
       `#${cardID}`
     );
   }
+  // Use the regular icon for the rest
   return cards.find((c) => c.id === cardID)?.iconUrls.medium ?? `#${cardID}`;
 }
