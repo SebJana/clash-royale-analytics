@@ -399,6 +399,16 @@ export function WordleGame({
               <>
                 <h2>🎉 Solved! 🎉</h2>
                 <p>Congratulations! You've proven your worth!</p>
+                <p>
+                  <a
+                    href={`https://dictionary.cambridge.org/dictionary/english/${solution}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="definition-link"
+                  >
+                    Look up definition
+                  </a>
+                </p>
                 <button
                   className="popup-button continue-button"
                   onClick={() => {
@@ -415,6 +425,16 @@ export function WordleGame({
                 <p>
                   The correct solution was:{" "}
                   <strong>{solution.toUpperCase()}</strong>
+                </p>
+                <p>
+                  <a
+                    href={`https://dictionary.cambridge.org/dictionary/english/${solution}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="definition-link"
+                  >
+                    Look up definition
+                  </a>
                 </p>
                 <button
                   className="popup-button retry-button"

@@ -239,8 +239,8 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
         "wordle_token": wordle_token,
     }
 
-    # Reveal the answer upon no more guesses left
-    if remaining_guesses == 0:
+    # Reveal the answer upon no more guesses left or when the request solved the wordle
+    if remaining_guesses == 0 or is_solution:
         result["solution"] = solution
 
     return result
