@@ -297,6 +297,9 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
             }
             placeholder="e.g., Mega Knight"
             disabled={loading}
+            autoComplete="off"
+            spellCheck="false"
+            data-form-type="other"
           />
         </div>
         <div className="question-group">
@@ -315,6 +318,9 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
             }
             placeholder="e.g., X-Bow"
             disabled={loading}
+            autoComplete="off"
+            spellCheck="false"
+            data-form-type="other"
           />
         </div>
         <div className="question-group">
@@ -333,6 +339,9 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
             }
             placeholder="e.g., Heal Spirit"
             disabled={loading}
+            autoComplete="off"
+            spellCheck="false"
+            data-form-type="other"
           />
         </div>
         <Button
