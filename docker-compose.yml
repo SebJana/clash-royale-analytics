@@ -59,6 +59,18 @@ services:
     networks:
       - cr-analytics
 
+  redis-rate-limit:
+    image: redis:8.0-alpine
+    command: >
+      redis-server
+      --appendonly no
+      --maxmemory 100mb
+      --maxmemory-policy allkeys-lru
+      --protected-mode no
+    restart: unless-stopped
+    networks:
+      - cr-analytics
+
   api:
     build:
       context: ./
@@ -67,6 +79,7 @@ services:
     depends_on:
       - mongo
       - redis
+      - redis-rate-limit
     env_file:
       - .env
     networks:

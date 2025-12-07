@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi_limiter.depends import RateLimiter
 from core.deps import (
     DbConn,
     CrApi,
@@ -16,7 +17,7 @@ from mongo import (
 router = APIRouter(prefix="/players", tags=["Tracked Players"])
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(RateLimiter(times=15, seconds=60))])
 async def list_tracked_players(mongo_conn: DbConn):
     try:
         players = await get_tracked_players(mongo_conn)
@@ -38,7 +39,7 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
         )
 
 
-@router.post("/{player_tag}")
+@router.post("/{player_tag}", dependencies=[Depends(RateLimiter(times=3, seconds=60))])
 async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi):
     try:
         player = await cr_api.check_existing_player(player_tag)
@@ -68,7 +69,9 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
         )
 
 
-@router.delete("/{player_tag}")
+@router.delete(
+    "/{player_tag}", dependencies=[Depends(RateLimiter(times=3, seconds=60))]
+)
 async def remove_tracked_player(
     mongo_conn: DbConn,
     _=Depends(require_auth),

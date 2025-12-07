@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
+from fastapi_limiter.depends import RateLimiter
 from rapidfuzz import fuzz
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -45,8 +46,10 @@ router = APIRouter(prefix="/auth", tags=["Authorization"])
 # 4) Auth Token:
 #    Client exchanges wordle_token for final auth token (grants access)
 
+# Use relatively strict rate limiting here to try and limit bot attack opportunities
 
-@router.get("/captcha_id")
+
+@router.get("/captcha_id", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def get_captcha_id(redis_conn: RedConn):
     """Generate a new captcha ID and store the associated text in Redis cache.
 
@@ -78,7 +81,10 @@ async def get_captcha_id(redis_conn: RedConn):
     return {"captcha_id": captcha_id}
 
 
-@router.get("/captcha_image/{captcha_id}")
+@router.get(
+    "/captcha_image/{captcha_id}",
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+)
 async def get_captcha_image(redis_conn: RedConn, captcha_id: str):
 
     # Check the redis cache for both the current and ahead version
@@ -99,7 +105,9 @@ async def get_captcha_image(redis_conn: RedConn, captcha_id: str):
     )
 
 
-@router.post("/verify_captcha")
+@router.post(
+    "/verify_captcha", dependencies=[Depends(RateLimiter(times=5, seconds=60))]
+)
 async def get_captcha_token(redis_conn: RedConn, req: CaptchaAnswerRequest):
 
     # Check the redis cache for both the current and ahead version
@@ -127,7 +135,7 @@ async def get_captcha_token(redis_conn: RedConn, req: CaptchaAnswerRequest):
     )
 
 
-@router.get("/wordle_id")
+@router.get("/wordle_id", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def get_wordle_id(redis_conn: RedConn):
 
     wordle = pick_random_wordle_solution()
@@ -151,7 +159,9 @@ async def get_wordle_id(redis_conn: RedConn):
     return {"wordle_id": wordle_id}
 
 
-@router.post("/verify_wordle")
+@router.post(
+    "/verify_wordle", dependencies=[Depends(RateLimiter(times=15, seconds=60))]
+)
 async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
 
     if not validate_access_token(req.captcha_token, AvailableTokenTypes.CAPTCHA.value):
@@ -242,7 +252,7 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
 # or brute-retrieved after the 6 allowed attempts). The custom Wordle challenge endpoint
 # is preferred, as it is more secure and more engaging for human users [and definitely more frustrating too ;)].
 """
-@router.post("/verify_wordle_nyt")
+@router.post("/verify_wordle_nyt", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def get_nyt_wordle_token(redis_conn: RedConn, req: NYTWordleAnswerRequest):
 
     if not validate_access_token(req.captcha_token, AvailableTokenTypes.CAPTCHA.value):
@@ -309,7 +319,12 @@ async def get_nyt_wordle_token(redis_conn: RedConn, req: NYTWordleAnswerRequest)
 # mostly implemented as a fun way to have SOME sort of access denial
 # For a more secure protection one of the answers could be an actual password instead of a card, in that
 # case fuzzy matching and the .lower() comparison should be adjusted (set settings.SECURITY_FUZZY_THRESHOLD to 100)
-@router.post("/verify_security_questions")
+# NOTE: having a short wordle token expiry time and a tight rate limiting for requests to solve the security questions
+# makes brute forcing the answers much harder
+@router.post(
+    "/verify_security_questions",
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
+)
 async def get_security_token(req: SecurityQuestionsRequest):
 
     if not validate_access_token(req.wordle_token, AvailableTokenTypes.WORDLE.value):
@@ -338,7 +353,7 @@ async def get_security_token(req: SecurityQuestionsRequest):
     )
 
 
-@router.post("/token")
+@router.post("/token", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def get_auth_token(req: AuthTokenRequest):
 
     if not validate_access_token(

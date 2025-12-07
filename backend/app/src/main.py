@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from contextlib import asynccontextmanager
+from fastapi_limiter import FastAPILimiter
+from redis.asyncio import Redis
 
 from routers import (
     players_details,
@@ -15,6 +17,7 @@ from core.settings import settings
 from redis_service import RedisConn
 from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn
+from helpers.ip_utils import rate_limit_key_func, get_real_client_ip
 
 # NOTE time response from Clash Royale/MongoDB is in UTC so frontend needs conversion logic
 # both for the query parameter time but also the times the user gets back, which needs to be displayed in their local time
@@ -89,6 +92,10 @@ async def lifespan(app: FastAPI):
     mongo_conn = MongoConn(app_name=settings.MONGO_CLIENT_NAME)
     await retry_async(mongo_conn.connect, name="MongoDB")
     app.state.mongo = mongo_conn
+
+    # Init rate limiting
+    rate_limit_redis = Redis(host="redis-rate-limit", port=6379, db=0)
+    await FastAPILimiter.init(rate_limit_redis, identifier=rate_limit_key_func)
 
     yield
 

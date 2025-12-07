@@ -1,5 +1,6 @@
 import time
 from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi_limiter.depends import RateLimiter
 from typing import Optional, List
 from datetime import datetime
 
@@ -30,7 +31,9 @@ router = APIRouter(
 )
 
 
-@router.get("/{player_tag}/profile")
+@router.get(
+    "/{player_tag}/profile", dependencies=[Depends(RateLimiter(times=10, seconds=60))]
+)
 async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn):
     # TODO how to handle more active users than the allowed key limit of the Clash Royale API?
     # maybe save/cache the player data upon every refresh/request here?
