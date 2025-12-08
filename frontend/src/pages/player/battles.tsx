@@ -45,7 +45,11 @@ export default function PlayerBattles() {
 
   // Amount of battles that can be loaded at once from a certain filter datetime
   // NOTE: adjust this to handle load on server for users that scroll indefinitely instead of filtering (also effects rendering time)
-  const maxLoadedBattles = 100;
+  const maxLoadedBattles = 200;
+  // Page size tuned for balanced backend load and smooth mobile rendering.
+  // NOTE: 15–30 items is the sweet range; 20 avoids spammy requests (too small) and heavy DOM work (too large).
+  const battlesPageSize = 20;
+
   // State signaling that cap is reached
   const [loadingCapReached, setLoadingCapReached] = useState(false);
 
@@ -66,8 +70,12 @@ export default function PlayerBattles() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = usePlayerBattlesInfinite(playerTag, 3, true, appliedBeforeDate); // Reduced page size (3) for better UX | loading/rendering times
-
+  } = usePlayerBattlesInfinite(
+    playerTag,
+    battlesPageSize,
+    true,
+    appliedBeforeDate
+  );
   // Flatten paginated battle data into a single array for easier rendering
   const battlesList = useMemo(
     () => battles?.pages.flatMap((p) => p.last_battles.battles) ?? [],
