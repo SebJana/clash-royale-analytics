@@ -252,6 +252,7 @@ function HomePage() {
             )}
           </div>
           <div className="untrack-section">
+            {/* TODO add unlocked/locked lock icon here, to indicate wether a player is authenticated or not*/}
             <h2 className="section-header">Remove Tracked Player</h2>
             <p className="section-description">
               Enter a player tag to stop tracking their activity. Previously
