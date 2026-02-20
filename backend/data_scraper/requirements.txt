@@ -1,5 +1,4 @@
-motor==3.4.0
-pymongo==4.8.0
-httpx==0.26.0
-python-dotenv==1.0.1
-redis==5.0.1
+# Shared module dependencies
+-r ./mongo/requirements.txt
+-r ./clash_royale_api/requirements.txt
+-r ./redis_service/requirements.txt

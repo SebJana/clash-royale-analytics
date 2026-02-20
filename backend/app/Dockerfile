@@ -7,6 +7,9 @@ WORKDIR /app
 
 # Copy requirements first for better caching
 COPY backend/app/requirements.txt /app/requirements.txt
+COPY backend/mongo/requirements.txt /app/mongo/requirements.txt
+COPY backend/redis_service/requirements.txt /app/redis_service/requirements.txt
+COPY backend/clash_royale_api/requirements.txt /app/clash_royale_api/requirements.txt
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt

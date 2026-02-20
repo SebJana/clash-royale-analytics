@@ -7,6 +7,9 @@ WORKDIR /app
 
 # Copy requirements first for better caching
 COPY data_scraper/requirements.txt /app/requirements.txt
+COPY mongo/requirements.txt /app/mongo/requirements.txt
+COPY redis_service/requirements.txt /app/redis_service/requirements.txt
+COPY clash_royale_api/requirements.txt /app/clash_royale_api/requirements.txt
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
