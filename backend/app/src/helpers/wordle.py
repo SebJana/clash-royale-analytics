@@ -25,7 +25,7 @@ def load_wordle_solutions():
     Returns:
         list[str]: List of all possible Wordle answer words.
     """
-    # Path works both locally and in Docker
+    # Path works ONLY in Docker
     file_path = Path("/app/shared_resources/wordle/possible-solutions.txt")
 
     with open(file_path, "r", encoding="utf-8") as f:

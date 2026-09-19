@@ -12,6 +12,8 @@ COPY backend/redis_service/requirements.txt /app/redis_service/requirements.txt
 COPY backend/clash_royale_api/requirements.txt /app/clash_royale_api/requirements.txt
 
 # Install any needed packages specified in requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends libcairo2 \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy shared mongo connection + redis connection + cr api client + api source 
