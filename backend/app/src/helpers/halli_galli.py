@@ -626,7 +626,7 @@ def create_card(fruit: str, amount: int) -> HalliGalliCard | None:
     )
 
 
-def draw_card() -> HalliGalliCard:
+def generate_random_card() -> HalliGalliCard:
     """Create one random valid Halli Galli card.
 
     A fruit and supported count are selected independently, then delegated to
