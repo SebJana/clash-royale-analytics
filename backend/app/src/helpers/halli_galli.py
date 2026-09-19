@@ -1,14 +1,12 @@
 from pathlib import Path
 import base64
 import colorsys
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from functools import lru_cache
 from io import BytesIO
 import math
 import random
 import re
-from statistics import mean
-from time import perf_counter
+from pydantic import BaseModel, ConfigDict, Field
 
 import cairosvg
 from PIL import Image, ImageChops, ImageDraw
@@ -33,7 +31,23 @@ FRUIT_ROTATION_RANGES = {
     4: (-14, 14),
     5: (-10, 10),
 }
-FRUIT_POSITION_JITTER = 18
+# Sparse cards can use stronger position variation; vertical movement is
+# deliberately larger than horizontal movement on every card type.
+FRUIT_POSITION_JITTER = {
+    1: (32, 56),
+    2: (32, 48),
+    3: (28, 40),
+    4: (22, 32),
+    5: (18, 26),
+}
+# Shift the base formation as a whole before independently jittering fruits.
+FORMATION_POSITION_SHIFT = {
+    1: (30, 42),
+    2: (28, 38),
+    3: (22, 32),
+    4: (18, 26),
+    5: (14, 20),
+}
 FRUIT_GAP = 8
 FRUIT_PLACEMENT_ATTEMPTS = 100
 FRUIT_LAYOUT_ATTEMPTS = 50
@@ -73,13 +87,17 @@ FRUIT_POSITIONS = {
     ],
 }
 
-HEX_COLOR_PATTERN = re.compile(r"#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\\b")
+# Match literal SVG palette values only; this avoids changing IDs or dimensions.
+HEX_COLOR_PATTERN = re.compile(r"#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b")
 DOCKER_HALLI_GALLI_DIR = Path("/app/shared_resources/halli_galli")
 
 
-@dataclass(frozen=True)
-class FruitStyle:
+class FruitStyle(BaseModel):
     """Random visual variation applied to one fruit icon."""
+
+    # Variation is generated once per fruit, then reused during layout retries
+    # so retries change positions without unexpectedly changing the artwork.
+    model_config = ConfigDict(frozen=True)
 
     scale: float
     is_horizontally_flipped: bool
@@ -89,35 +107,127 @@ class FruitStyle:
     lightness_multiplier: float
 
 
-@dataclass(frozen=True)
-class FruitPlacement:
-    """A scaled fruit's center position and appearance on the card."""
+class FruitCreationPlacement(BaseModel):
+    """Internal placement and styling used while generating a fruit image."""
 
-    center_x: float
-    center_y: float
+    model_config = ConfigDict(frozen=True)
+
+    relative_x: float = Field(ge=0, le=1)
+    relative_y: float = Field(ge=0, le=1)
     style: FruitStyle
 
     @property
-    def half_extent(self) -> float:
-        """Return a rotation-aware half-size for overlap detection."""
+    def center_x(self) -> float:
+        """Return the horizontal center in card pixels for rendering."""
 
-        half_size = FRUIT_SIZE * self.style.scale / 2
+        return self.relative_x * CARD_WIDTH
+
+    @property
+    def center_y(self) -> float:
+        """Return the vertical center in card pixels for rendering."""
+
+        return self.relative_y * CARD_HEIGHT
+
+    def to_image_bounds(
+        self, visible_hull: tuple[tuple[float, float], ...]
+    ) -> "FruitImageBounds":
+        """Transform the cached painted SVG hull into an unchecked image box."""
+
+        image_x = self.center_x - FRUIT_SIZE / 2
+        image_y = self.center_y - FRUIT_SIZE / 2
+        horizontal_scale = (
+            -self.style.scale
+            if self.style.is_horizontally_flipped
+            else self.style.scale
+        )
+        vertical_scale = self.style.scale
         rotation = math.radians(self.style.rotation_degrees)
-        return half_size * (abs(math.cos(rotation)) + abs(math.sin(rotation)))
+        cosine = math.cos(rotation)
+        sine = math.sin(rotation)
+
+        transformed_points = []
+        for source_x, source_y in visible_hull:
+            # This matches the translate -> rotate -> scale SVG transform used
+            # for rendering each image element below.
+            offset_x = (image_x + source_x - self.center_x) * horizontal_scale
+            offset_y = (image_y + source_y - self.center_y) * vertical_scale
+            transformed_points.append(
+                (
+                    self.center_x + offset_x * cosine - offset_y * sine,
+                    self.center_y + offset_x * sine + offset_y * cosine,
+                )
+            )
+
+        min_x = min(point[0] for point in transformed_points)
+        max_x = max(point[0] for point in transformed_points)
+        min_y = min(point[1] for point in transformed_points)
+        max_y = max(point[1] for point in transformed_points)
+        return FruitImageBounds(
+            x=min_x / CARD_WIDTH,
+            y=min_y / CARD_HEIGHT,
+            width=(max_x - min_x) / CARD_WIDTH,
+            height=(max_y - min_y) / CARD_HEIGHT,
+        )
+
+    def to_image_position(
+        self, visible_hull: tuple[tuple[float, float], ...]
+    ) -> "FruitImagePosition":
+        """Return a validated final-image box for an accepted placement."""
+
+        return FruitImagePosition(**self.to_image_bounds(visible_hull).model_dump())
 
 
-def _random_source(rng: random.Random | None):
-    """Return an injectable random source, defaulting to the module generator."""
+class FruitImageBounds(BaseModel):
+    """Internal normalized box that may temporarily extend outside the card."""
 
-    return rng if rng is not None else random
+    model_config = ConfigDict(frozen=True)
+
+    x: float
+    y: float
+    width: float = Field(gt=0)
+    height: float = Field(gt=0)
+
+
+class FruitImagePosition(BaseModel):
+    """A normalized painted fruit bounding box on the final card image."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # x/y identify the top-left corner in normalized 0-1 card coordinates.
+    # Bounds derive from source SVG alpha pixels, not the full viewport, and
+    # remain usable when the PNG is displayed at a different size.
+    # Keep these values server-side for click hit testing: a submitted pointer
+    # coordinate can be checked against the target fruit's painted bounds. This
+    # means automation must locate the fruit on the image, not merely classify
+    # the card's fruit type or count. Do not expose these boxes to the client.
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    width: float = Field(gt=0, le=1)
+    height: float = Field(gt=0, le=1)
+
+
+class HalliGalliCard(BaseModel):
+    """A rendered card and the server-side metadata used to produce it."""
+
+    # The renderer has finished when this model is created; immutable metadata
+    # prevents its answer from drifting away from the rendered image in memory.
+    model_config = ConfigDict(frozen=True)
+
+    image: bytes
+    fruit: str
+    amount: int
+    fruit_positions: list[FruitImagePosition]
 
 
 def find_halli_galli_asset_dir() -> Path:
     """Find assets in Docker first, then locate them from a local checkout."""
 
     if DOCKER_HALLI_GALLI_DIR.is_dir():
+        # Docker copies shared resources to this stable runtime location.
         return DOCKER_HALLI_GALLI_DIR
 
+    # Local paths vary by developer, so discover the repository resource folder
+    # from this module rather than relying on a machine-specific absolute path.
     for parent in Path(__file__).resolve().parents:
         asset_dir = parent / "shared_resources" / "halli_galli"
         if asset_dir.is_dir():
@@ -126,7 +236,7 @@ def find_halli_galli_asset_dir() -> Path:
     raise FileNotFoundError("Could not locate shared_resources/halli_galli")
 
 
-def load_random_fruit_svg(fruit: str, rng: random.Random | None = None) -> str:
+def load_random_fruit_svg(fruit: str) -> str:
     """Load a random SVG variation for the given fruit."""
 
     fruit_path = find_halli_galli_asset_dir() / fruit
@@ -137,22 +247,103 @@ def load_random_fruit_svg(fruit: str, rng: random.Random | None = None) -> str:
         raise FileNotFoundError(f"No SVG files found in {fruit_path}")
 
     # Pick one of the variations in the fruit directory
-    file_path = _random_source(rng).choice(svg_files)
+    file_path = random.choice(svg_files)
 
     return file_path.read_text(encoding="utf-8")
 
 
-def create_fruit_style(amount: int, rng: random.Random | None = None) -> FruitStyle:
+def _convex_hull(
+    points: set[tuple[float, float]],
+) -> tuple[tuple[float, float], ...]:
+    """Return the convex hull used for fast affine bounding-box transforms."""
+
+    sorted_points = sorted(points)
+    if len(sorted_points) <= 1:
+        return tuple(sorted_points)
+
+    def cross(
+        origin: tuple[float, float],
+        first: tuple[float, float],
+        second: tuple[float, float],
+    ) -> float:
+        return (first[0] - origin[0]) * (second[1] - origin[1]) - (
+            first[1] - origin[1]
+        ) * (second[0] - origin[0])
+
+    lower = []
+    for point in sorted_points:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= 0:
+            lower.pop()
+        lower.append(point)
+
+    upper = []
+    for point in reversed(sorted_points):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= 0:
+            upper.pop()
+        upper.append(point)
+
+    return tuple(lower[:-1] + upper[:-1])
+
+
+@lru_cache(maxsize=None)
+def get_visible_svg_hull(svg: str) -> tuple[tuple[float, float], ...]:
+    """Cache the convex hull of a fixed SVG's non-transparent source pixels."""
+
+    # Rendering source assets at their displayed 96px viewport captures their
+    # real paths, fills, strokes, clipping, and transparent padding at once.
+    png = cairosvg.svg2png(
+        bytestring=svg.encode("utf-8"),
+        output_width=FRUIT_SIZE,
+        output_height=FRUIT_SIZE,
+    )
+    alpha = Image.open(BytesIO(png)).convert("RGBA").getchannel("A")
+    pixel_corners = set()
+
+    for index, opacity in enumerate(alpha.getdata()):
+        if opacity == 0:
+            continue
+
+        pixel_x = index % FRUIT_SIZE
+        pixel_y = index // FRUIT_SIZE
+        # Pixel corners, rather than centers, avoid under-reporting the visible
+        # extent by half a pixel before scale and rotation are applied.
+        pixel_corners.update(
+            {
+                (pixel_x, pixel_y),
+                (pixel_x + 1, pixel_y),
+                (pixel_x, pixel_y + 1),
+                (pixel_x + 1, pixel_y + 1),
+            }
+        )
+
+    if not pixel_corners:
+        raise ValueError("Fruit SVG has no visible pixels")
+
+    return _convex_hull(pixel_corners)
+
+
+def create_fruit_style(amount: int) -> FruitStyle:
     """Create subtle, independently testable visual variation for one fruit."""
 
-    source = _random_source(rng)
+    # Amount-specific ranges keep sparse cards expressive without making dense
+    # layouts impossible to place after rotation and collision checks.
     return FruitStyle(
-        scale=source.uniform(*FRUIT_SCALE_RANGES[amount]),
-        is_horizontally_flipped=source.choice((True, False)),
-        rotation_degrees=source.uniform(*FRUIT_ROTATION_RANGES[amount]),
-        hue_shift=source.uniform(-0.05, 0.05),
-        saturation_multiplier=source.uniform(0.85, 1.15),
-        lightness_multiplier=source.uniform(0.90, 1.10),
+        scale=random.uniform(*FRUIT_SCALE_RANGES[amount]),
+        is_horizontally_flipped=random.choice((True, False)),
+        rotation_degrees=random.uniform(*FRUIT_ROTATION_RANGES[amount]),
+        hue_shift=random.uniform(-0.03, 0.03),
+        saturation_multiplier=random.uniform(0.90, 1.10),
+        lightness_multiplier=random.uniform(0.94, 1.06),
+    )
+
+
+def create_formation_offset(amount: int) -> tuple[float, float]:
+    """Create one shared x/y offset for the card's entire fruit formation."""
+
+    max_x_shift, max_y_shift = FORMATION_POSITION_SHIFT[amount]
+    return (
+        random.uniform(-max_x_shift, max_x_shift),
+        random.uniform(-max_y_shift, max_y_shift),
     )
 
 
@@ -162,57 +353,96 @@ def clamp(value: float, lower: float, upper: float) -> float:
     return max(lower, min(value, upper))
 
 
-def placement_is_non_overlapping(
-    candidate: FruitPlacement, placements: list[FruitPlacement]
+def image_position_is_valid(
+    candidate: FruitImageBounds,
+    placed_positions: list[FruitImageBounds],
 ) -> bool:
-    """Check whether a candidate has the required gap from every fruit."""
+    """Check that a painted bounding box stays on-card and clear of others."""
 
+    horizontal_margin = CARD_CORNER_RADIUS / CARD_WIDTH
+    vertical_margin = CARD_CORNER_RADIUS / CARD_HEIGHT
+    horizontal_gap = FRUIT_GAP / CARD_WIDTH
+    vertical_gap = FRUIT_GAP / CARD_HEIGHT
+
+    if not (
+        candidate.x >= horizontal_margin
+        and candidate.y >= vertical_margin
+        and candidate.x + candidate.width <= 1 - horizontal_margin
+        and candidate.y + candidate.height <= 1 - vertical_margin
+    ):
+        return False
+
+    # The returned painted boxes are the same boxes used here. A separating-axis
+    # check is therefore enough to reject boxes that touch or overlap.
     return all(
-        abs(candidate.center_x - placement.center_x)
-        >= candidate.half_extent + placement.half_extent + FRUIT_GAP
-        or abs(candidate.center_y - placement.center_y)
-        >= candidate.half_extent + placement.half_extent + FRUIT_GAP
-        for placement in placements
+        candidate.x + candidate.width + horizontal_gap <= position.x
+        or position.x + position.width + horizontal_gap <= candidate.x
+        or candidate.y + candidate.height + vertical_gap <= position.y
+        or position.y + position.height + vertical_gap <= candidate.y
+        for position in placed_positions
     )
+
+
+def create_standard_fruit_placements(
+    relative_positions: list[tuple[float, float]],
+    styles: list[FruitStyle],
+) -> list[FruitCreationPlacement]:
+    """Return the original unshifted formation when random placement is exhausted."""
+
+    # The base formations were chosen to be readable before any variation. Keep
+    # the already-selected styles so a fallback does not unexpectedly reroll art.
+    return [
+        FruitCreationPlacement(
+            relative_x=relative_x,
+            relative_y=relative_y,
+            style=style,
+        )
+        for (relative_x, relative_y), style in zip(relative_positions, styles)
+    ]
 
 
 def create_fruit_placements(
     relative_positions: list[tuple[float, float]],
     amount: int,
-    rng: random.Random | None = None,
-) -> list[FruitPlacement]:
-    """Jitter fruit centers while enforcing card bounds and no-overlap spacing."""
+    visible_hulls: list[tuple[tuple[float, float], ...]],
+) -> list[FruitCreationPlacement]:
+    """Jitter fruits while enforcing their final painted bounds and spacing."""
 
-    source = _random_source(rng)
-    styles = [create_fruit_style(amount, source) for _ in relative_positions]
+    if len(relative_positions) != len(visible_hulls):
+        raise ValueError("Each fruit position requires one visible SVG hull")
+
+    # Keep visual identity fixed while trying alternate positions for it.
+    styles = [create_fruit_style(amount) for _ in relative_positions]
 
     # A valid early jitter can still leave too little room for a later fruit.
     # Retry the entire layout rather than weakening the no-overlap constraint.
     for _ in range(FRUIT_LAYOUT_ATTEMPTS):
         placements = []
+        image_positions = []
+        # This moves the die-like formation as one unit before each fruit gets
+        # its own jitter, avoiding a recognizable fixed formation origin.
+        formation_x, formation_y = create_formation_offset(amount)
+        max_x_jitter, max_y_jitter = FRUIT_POSITION_JITTER[amount]
 
-        for (relative_x, relative_y), style in zip(relative_positions, styles):
-            half_extent = FruitPlacement(0, 0, style).half_extent
-            base_x = CARD_WIDTH * relative_x
-            base_y = CARD_HEIGHT * relative_y
+        for (relative_x, relative_y), style, visible_hull in zip(
+            relative_positions, styles, visible_hulls
+        ):
+            base_x = CARD_WIDTH * relative_x + formation_x
+            base_y = CARD_HEIGHT * relative_y + formation_y
 
             for _ in range(FRUIT_PLACEMENT_ATTEMPTS):
-                center_x = clamp(
-                    base_x
-                    + source.uniform(-FRUIT_POSITION_JITTER, FRUIT_POSITION_JITTER),
-                    half_extent + CARD_CORNER_RADIUS,
-                    CARD_WIDTH - half_extent - CARD_CORNER_RADIUS,
+                center_x = base_x + random.uniform(-max_x_jitter, max_x_jitter)
+                center_y = base_y + random.uniform(-max_y_jitter, max_y_jitter)
+                candidate = FruitCreationPlacement(
+                    relative_x=center_x / CARD_WIDTH,
+                    relative_y=center_y / CARD_HEIGHT,
+                    style=style,
                 )
-                center_y = clamp(
-                    base_y
-                    + source.uniform(-FRUIT_POSITION_JITTER, FRUIT_POSITION_JITTER),
-                    half_extent + CARD_CORNER_RADIUS,
-                    CARD_HEIGHT - half_extent - CARD_CORNER_RADIUS,
-                )
-                candidate = FruitPlacement(center_x, center_y, style)
+                candidate_position = candidate.to_image_bounds(visible_hull)
 
-                if placement_is_non_overlapping(candidate, placements):
+                if image_position_is_valid(candidate_position, image_positions):
                     placements.append(candidate)
+                    image_positions.append(candidate_position)
                     break
             else:
                 break
@@ -220,7 +450,9 @@ def create_fruit_placements(
         if len(placements) == len(relative_positions):
             return placements
 
-    raise RuntimeError("Could not place fruit without overlapping another fruit")
+    # Random variation is optional; retain a predictable base formation if an
+    # unusually constrained randomized layout exhausts its attempts.
+    return create_standard_fruit_placements(relative_positions, styles)
 
 
 def augment_svg_colors(svg: str, style: FruitStyle) -> str:
@@ -229,6 +461,7 @@ def augment_svg_colors(svg: str, style: FruitStyle) -> str:
     def replace_color(match: re.Match) -> str:
         hex_color = match.group(1)
         if len(hex_color) == 3:
+            # Normalize shorthand (#abc) before converting it through HLS.
             hex_color = "".join(component * 2 for component in hex_color)
 
         red, green, blue = (
@@ -247,10 +480,12 @@ def augment_svg_colors(svg: str, style: FruitStyle) -> str:
     return HEX_COLOR_PATTERN.sub(replace_color, svg)
 
 
-def create_fruit_element(fruit_svg: str, placement: FruitPlacement) -> str:
+def create_fruit_element(fruit_svg: str, placement: FruitCreationPlacement) -> str:
     """Build the SVG image element for one transformed and recolored fruit."""
 
     styled_svg = augment_svg_colors(fruit_svg, placement.style)
+    # Embed the asset so the intermediate SVG remains portable to CairoSVG and
+    # never needs to expose a resource path to a client.
     encoded_svg = base64.b64encode(styled_svg.encode("utf-8")).decode("ascii")
     x = placement.center_x - FRUIT_SIZE / 2
     y = placement.center_y - FRUIT_SIZE / 2
@@ -278,6 +513,8 @@ def create_fruit_element(fruit_svg: str, placement: FruitPlacement) -> str:
 def build_card_svg(fruit_elements: list[str]) -> str:
     """Build the transparent SVG foreground containing the border and fruits."""
 
+    # The background is intentionally omitted here: it is added as raster data
+    # later, allowing the SVG foreground to stay transparent at rounded corners.
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{CARD_WIDTH}" '
         f'height="{CARD_HEIGHT}" viewBox="0 0 {CARD_WIDTH} {CARD_HEIGHT}">'
@@ -295,17 +532,20 @@ def render_svg_foreground(card_svg: str) -> Image.Image:
     return Image.open(BytesIO(png)).convert("RGBA")
 
 
-def create_noisy_background(rng: random.Random | None = None) -> Image.Image:
+def create_noisy_background() -> Image.Image:
     """Create a subtly tinted, lightly noisy background clipped to the card."""
 
-    source = _random_source(rng)
-    base_color = tuple(source.randint(*BACKGROUND_COLOR_RANGE) for _ in range(3))
+    # Per-channel base variation avoids every card sharing identical flat white.
+    base_color = tuple(random.randint(*BACKGROUND_COLOR_RANGE) for _ in range(3))
     background = Image.new("RGB", (CARD_WIDTH, CARD_HEIGHT), base_color)
     noise = Image.effect_noise(
         (CARD_WIDTH, CARD_HEIGHT), BACKGROUND_NOISE_STANDARD_DEVIATION
     ).convert("RGB")
+    # Noise is centered around 128, so the negative offset preserves the chosen
+    # base color while adding only a low-strength texture.
     background = ImageChops.add(background, noise, offset=-128).convert("RGBA")
 
+    # Mask the background as well as the SVG border so corners stay transparent.
     card_mask = Image.new("L", (CARD_WIDTH, CARD_HEIGHT), 0)
     ImageDraw.Draw(card_mask).rounded_rectangle(
         (0, 0, CARD_WIDTH - 1, CARD_HEIGHT - 1),
@@ -325,13 +565,13 @@ def compose_card(background: Image.Image, foreground: Image.Image) -> bytes:
     return output.getvalue()
 
 
-def create_card(fruit: str, amount: int) -> bytes | None:
+def create_card(fruit: str, amount: int) -> HalliGalliCard | None:
     """Create a PNG card containing ``amount`` of ``fruit``.
 
     Fruit SVGs are embedded in an intermediate SVG and then turned into a png.
 
     Returns:
-        bytes: The completed PNG image.
+        HalliGalliCard: The completed PNG image and its server-side metadata.
         None: If ``fruit`` or ``amount`` is unsupported.
     """
     # Card-generation flow:
@@ -344,6 +584,8 @@ def create_card(fruit: str, amount: int) -> bytes | None:
     #    readable card even with the intentionally stronger visual variation.
     # 4. Composite the icons over a randomized, lightly noisy background and
     #    rasterize the complete result on the server.
+    # 5. Retain the final painted bounds server-side so click validation can use
+    #    the rendered target location without sending its coordinates to clients.
     #
     # The response is a flattened PNG rather than JSON, client-side drawing
     # instructions, or SVG. Those formats expose semantic details such as the
@@ -360,10 +602,47 @@ def create_card(fruit: str, amount: int) -> bytes | None:
     if amount not in FRUIT_POSITIONS:
         return None
 
-    placements = create_fruit_placements(FRUIT_POSITIONS[amount], amount)
-    fruit_elements = [
-        create_fruit_element(load_random_fruit_svg(fruit), placement)
-        for placement in placements
-    ]
+    fruit_svgs = [load_random_fruit_svg(fruit) for _ in FRUIT_POSITIONS[amount]]
+    visible_hulls = [get_visible_svg_hull(fruit_svg) for fruit_svg in fruit_svgs]
+    placements = create_fruit_placements(
+        FRUIT_POSITIONS[amount], amount, visible_hulls
+    )
+    fruit_elements = []
+    fruit_positions = []
+    for fruit_svg, visible_hull, placement in zip(
+        fruit_svgs, visible_hulls, placements
+    ):
+        fruit_elements.append(create_fruit_element(fruit_svg, placement))
+        fruit_positions.append(
+            placement.to_image_position(visible_hull)
+        )
+
     foreground = render_svg_foreground(build_card_svg(fruit_elements))
-    return compose_card(create_noisy_background(), foreground)
+    return HalliGalliCard(
+        image=compose_card(create_noisy_background(), foreground),
+        fruit=fruit,
+        amount=amount,
+        fruit_positions=fruit_positions,
+    )
+
+
+def draw_card() -> HalliGalliCard:
+    """Create one random valid Halli Galli card.
+
+    A fruit and supported count are selected independently, then delegated to
+    ``create_card`` so the normal rendering, variation, and bound calculation
+    pipeline is used.
+
+    Returns:
+        HalliGalliCard: A fully rendered card with normalized fruit bounds.
+    """
+    random_fruit = random.choice(AVAILABLE_FRUITS)
+    random_amount = random.choice(tuple(FRUIT_POSITIONS))
+    card = create_card(random_fruit, random_amount)
+
+    # Both values come from validated constants, so a missing card indicates a
+    # programming error (or svg file lookup error) rather than an expected caller-input failure.
+    if card is None:
+        raise RuntimeError("Could not create a randomly selected Halli Galli card")
+
+    return card
