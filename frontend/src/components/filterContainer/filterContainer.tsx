@@ -127,18 +127,13 @@ export function FilterContainer({
   // Game mode initialization
   useEffect(() => {
     if (gameModes && !gameModesInitialized && !gameModesLoading) {
-      const allGameModeKeys = Object.keys(gameModes);
-
-      // Only initialize with all game modes if no applied filters exist
-      // This prevents overriding user's applied filter selections
-      if (!appliedFilters || appliedFilters.gameModes.length === 0) {
-        setSelectedGameModes(allGameModeKeys);
-        setAppliedGameModes(allGameModeKeys);
-      }
-
+      // Keep an empty selection as the canonical "all modes" value. The
+      // GameModeFilter renders it as "All game modes" without bonbons, and API
+      // helpers omit the game_modes query parameter, so newly saved battle
+      // modes are included even if the mode catalogue cache is briefly stale.
       setGameModesInitialized(true);
     }
-  }, [gameModes, gameModesInitialized, gameModesLoading, appliedFilters]);
+  }, [gameModes, gameModesInitialized, gameModesLoading]);
 
   // Enable apply button when any selection differs from applied state
   useEffect(() => {

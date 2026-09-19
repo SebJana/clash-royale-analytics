@@ -1,241 +1,239 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState } from "react";
 import {
   internalNamesToDisplayNames,
   internalDisplayMapToDisplayNamesList,
 } from "../../utils/gameModes";
-import { ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Search } from "lucide-react";
 import "./gameModeFilter.css";
 
-/**
- * Utility function to get unique items from an array
- * @param arr - Array of strings
- * @returns Array with duplicate strings removed
- */
-const uniq = (arr: string[]) => Array.from(new Set(arr));
+type GameModeOption = {
+  display: string;
+  internals: string[];
+};
 
 /**
  * GameModeFilter Component
  *
- * A collapsible filter component for selecting game modes. Handles the complexity of
- * mapping internal API keys to user-friendly display names, allowing multiple internal
- * modes to share the same display name.
+ * A collapsible, searchable game mode selector. The dropdown presents friendly
+ * display names, but every selection sent to the parent stays as the internal
+ * name saved in the database.
  *
  * Key behaviors:
- * - Empty selection array means "all modes selected" (no filtering)
- * - Visual state may differ from API state for better UX
- * - Supports "Select All" and "Clear" actions
+ * - Empty selection array means "all modes selected" (no filtering / no query param)
+ * - Empty selection intentionally has no bonbons; bonbons only represent an explicit subset
+ * - Multiple internal modes may share one display name, so they are selected and removed together
+ * - Clicking a selected bonbon directly removes its display group from the selection
  */
-
-// TODO upon any of the other filters changing, the full game mode selection to empty array doesn't work anymore
 export function GameModeFilter({
   gameModes,
   selected,
   onChange,
 }: Readonly<{
-  gameModes: Record<string, string>; // Map of internal keys to raw names from API
-  selected: string[]; // Internal keys currently selected/used by API
-  onChange: (next: string[]) => void; // Callback to emit internal keys for API (empty array when all selected or none)
+  gameModes: Record<string, string>;
+  selected: string[];
+  onChange: (next: string[]) => void;
 }>) {
-  // Controls whether the filter options are expanded or collapsed
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Controls the same show/hide behavior used by the other filter sections.
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
+  // The mode list is a separate dropdown inside the expanded filter section.
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  // Keep the search value local so typing does not affect the applied filters.
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Local visual state for selected modes (internal keys)
-  // This can differ from the parent's `selected` prop for better UX
-  const [displaySelectedModes, setDisplaySelectedModes] = useState<string[]>(
-    []
-  );
-
-  // Convert raw game mode names from API to user-friendly display names
-  // Creates a Map: internal key -> display name
+  // Convert raw names from the API into the labels shown to the user.
   const gameModesMap = useMemo(
     () => internalNamesToDisplayNames(gameModes),
     [gameModes]
   );
 
-  // Extract unique display names from the map
-  // Multiple internal keys may map to the same display name
-  const uniqueDisplayNames = useMemo(
-    () => internalDisplayMapToDisplayNamesList(gameModesMap),
-    [gameModesMap]
-  );
+  // Build one option for each display name. This keeps related internal names
+  // (for example Ranked variants) together while the API still receives raw names.
+  const options = useMemo<GameModeOption[]>(() => {
+    const displayNames = internalDisplayMapToDisplayNamesList(gameModesMap);
 
-  // Group internal keys by their display names
-  // Each option represents one filter button with its associated internal keys
-  const options = useMemo(() => {
-    return uniqueDisplayNames.map((display) => {
-      const internals: string[] = [];
-      // Find all internal keys that map to this display name
-      for (const [internal, displayName] of gameModesMap.entries()) {
-        if (displayName === display) internals.push(internal);
-      }
-      return { display, internals };
-    });
-  }, [uniqueDisplayNames, gameModesMap]);
-
-  // Complete list of all internal keys (deduplicated)
-  // Used for "Select All" functionality and comparison logic
-  const allInternals = useMemo(
-    () => uniq(options.flatMap((o) => o.internals)),
-    [options]
-  );
-
-  // Track whether we've initialized the component from props
-  // This prevents the UI from resetting when parent sends empty array after user actions
-  const didInit = useRef(false);
-
-  /**
-   * Initialize and sync local state with parent props
-   *
-   * Complex logic to handle the fact that an empty `selected` array can mean:
-   * 1. "All modes selected" (initial state)
-   * 2. "No filtering applied" (after user clicks Clear)
-   *
-   * We only auto-sync on the first render, then only when parent provides
-   * a concrete subset of modes.
-   */
-  useEffect(() => {
-    if (!didInit.current) {
-      // Initial setup: empty selection means "all selected" visually
-      setDisplaySelectedModes(
-        selected.length === 0 ? allInternals : uniq(selected)
+    return displayNames
+      .map((display) => ({
+        display,
+        internals: Array.from(gameModesMap.entries())
+          .filter(([, displayName]) => displayName === display)
+          .map(([internal]) => internal),
+      }))
+      .sort((a, b) =>
+        a.display.localeCompare(b.display, undefined, { sensitivity: "base" })
       );
-      didInit.current = true;
+  }, [gameModesMap]);
+
+  // A Set makes repeated selected-state checks cheap while rendering the list.
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+
+  // Only explicit selections become bonbons. [] means all modes, therefore no bonbons.
+  const selectedOptions = useMemo(
+    () =>
+      options.filter((option) =>
+        option.internals.some((internal) => selectedSet.has(internal))
+      ),
+    [options, selectedSet]
+  );
+
+  // Search both the friendly label and the internal value. The latter is useful
+  // when a user sees a raw mode name in a battle response or URL.
+  const filteredOptions = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLocaleLowerCase();
+    if (!normalizedSearch) return options;
+
+    return options.filter(
+      ({ display, internals }) =>
+        display.toLocaleLowerCase().includes(normalizedSearch) ||
+        internals.some((internal) =>
+          internal.toLocaleLowerCase().includes(normalizedSearch)
+        )
+    );
+  }, [options, searchTerm]);
+
+  // A display group is selected if at least one of its raw modes is selected.
+  const isOptionSelected = (option: GameModeOption) =>
+    option.internals.some((internal) => selectedSet.has(internal));
+
+  // Toggle every raw name represented by a display option, never the display name itself.
+  const toggleOption = (option: GameModeOption) => {
+    if (isOptionSelected(option)) {
+      onChange(selected.filter((mode) => !option.internals.includes(mode)));
       return;
     }
 
-    // On subsequent updates, only sync when parent provides concrete selection
-    // This preserves local visual state when parent sends empty array
-    if (selected.length > 0) {
-      setDisplaySelectedModes(uniq(selected));
-    }
-    // If selected is empty, keep current visual state unchanged
-  }, [selected, allInternals]);
-
-  /**
-   * Check if a display group (button) should appear selected
-   * Returns true if at least one of the internal keys for this display is selected
-   * @param internals - Array of internal keys for a display group
-   * @returns Whether this display group should show as selected
-   */
-  const isDisplaySelected = (internals: string[]) =>
-    internals.some((internal) => displaySelectedModes.includes(internal));
-
-  /**
-   * Toggle selection state for a display group
-   * Handles adding/removing all internal keys for a display name
-   * Also determines what to emit to the parent component
-   *
-   * @param internals - Array of internal keys to toggle
-   */
-  const toggle = (internals: string[]) => {
-    const currentlyOn = isDisplaySelected(internals);
-
-    // Update visual state: add or remove all internals for this display
-    const nextDisplay = currentlyOn
-      ? displaySelectedModes.filter((s) => !internals.includes(s))
-      : uniq([...displaySelectedModes, ...internals]);
-
-    setDisplaySelectedModes(nextDisplay);
-
-    // Determine what to emit to parent based on the new selection
-    const nextSet = new Set(nextDisplay);
-
-    if (nextSet.size === 0) {
-      // No modes selected → emit empty array (means "no filtering")
-      onChange([]);
-      return;
-    }
-
-    // Check if all possible modes are selected
-    const allSet = new Set(allInternals);
-    const isAllSelected =
-      nextSet.size === allSet.size && [...allSet].every((x) => nextSet.has(x));
-
-    if (isAllSelected) {
-      // All modes selected → emit empty array (means "no filtering, show all")
-      onChange([]);
-    } else {
-      // Partial selection → emit the actual selected internal keys
-      onChange([...nextSet]);
-    }
+    onChange(Array.from(new Set([...selected, ...option.internals])));
   };
 
-  /**
-   * Select all game modes
-   * Sets visual state to show all modes selected and emits empty array to parent
-   */
-  const selectAll = () => {
-    setDisplaySelectedModes(allInternals);
-    onChange([]); // Empty array means "all selected" to the parent
+  const selectAllModes = () => {
+    // Empty is intentionally the all-modes state, not an empty result set.
+    onChange([]);
   };
 
-  /**
-   * Clear all selections
-   * Sets visual state to show no modes selected and emits empty array to parent
-   */
-  const clearAll = () => {
-    setDisplaySelectedModes([]); // Visual: no modes selected
-    onChange([]); // API: no filtering (could mean "show all" or "show none" based on backend logic)
+  // Bonbons are shortcuts for removing a selected display group.
+  const removeOption = (option: GameModeOption) => {
+    onChange(selected.filter((mode) => !option.internals.includes(mode)));
   };
 
   return (
     <div className="game-mode-filter-container">
-      {/* Header button to toggle expand/collapse state */}
       <button
         type="button"
         className="game-mode-filter-component-header"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => setIsFilterVisible((visible) => !visible)}
+        aria-expanded={isFilterVisible}
+        aria-controls="game-mode-filter-content"
       >
+        {/* Header stays left-aligned and toggles the entire filter section. */}
         <span className="game-mode-filter-component-title">Game Modes</span>
-        {/* Chevron icon that rotates based on expanded state */}
         <ChevronUp
-          className={`game-mode-filter-component-toggle ${
-            isExpanded ? "" : "collapsed"
+          className={`game-mode-filter-header-toggle ${
+            isFilterVisible ? "" : "collapsed"
           }`}
+          aria-hidden="true"
         />
       </button>
 
-      {/* Filter options grid - hidden/shown based on expanded state */}
-      <div
-        id="game-mode-filter-grid"
-        className={`game-mode-filter-component-grid ${
-          isExpanded ? "" : "hidden"
-        }`}
-      >
-        {/* Render a button for each unique display name */}
-        {options.map(({ internals, display }) => (
-          <button
-            key={display}
-            type="button"
-            className={`game-mode-filter-component-tag ${
-              isDisplaySelected(internals) ? "is-selected" : ""
-            }`}
-            onClick={() => toggle(internals)}
-          >
-            <span className="game-mode-filter-component-tag-text">
-              {display}
-            </span>
-          </button>
-        ))}
+      {isFilterVisible && (
+        <div id="game-mode-filter-content" className="game-mode-filter-content">
+          {selectedOptions.length > 0 && (
+            <div
+              className="game-mode-filter-selected"
+              aria-label="Selected game modes"
+            >
+              {/* Clicking a bonbon removes it immediately; there is no separate delete state. */}
+              {selectedOptions.map((option) => (
+                <button
+                  key={option.display}
+                  type="button"
+                  className="game-mode-filter-bonbon"
+                  onClick={() => removeOption(option)}
+                  aria-label={`Remove ${option.display}`}
+                  title={`Remove ${option.display}`}
+                >
+                  {option.display}
+                </button>
+              ))}
+            </div>
+          )}
 
-        {/* Action buttons for bulk operations */}
-        <div className="game-mode-filter-component-actions">
           <button
             type="button"
-            className="game-mode-filter-component-action-button game-mode-filter-component-select-all"
-            onClick={selectAll}
+            className="game-mode-filter-dropdown-trigger"
+            onClick={() => setIsDropdownOpen((open) => !open)}
+            aria-expanded={isDropdownOpen}
+            aria-controls="game-mode-filter-dropdown"
           >
-            Select All
+            <span>
+              {selectedOptions.length === 0
+                ? "All game modes"
+                : `${selectedOptions.length} mode${
+                    selectedOptions.length === 1 ? "" : "s"
+                  } selected`}
+            </span>
+            <ChevronDown
+              className={`game-mode-filter-component-toggle ${
+                isDropdownOpen ? "expanded" : ""
+              }`}
+              aria-hidden="true"
+            />
           </button>
-          <button
-            type="button"
-            className="game-mode-filter-component-action-button game-mode-filter-component-clear"
-            onClick={clearAll}
-          >
-            Clear
-          </button>
+
+          {isDropdownOpen && (
+            <div
+              id="game-mode-filter-dropdown"
+              className="game-mode-filter-dropdown"
+            >
+              <label className="game-mode-filter-search">
+                <Search aria-hidden="true" />
+                <span className="sr-only">Search game modes</span>
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search game modes"
+                />
+              </label>
+
+              <div
+                className="game-mode-filter-options"
+                role="listbox"
+                aria-label="Game modes"
+              >
+                {/* Resetting to [] is how the API knows to include every saved game mode. */}
+                <button
+                  type="button"
+                  className={`game-mode-filter-option ${
+                    selected.length === 0 ? "is-selected" : ""
+                  }`}
+                  onClick={selectAllModes}
+                  role="option"
+                  aria-selected={selected.length === 0}
+                >
+                  All game modes
+                </button>
+                {filteredOptions.map((option) => (
+                  <button
+                    key={option.display}
+                    type="button"
+                    className={`game-mode-filter-option ${
+                      isOptionSelected(option) ? "is-selected" : ""
+                    }`}
+                    onClick={() => toggleOption(option)}
+                    role="option"
+                    aria-selected={isOptionSelected(option)}
+                  >
+                    {option.display}
+                  </button>
+                ))}
+              </div>
+
+              {filteredOptions.length === 0 && (
+                <p className="game-mode-filter-empty">No game modes found.</p>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

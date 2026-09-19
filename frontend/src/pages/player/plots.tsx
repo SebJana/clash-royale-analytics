@@ -120,19 +120,11 @@ export default function PlayerPlots() {
 
   // Game mode initialization
   // Initialize selected game modes once when game modes are loaded
-  // This prevents double API calls by ensuring deck stats only load after game modes are ready
+  // An empty selection means all modes and deliberately omits game_modes from
+  // the request. Do not expand it to the current list of mode keys: a new mode
+  // can exist in battle data before it appears in the cached mode list.
   useEffect(() => {
     if (gameModes && !gameModesInitialized && !gameModesLoading) {
-      // Auto-select all game modes when they first become available
-      // This provides a good default that shows all available data
-      const allGameModeKeys = Object.keys(gameModes);
-
-      // Only initialize if no game modes are already selected to avoid overriding user selections
-      setAppliedFilters((prev) => ({
-        ...prev,
-        gameModes:
-          prev.gameModes.length === 0 ? allGameModeKeys : prev.gameModes,
-      }));
       setGameModesInitialized(true);
     }
   }, [gameModes, gameModesInitialized, gameModesLoading]);
