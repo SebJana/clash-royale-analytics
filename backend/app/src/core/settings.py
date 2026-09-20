@@ -12,7 +12,8 @@ class Settings:
 
     # Redis Configuration
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
-    REDIS_HOST: str = "redis"
+    CACHE_REDIS_HOST: str = "redis-cache"
+    AUTH_STATE_REDIS_HOST: str = "redis-auth-state"
     REDIS_PORT: int = 6379
 
     # JWT Secret for Admin tokens

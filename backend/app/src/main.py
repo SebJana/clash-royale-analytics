@@ -14,7 +14,7 @@ from routers import (
     auth,
 )
 from core.settings import settings
-from redis_service import RedisConn
+from redis_service import CacheRedisConn, RedisConn
 from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn
 from helpers.ip_utils import rate_limit_key_func, get_real_client_ip
@@ -80,22 +80,46 @@ async def lifespan(app: FastAPI):
     app.state.cr_api = cr_api
 
     # Retry Redis
-    redis_conn = RedisConn(
-        host=settings.REDIS_HOST,
+    redis_conn = CacheRedisConn(
+        host=settings.CACHE_REDIS_HOST,
         port=settings.REDIS_PORT,
         password=settings.REDIS_PASSWORD,
     )
-    await retry_async(redis_conn.connect, name="Redis")
+    await retry_async(redis_conn.connect, name="cache Redis")
     app.state.redis = redis_conn
+
+    # Challenge state is isolated from evictable response/media cache entries.
+    # A cache memory spike can no longer remove a valid CAPTCHA or Wordle game.
+    auth_state_redis = RedisConn(
+        host=settings.AUTH_STATE_REDIS_HOST,
+        port=settings.REDIS_PORT,
+        password=settings.REDIS_PASSWORD,
+    )
+    await retry_async(auth_state_redis.connect, name="auth state Redis")
+    app.state.auth_state_redis = auth_state_redis
 
     # Retry MongoDB
     mongo_conn = MongoConn(app_name=settings.MONGO_CLIENT_NAME)
     await retry_async(mongo_conn.connect, name="MongoDB")
     app.state.mongo = mongo_conn
 
-    # Init rate limiting
-    rate_limit_redis = Redis(host="redis-rate-limit", port=6379, db=0)
-    await FastAPILimiter.init(rate_limit_redis, identifier=rate_limit_key_func)
+    async def initialize_rate_limit_redis() -> Redis:
+        """Connect rate limiting separately so it cannot reuse auth/cache clients."""
+
+        rate_limit_redis = Redis(
+            host="redis-rate-limit",
+            port=6379,
+            password=settings.REDIS_PASSWORD,
+            db=0,
+        )
+        await rate_limit_redis.ping()
+        await FastAPILimiter.init(rate_limit_redis, identifier=rate_limit_key_func)
+        return rate_limit_redis
+
+    # Rate-limit startup receives the same retry treatment as the other stores.
+    rate_limit_redis = await retry_async(
+        initialize_rate_limit_redis, name="rate-limit Redis"
+    )
 
     yield
 
@@ -103,6 +127,8 @@ async def lifespan(app: FastAPI):
     await app.state.cr_api.close()
     mongo_conn.close()
     await redis_conn.close()
+    await auth_state_redis.close()
+    await rate_limit_redis.aclose()
 
 
 app = FastAPI(lifespan=lifespan)

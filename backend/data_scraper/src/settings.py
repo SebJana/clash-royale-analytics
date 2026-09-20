@@ -12,7 +12,8 @@ class Settings:
 
     # Redis Configuration
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
-    REDIS_HOST: str = "redis"
+    # The scraper writes versioned, reconstructible data only.
+    REDIS_HOST: str = "redis-cache"
     REDIS_PORT: int = 6379
 
     # Application Configuration

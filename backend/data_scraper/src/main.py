@@ -15,7 +15,7 @@ from mongo import (
     print_first_battles,
 )
 from mongo import get_tracked_player_tags
-from redis_service import RedisConn, build_redis_key, set_redis_json
+from redis_service import CacheRedisConn, build_redis_key, set_redis_json
 from api_rate_limiter import ApiRateLimiter
 from settings import settings
 
@@ -31,7 +31,7 @@ async def init():
     """Initialize API, Redis, and MongoDB clients. Does a health/connection
 
     Returns:
-        tuple[ClashRoyaleAPI, RedisConn, MongoConn]: Initialized clients.
+        tuple[ClashRoyaleAPI, CacheRedisConn, MongoConn]: Initialized clients.
 
     Raises:
         SystemExit: If either Redis or MongoDB connection fails.
@@ -42,7 +42,7 @@ async def init():
     await retry_async(cr_api.check_connection, name="Clash Royale API")
 
     # Retry Redis
-    redis_conn = RedisConn(
+    redis_conn = CacheRedisConn(
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
         password=settings.REDIS_PASSWORD,
@@ -252,7 +252,7 @@ def extract_game_modes(battle_logs: list[dict], mode_store: UniqueGameModes):
             mode_store.add(game_mode)
 
 
-async def cache_cards(cr_api: ClashRoyaleAPI, redis_conn: RedisConn):
+async def cache_cards(cr_api: ClashRoyaleAPI, redis_conn: CacheRedisConn):
     """Fetch all card metadata and write it to Redis using 'version-ahead'.
 
     The card cache is set with a TTL and marked as one version ahead; after
@@ -262,7 +262,7 @@ async def cache_cards(cr_api: ClashRoyaleAPI, redis_conn: RedisConn):
 
     Args:
         cr_api (ClashRoyaleAPI): API client to fetch the cards.
-        redis_conn (RedisConn): Redis connection used to store the cache.
+        redis_conn (CacheRedisConn): Redis connection used to store the cache.
     """
 
     try:

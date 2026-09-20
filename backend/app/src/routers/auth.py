@@ -6,9 +6,9 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
-from core.deps import RedConn
-from redis_service import get_redis_json, set_redis_json, build_redis_key
-from helpers.auth import get_captcha_text_from_cache, get_wordle_challenge_from_cache
+from core.deps import AuthStateConn
+from redis_service import build_auth_state_key, set_auth_state_json
+from helpers.auth import get_captcha_text_from_state, get_wordle_challenge_from_state
 from models.schema import (
     SecurityQuestionsRequest,
     CaptchaAnswerRequest,
@@ -50,15 +50,14 @@ router = APIRouter(prefix="/auth", tags=["Authorization"])
 
 
 @router.get("/captcha_id", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
-async def get_captcha_id(redis_conn: RedConn):
-    """Generate a new captcha ID and store the associated text in Redis cache.
+async def get_captcha_id(auth_state_conn: AuthStateConn):
+    """Generate a new CAPTCHA ID and store its answer in auth state.
 
-    Creates a unique captcha ID and generates random text for the challenge.
-    The captcha text is stored using version_ahead=True to ensure the captcha
-    remains valid for its full TTL even if a cache version refresh occurs.
+    Challenge keys have no cache version. They remain readable until their TTL
+    expires, regardless of data-scraper cache invalidation.
 
     Args:
-        redis_conn (RedConn): Redis connection instance.
+        auth_state_conn (AuthStateConn): Versionless auth-state Redis connection.
 
     Returns:
         dict: Dictionary containing the generated captcha_id.
@@ -66,16 +65,12 @@ async def get_captcha_id(redis_conn: RedConn):
     text = generate_captcha_string(settings.CAPTCHA_CHAR_LENGTH)
     captcha_id = str(uuid.uuid4())
 
-    key = await build_redis_key(
-        conn=redis_conn,
-        service="crApi",
-        resource="captchaText",
-        version_ahead=True,
-        params={"captcha_id": captcha_id},
-    )
-
-    await set_redis_json(
-        redis_conn, key, value=text, ttl=settings.CACHE_TTL_CAPTCHA_CHALLENGE
+    key = build_auth_state_key("captcha", captcha_id)
+    await set_auth_state_json(
+        auth_state_conn,
+        key,
+        value=text,
+        ttl=settings.CACHE_TTL_CAPTCHA_CHALLENGE,
     )
 
     return {"captcha_id": captcha_id}
@@ -85,10 +80,9 @@ async def get_captcha_id(redis_conn: RedConn):
     "/captcha_image/{captcha_id}",
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
 )
-async def get_captcha_image(redis_conn: RedConn, captcha_id: str):
+async def get_captcha_image(auth_state_conn: AuthStateConn, captcha_id: str):
 
-    # Check the redis cache for both the current and ahead version
-    text = await get_captcha_text_from_cache(redis_conn, captcha_id=captcha_id)
+    text = await get_captcha_text_from_state(auth_state_conn, captcha_id=captcha_id)
 
     if not text:
         raise HTTPException(
@@ -108,10 +102,9 @@ async def get_captcha_image(redis_conn: RedConn, captcha_id: str):
 @router.post(
     "/verify_captcha", dependencies=[Depends(RateLimiter(times=5, seconds=60))]
 )
-async def get_captcha_token(redis_conn: RedConn, req: CaptchaAnswerRequest):
+async def get_captcha_token(auth_state_conn: AuthStateConn, req: CaptchaAnswerRequest):
 
-    # Check the redis cache for both the current and ahead version
-    text = await get_captcha_text_from_cache(redis_conn, captcha_id=req.captcha_id)
+    text = await get_captcha_text_from_state(auth_state_conn, captcha_id=req.captcha_id)
 
     if not text:
         raise HTTPException(
@@ -136,24 +129,18 @@ async def get_captcha_token(redis_conn: RedConn, req: CaptchaAnswerRequest):
 
 
 @router.get("/wordle_id", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
-async def get_wordle_id(redis_conn: RedConn):
+async def get_wordle_id(auth_state_conn: AuthStateConn):
 
     wordle = pick_random_wordle_solution()
     wordle_id = str(uuid.uuid4())
 
-    key = await build_redis_key(
-        conn=redis_conn,
-        service="crApi",
-        resource="wordleSolution",
-        version_ahead=True,
-        params={"wordle_id": wordle_id},
-    )
-
-    await set_redis_json(
-        redis_conn,
+    key = build_auth_state_key("wordle", wordle_id)
+    await set_auth_state_json(
+        auth_state_conn,
         key,
         value={"solution": wordle, "guesses": 0},
-        ttl=settings.CACHE_TTL_CAPTCHA_CHALLENGE,
+        # Challenge TTL is exact; cache jitter is only for rebuildable data.
+        ttl=settings.CACHE_TTL_WORDLE_CHALLENGE,
     )
 
     return {"wordle_id": wordle_id}
@@ -162,7 +149,7 @@ async def get_wordle_id(redis_conn: RedConn):
 @router.post(
     "/verify_wordle", dependencies=[Depends(RateLimiter(times=15, seconds=60))]
 )
-async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
+async def get_wordle_token(auth_state_conn: AuthStateConn, req: WordleAnswerRequest):
 
     if not validate_access_token(req.captcha_token, AvailableTokenTypes.CAPTCHA.value):
         raise HTTPException(
@@ -171,8 +158,8 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
         )
 
     # Extract the wordle session to the given wordle_id
-    wordle_session, key = await get_wordle_challenge_from_cache(
-        redis_conn, req.wordle_id
+    wordle_session, key = await get_wordle_challenge_from_state(
+        auth_state_conn, req.wordle_id
     )
 
     # Session not found (either expired or non existent id given)
@@ -228,8 +215,11 @@ async def get_wordle_token(redis_conn: RedConn, req: WordleAnswerRequest):
 
     # Save the updated session again
     # NOTE: resets the previous TTL, so the TTL is a PER GUESS TTL
-    await set_redis_json(
-        redis_conn, key, updated_challenge, settings.CACHE_TTL_WORDLE_CHALLENGE
+    await set_auth_state_json(
+        auth_state_conn,
+        key,
+        updated_challenge,
+        settings.CACHE_TTL_WORDLE_CHALLENGE,
     )
 
     result = {

@@ -2,7 +2,7 @@ from fastapi import Depends, Request, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Annotated
 from helpers.jwt import validate_access_token, AvailableTokenTypes
-from redis_service import RedisConn
+from redis_service import CacheRedisConn, RedisConn
 from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn, check_player_tracked
 
@@ -16,10 +16,19 @@ def get_mongo(request: Request) -> MongoConn:
 
 
 # Dependency that returns the redis connection
-def get_redis(request: Request) -> RedisConn:
+def get_redis(request: Request) -> CacheRedisConn:
     r = getattr(request.app.state, "redis", None)
     if r is None:
         raise HTTPException(status_code=500, detail="Redis not initialized")
+    return r
+
+
+def get_auth_state_redis(request: Request) -> RedisConn:
+    """Return the isolated store for active CAPTCHA and Wordle challenges."""
+
+    r = getattr(request.app.state, "auth_state_redis", None)
+    if r is None:
+        raise HTTPException(status_code=500, detail="Auth state Redis not initialized")
     return r
 
 
@@ -35,7 +44,8 @@ def get_cr_api(request: Request) -> ClashRoyaleAPI:
 # Global dependencies for usage in the routes
 CrApi = Annotated[ClashRoyaleAPI, Depends(get_cr_api)]
 DbConn = Annotated[MongoConn, Depends(get_mongo)]
-RedConn = Annotated[RedisConn, Depends(get_redis)]
+RedConn = Annotated[CacheRedisConn, Depends(get_redis)]
+AuthStateConn = Annotated[RedisConn, Depends(get_auth_state_redis)]
 
 
 # Dependency that ensures the given player tag is active in the players collection

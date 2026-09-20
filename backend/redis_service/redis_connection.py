@@ -7,14 +7,17 @@ import random
 
 
 class RedisConn:
-    """
-    Wrapper for an async Redis connection.
+    """Wrapper for a versionless async Redis connection.
+
+    This base connection deliberately has no cache-version methods. It is used
+    for state whose key must remain stable for its entire TTL, such as an
+    in-progress authentication challenge.
 
     Args:
-        host (str): Redis server hostname or IP.
-        port (int): Redis server port (default 6379).
-        password (str): Password for Redis authentication (if required).
-        decode_responses (bool): If True, automatically decode bytes to str.
+        host (str): Redis service hostname or IP address.
+        port (int): Redis service port.
+        password (str): Password required by the Redis service.
+        decode_responses (bool): Decode Redis string responses as ``str``.
     """
 
     def __init__(
@@ -24,7 +27,7 @@ class RedisConn:
         self._port = port
         self._password = password
         self._decode = decode_responses
-        self.client: redis.Redis
+        self.client: redis.Redis | None = None
 
     async def connect(self):
         """
@@ -42,9 +45,23 @@ class RedisConn:
         # Perform health check to confirm connection works
         await self.client.ping()  # fail if connection couldn't be established
 
-        await self.client.setnx(
-            "global:version", 1
-        )  # Only init with '1' if key doesn't exist yet
+    async def close(self):
+        """Close the Redis client if it was initialized."""
+
+        if self.client is not None:
+            await self.client.aclose()
+
+
+class CacheRedisConn(RedisConn):
+    """Redis connection for reconstructible data that supports invalidation."""
+
+    async def connect(self):
+        """Connect and initialize the version namespace owned by the cache."""
+
+        await super().connect()
+        # This key exists only in redis-cache. Incrementing it makes prior
+        # cache entries unreachable without touching auth challenge state.
+        await self.client.setnx("global:version", 1)
 
     async def get_version(self) -> int:
         """
@@ -63,21 +80,12 @@ class RedisConn:
         new_val = await self.client.incr("global:version")
         return new_val
 
-    async def close(self):
-        """
-        Close the Redis connection if it's open.
-        """
-
-        if self.client:
-            await self.client.aclose()
-
-
 async def get_redis_json(conn: RedisConn, key: str):
     """
     Fetch a JSON value from Redis and deserialize it.
 
     Args:
-        conn (RedisConn): Wrapper around an async Redis connection.
+        conn (RedisConn): Redis connection that owns ``key``.
         key (str): Redis key to fetch.
 
     Returns:
@@ -110,12 +118,12 @@ def _json_default(object):
     raise TypeError(f"Object of type {type(object)} is not JSON serializable")
 
 
-async def set_redis_json(conn: RedisConn, key: str, value, ttl: int):
+async def set_redis_json(conn: CacheRedisConn, key: str, value, ttl: int):
     """
     Serialize a Python object to JSON and store it in Redis with TTL.
 
     Args:
-        conn (RedisConn): Wrapper around an async Redis connection.
+        conn (CacheRedisConn): Versioned Redis connection for rebuildable cache data.
         key (str): Redis key to set.
         value: Python object to serialize and store.
         ttl (int): Time-to-live in seconds (key expires automatically).
@@ -124,6 +132,34 @@ async def set_redis_json(conn: RedisConn, key: str, value, ttl: int):
     jittered_ttl = jitter_ttl(ttl)
     payload = json.dumps(value, default=_json_default, separators=(",", ":"))
     await conn.client.setex(key, jittered_ttl, payload)
+
+
+async def get_auth_state_json(conn: RedisConn, key: str):
+    """Read short-lived auth state without involving cache invalidation.
+
+    Args:
+        conn (RedisConn): Versionless Redis connection for auth challenges.
+        key (str): Stable auth-state key produced by ``build_auth_state_key``.
+
+    Returns:
+        The deserialized stored value, or ``None`` when the challenge expired.
+    """
+
+    return await get_redis_json(conn, key)
+
+
+async def set_auth_state_json(conn: RedisConn, key: str, value, ttl: int):
+    """Store auth state with its exact security TTL, never cache TTL jitter.
+
+    Args:
+        conn (RedisConn): Versionless Redis connection for auth challenges.
+        key (str): Stable auth-state key produced by ``build_auth_state_key``.
+        value: JSON-serializable challenge data to store.
+        ttl (int): Exact challenge lifetime in seconds.
+    """
+
+    payload = json.dumps(value, default=_json_default, separators=(",", ":"))
+    await conn.client.setex(key, ttl, payload)
 
 
 def jitter_ttl(ttl: int, pct: float = 0.10, min_ttl: int = 60) -> int:
@@ -135,6 +171,8 @@ def jitter_ttl(ttl: int, pct: float = 0.10, min_ttl: int = 60) -> int:
 
     Args:
         ttl (int): Base time-to-live in seconds.
+        pct (float): Maximum proportional variation applied to ``ttl``.
+        min_ttl (int): Lower bound for the returned TTL in seconds.
 
     Returns:
         int: Jittered TTL in seconds.
@@ -176,7 +214,7 @@ def _to_param_str(val) -> str:
 
 
 async def build_redis_key(
-    conn: RedisConn,
+    conn: CacheRedisConn,
     service: str,
     resource: str,
     params: dict | None = None,
@@ -186,13 +224,13 @@ async def build_redis_key(
     Build a consistent Redis key string.
 
     Args:
-        conn (RedisConn): Wrapper around an async Redis connection, to access the version key.
-        resource (str): The type of data or entity, e.g. "decks", "player", "leaked-elixir" ...
+        conn (CacheRedisConn): Cache connection used to access the version key.
         service (str): The service or namespace prefix, e.g. "cr_api" or "mongo"
+        resource (str): The type of data or entity, e.g. "decks", "player", "leaked-elixir".
         params (dict): Additional key-value pairs describing this cache entry.
                 These will be sorted and appended as 'key=value' segments.
                 e.g. {"player_tag": "YYRJQY28", "start_date": "2025-08-01", "end_date": 2025-08-01})
-        version_ahead (bool): Flag deciding if the key is being built for the current version or the next one (default: False)
+        version_ahead (bool): Use the next cache version during a staged refresh.
     Returns:
         str: A Redis key in the format 'version:service:resource:param1=val1:param2=val2'.
     """
@@ -226,3 +264,21 @@ async def build_redis_key(
     return (
         version_str + ":" + service + ":" + hashlib.md5(key.encode("utf-8")).hexdigest()
     )
+
+
+def build_auth_state_key(resource: str, challenge_id: str) -> str:
+    """Build a stable, namespaced key for a short-lived auth challenge.
+
+    Auth keys intentionally omit the global cache version: cache invalidation
+    must never invalidate a CAPTCHA or Wordle challenge that is still within
+    its promised lifetime.
+
+    Args:
+        resource (str): Fixed challenge category, such as ``captcha`` or ``wordle``.
+        challenge_id (str): Client-visible UUID that identifies one challenge.
+
+    Returns:
+        str: A delimiter-safe key in the ``auth:<resource>:<id>`` namespace.
+    """
+
+    return f"auth:{resource}:{quote(challenge_id, safe='')}"
