@@ -31,6 +31,7 @@ ENV PYTHONPATH=/app
 # Expose port
 EXPOSE 8000
 
-# Start the app with uvicorn
-CMD ["uvicorn", "main:app", "--app-dir", "/app/src", "--host", "0.0.0.0", "--port", "8000"]
+# The API is only reachable on the Compose network; nginx replaces forwarded IP headers.
+# Trust that internal boundary so Uvicorn exposes the resolved IP as request.client.host.
+CMD ["uvicorn", "main:app", "--app-dir", "/app/src", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
 

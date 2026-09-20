@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Base URL configuration:
-// - Development: Vite proxy handles /api -> http://localhost:8000/api
+// - Development: Vite proxy handles /api -> local nginx -> API
 // - Production (Docker): nginx proxy handles /api -> http://api:8000/api
 const api = axios.create({
   baseURL: "/api",

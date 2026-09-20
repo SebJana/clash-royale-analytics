@@ -17,7 +17,7 @@ from core.settings import settings
 from redis_service import CacheRedisConn, RedisConn
 from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn
-from helpers.ip_utils import rate_limit_key_func, get_real_client_ip
+from helpers.ip_utils import rate_limit_key_func
 
 # NOTE time response from Clash Royale/MongoDB is in UTC so frontend needs conversion logic
 # both for the query parameter time but also the times the user gets back, which needs to be displayed in their local time

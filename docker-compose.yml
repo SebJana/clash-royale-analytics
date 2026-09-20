@@ -104,8 +104,6 @@ services:
       - .env
     networks:
       - cr-analytics
-    ports: # TODO remove port for prod
-      - "8000:8000"
     restart: unless-stopped
 
   frontend:
@@ -117,6 +115,9 @@ services:
       - cr-analytics
     ports:
       - "80:80"
+      # Optional second public port. Remove this line when only port 80 should be exposed.
+      # Swagger also remains public on port 80 until its nginx location is removed.
+      - "8000:80"
     depends_on:
       - api
 
