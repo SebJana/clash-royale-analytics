@@ -36,7 +36,7 @@ type DeckSortFields = {
 
 function calculateAndFormatUsageRate(
   battleCount: number,
-  totalBattles: number
+  totalBattles: number,
 ) {
   const usageRate = (battleCount / totalBattles) * 100; // In percent
   const roundedUsageRate = round(usageRate, 1);
@@ -54,7 +54,7 @@ export default function PlayerDecks() {
 
   // State to store applied filters from FilterContainer
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(
-    getCurrentFilterState()
+    getCurrentFilterState(),
   );
 
   // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
@@ -131,7 +131,7 @@ export default function PlayerDecks() {
     playerTag,
     appliedFilters.startDate,
     appliedFilters.endDate,
-    gameModesInitialized ? appliedFilters.gameModes : null // Use applied filters for the query
+    gameModesInitialized ? appliedFilters.gameModes : null, // Use applied filters for the query
   );
 
   // Helper function to check if a deck contains a specific card
@@ -139,7 +139,7 @@ export default function PlayerDecks() {
     return deck.deck?.some(
       (deckCard) =>
         deckCard.id === appliedCard.id &&
-        (deckCard.evolutionLevel ?? 0) === (appliedCard.evolutionLevel ?? 0)
+        (deckCard.evolutionLevel ?? 0) === (appliedCard.evolutionLevel ?? 0),
     );
   };
 
@@ -152,7 +152,7 @@ export default function PlayerDecks() {
   // Helper function to calculate amount of matched cards for a deck
   const calculateMatchCount = (deck: Deck) => {
     const matchingCards = appliedFilters.cards.filter((appliedCard) =>
-      deckContainsCard(deck, appliedCard)
+      deckContainsCard(deck, appliedCard),
     );
     return matchingCards.length;
   };
@@ -169,7 +169,7 @@ export default function PlayerDecks() {
         // Usage rate = (deck battles / total battles in this filtered set) * 100
         const totalBattlesForSort = decksToSort.reduce(
           (sum, deck) => sum + deck.count,
-          0
+          0,
         );
         valueA = (a.count / totalBattlesForSort) * 100;
         valueB = (b.count / totalBattlesForSort) * 100;
@@ -215,7 +215,7 @@ export default function PlayerDecks() {
       // Include mode: deck must contain ALL selected cards (strict filtering)
       const filteredDecks = allDecks.filter((deck) => {
         return appliedFilters.cards.every((appliedCard) =>
-          deckContainsCard(deck, appliedCard)
+          deckContainsCard(deck, appliedCard),
         );
       });
 
@@ -265,6 +265,7 @@ export default function PlayerDecks() {
   }
   const totalDecks = filteredDecks.length;
 
+  // TODO for long time ranges this might be thousands of decks to display, add virtual window here or capped X approach
   return (
     <div className="decks-page">
       <div className="decks-content">
@@ -347,11 +348,11 @@ export default function PlayerDecks() {
                           <div className="decks-card-match-header">
                             <span className="decks-card-match-value">{`${round(
                               d.matchPercentage,
-                              1
+                              1,
                             )}% (${d.matchCount} matching ${pluralize(
                               d.matchCount,
                               "Card",
-                              "Cards"
+                              "Cards",
                             )})`}</span>
                             <span className="decks-card-match-label">
                               Card Match
@@ -377,14 +378,14 @@ export default function PlayerDecks() {
                         label="Usage Rate"
                         value={calculateAndFormatUsageRate(
                           d.count,
-                          totalBattles
+                          totalBattles,
                         )}
                       />
                       <StatCard
                         label={pluralize(
                           d.modes.length,
                           "Game Mode",
-                          "Game Modes"
+                          "Game Modes",
                         )}
                         value={d.modes.length}
                       />

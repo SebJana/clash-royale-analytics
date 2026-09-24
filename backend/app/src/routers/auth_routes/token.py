@@ -1,0 +1,32 @@
+"""Final authentication token exchange route."""
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
+from fastapi_limiter.depends import RateLimiter
+
+from core.settings import settings
+from helpers.jwt import AvailableTokenTypes, create_access_token, validate_access_token
+from routers.auth_routes.common import round_token_scheme
+
+router = APIRouter()
+
+
+@router.post("/token", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
+async def get_auth_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(round_token_scheme),
+):
+    if not credentials or not validate_access_token(
+        credentials.credentials,
+        AvailableTokenTypes.SECURITY.value,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="No authorization token generated, invalid token given",
+        )
+
+    return {
+        "auth_token": create_access_token(
+            type=AvailableTokenTypes.AUTH.value,
+            expires_minutes=settings.AUTH_TOKEN_EXPIRES_IN,
+        )
+    }

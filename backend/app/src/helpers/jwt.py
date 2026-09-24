@@ -8,6 +8,7 @@ from core.settings import settings
 # Types of tokens the api gives out and validates
 class AvailableTokenTypes(StrEnum):
     CAPTCHA = "captcha"
+    HALLI_GALLI = "halli_galli"
     SECURITY = "security"
     WORDLE = "wordle"
     AUTH = "auth"
@@ -40,24 +41,53 @@ def create_access_token(type: str, expires_minutes: int = 30):
     return jwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
 
 
-def validate_access_token(token: str, type: str):
-    """
-    Validate and decode a JWT access token.
+def get_access_token_claims(token: str, token_type: str) -> dict | None:
+    """Return verified claims for a token of ``token_type``, or ``None``.
 
-    This function attempts to decode and validate a JWT token to ensure it's
-    valid, not expired, and properly signed. Returns True if the token is valid
-    and has the given type.
+    JWT decoding verifies the signature and expiry before this function returns
+    any claims. In addition to checking the token type, it requires a string
+    ``jti`` (JWT ID). The JTI is a unique identifier generated when this token
+    was issued, so server-side state can be bound to this exact token without
+    storing the bearer token itself.
 
     Args:
-        type (str): The type/role the token should be.
-        token (str): The JWT token string to validate and decode.
+        token: Encoded JWT bearer token to verify and decode.
+        token_type: Required value of the token's ``type`` claim.
 
     Returns:
-        bool: True if the token is valid and has the specified type,
-              False otherwise (token is malformed, expired, or improperly signed).
+        The verified JWT claims when the token is valid, unexpired, of the
+        requested type, and has a JTI; otherwise ``None``.
     """
+
+    # NOTE: Halli Galli binds a latency calibration to the Wordle token's JTI
+    # for connection-specific fairness, not as a primary anti-cheat boundary.
+    # A security-question attempt counter can likewise use the JTI as its
+    # Redis key to limit attempts per issued Halli Galli token instead of per IP.
+
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
-        return payload.get("type") == type
     except JWTError:
-        return False
+        return None
+
+    if payload.get("type") != token_type or not isinstance(payload.get("jti"), str):
+        return None
+    return payload
+
+
+def validate_access_token(token: str, type: str) -> bool:
+    """Return whether ``token`` is a valid, unexpired token of ``type``.
+
+    This boolean compatibility helper intentionally discards verified claims.
+    Call ``get_access_token_claims`` when a caller needs the verified JTI or
+    another claim for server-side token binding.
+
+    Args:
+        token: Encoded JWT bearer token to verify.
+        type: Required value of the token's ``type`` claim.
+
+    Returns:
+        ``True`` when the token is valid, unexpired, and has the requested
+        type; otherwise ``False``.
+    """
+
+    return get_access_token_claims(token, type) is not None

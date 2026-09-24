@@ -28,6 +28,9 @@ REDIS_PASSWORD=YOUR_SECURE_REDIS_PASSWORD
 # JWT Secret for Admin Authentication
 JWT_SECRET=YOUR_SECURE_JWT_SECRET_KEY
 
+# Browser origins allowed to open the Halli Galli calibration WebSocket
+HALLI_GALLI_WS_ALLOWED_ORIGINS=http://localhost,http://127.0.0.1
+
 # Security Question Answers for Admin Access
 MOST_ANNOYING_CARD="Card1"
 MOST_SKILLFUL_CARD="Card2"
@@ -65,6 +68,10 @@ APP_API_KEY = ey41eas...
 
 - `JWT_SECRET`: Secret key used for signing JWT tokens for admin authentication. Should be a long, random string for security.
 
+#### Halli Galli WebSocket Origins
+
+- `HALLI_GALLI_WS_ALLOWED_ORIGINS`: Comma-separated browser origins that may open the Halli Galli latency-calibration WebSocket. For a deployed site, use its public browser origin, for example `https://analytics.example.com`; do not use Docker-internal hostnames or container IP addresses. If users access the site through a public IP rather than a domain, that exact `https://IP_ADDRESS` origin can be listed instead.
+
 #### Security Questions
 
 - `MOST_ANNOYING_CARD`: Answer to the first security question for admin access (Most annoying card in Clash Royale?)
@@ -90,6 +97,12 @@ Start all services by running:
 ```bash
 docker compose up -d
 ```
+
+The API is available through nginx at `http://localhost/api` or
+`http://localhost:8000/api`. Swagger UI is at `http://localhost:8000/docs`.
+The optional `8000:80` mapping is marked in `docker-compose.yml`. Removing it
+closes port 8000, but Swagger stays available at `/docs` on port 80 until the
+documentation location in `frontend/nginx.conf` is removed or protected.
 
 ### 2. Local Development Setup
 
@@ -121,7 +134,7 @@ Start all required docker services for the backend (api, mongo, redis)
 
    The frontend will be available at `http://localhost:5173`
 
-**Note**: The Vite development server is configured to proxy `/api` requests to `http://localhost:8000`, so all services (backend, mongo and redis) need to be running for local development.
+**Note**: The Vite development server proxies `/api` through the Docker frontend at `http://localhost:80`, so the frontend container and backend services need to be running for local development.
 
 ### 3. Restoring Data
 
@@ -140,3 +153,9 @@ cd db
 cd db
 .\restore.ps1 .\backups\clash_royale_YYYY-MM-DD_HH-MM-SS
 ```
+
+# TODO
+
+2. Add celebratory animation upon successfully completing the full authentication flow for removal permissions + check and adjust how many tries one gets for the security questions (the token that unlocks security questions try should be locked after 3 attempts?, via a counter field or something the like in the token itself or as a session on the server tied to that token?)
+
+3. Add another step into the auth flow, has to be time consuming and challenging game before the questions step + server-side verifiable game that tests accuracy/reaction time/skill? 🗿

@@ -32,6 +32,24 @@ def get_auth_state_redis(request: Request) -> RedisConn:
     return r
 
 
+def get_card_image_redis(request: Request) -> RedisConn:
+    """Return the binary client for the existing Redis cache server.
+
+    The pool size and future preload count come from settings and game rules;
+    this connection only reads and writes the associated image bytes.
+
+    Args:
+        request (Request): Request whose app owns the Redis connection.
+
+    Returns:
+        RedisConn: Connection that returns raw image bytes.
+    """
+    r = getattr(request.app.state, "card_image_redis", None)
+    if r is None:
+        raise HTTPException(status_code=500, detail="Card image Redis not initialized")
+    return r
+
+
 # Dependency that returns the Cr API client
 def get_cr_api(request: Request) -> ClashRoyaleAPI:
     api = getattr(request.app.state, "cr_api", None)
@@ -46,6 +64,7 @@ CrApi = Annotated[ClashRoyaleAPI, Depends(get_cr_api)]
 DbConn = Annotated[MongoConn, Depends(get_mongo)]
 RedConn = Annotated[CacheRedisConn, Depends(get_redis)]
 AuthStateConn = Annotated[RedisConn, Depends(get_auth_state_redis)]
+CardImageConn = Annotated[RedisConn, Depends(get_card_image_redis)]
 
 
 # Dependency that ensures the given player tag is active in the players collection

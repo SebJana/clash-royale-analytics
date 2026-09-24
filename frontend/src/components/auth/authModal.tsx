@@ -26,7 +26,7 @@ interface AuthModalProps {
   readonly onSuccess: () => void;
 }
 
-type AuthStep = "captcha" | "wordle" | "security" | "complete";
+type AuthStep = "captcha" | "wordle" | "halli_galli" | "security" | "complete";
 const MAX_WORDLE_GUESSES_ALLOWED = 6; // Standard Wordle guess limit
 
 export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
@@ -44,6 +44,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   // Wordle state
   const [wordleId, setWordleId] = useState("");
   const [wordleToken, setWordleToken] = useState("");
+  const [halliGalliToken, setHalliGalliToken] = useState("");
 
   // Security questions state
   const [securityAnswers, setSecurityAnswers] = useState({
@@ -88,7 +89,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
         answer: captchaAnswer,
       });
       setCaptchaToken(captcha_token);
-      await initializeWordle();
+      await initializeWordle(captcha_token);
     } catch (err) {
       setError("Incorrect captcha answer. Please try again.");
       console.error("Captcha verification error:", err);
@@ -99,10 +100,10 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     }
   };
 
-  const initializeWordle = async () => {
+  const initializeWordle = async (token = captchaToken) => {
     setLoading(true);
     try {
-      const { wordle_id } = await getWordleId();
+      const { wordle_id } = await getWordleId(token);
       setWordleId(wordle_id);
       setCurrentStep("wordle");
     } catch (err) {
@@ -115,17 +116,16 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
 
   const handleWordleGuess = async (guess: string) => {
     try {
-      const result = await submitWordleGuess({
-        captcha_token: captchaToken,
+      const result = await submitWordleGuess(captchaToken, {
         wordle_id: wordleId,
         wordle_guess: guess,
       });
 
-      // If the guess was correct, we get a wordle_token
+      // A correct guess returns a wordle_token
       if (result.is_solution && result.wordle_token) {
         setWordleToken(result.wordle_token);
         // Don't transition immediately - let the Wordle component show success popup
-        // setCurrentStep("security"); // This will be called by handleWordleSuccess [upon user clicking continue]
+        // The next step starts after the Wordle success popup is closed.
         return {
           correct: true,
           feedback: {
@@ -154,7 +154,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   const handleWordleFailure = async () => {
     // Reset the Wordle challenge to allow retry --> request new id
     try {
-      const { wordle_id } = await getWordleId();
+      const { wordle_id } = await getWordleId(captchaToken);
       setWordleId(wordle_id);
       setError(null); // Clear any previous errors
     } catch (err) {
@@ -164,13 +164,17 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   };
 
   const handleWordleSuccess = () => {
-    // Move to the next step (security questions)
-    setCurrentStep("security");
+    // Halli Galli must be won before security questions accept a token.
+    setCurrentStep("halli_galli");
   };
 
   const handleSecuritySubmit = async () => {
     const { most_annoying_card, most_skillful_card, most_mousey_card } =
       securityAnswers;
+    if (!halliGalliToken) {
+      setError("Complete Halli Galli before answering security questions.");
+      return;
+    }
     if (
       !most_annoying_card.trim() ||
       !most_skillful_card.trim() ||
@@ -183,8 +187,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const { security_token } = await verifySecurityQuestions({
-        wordle_token: wordleToken,
+      const { security_token } = await verifySecurityQuestions(halliGalliToken, {
         most_annoying_card,
         most_skillful_card,
         most_mousey_card,
@@ -212,6 +215,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     setCaptchaToken("");
     setWordleId("");
     setWordleToken("");
+    setHalliGalliToken("");
     setSecurityAnswers({
       most_annoying_card: "",
       most_skillful_card: "",
@@ -271,6 +275,17 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
           onSuccess={handleWordleSuccess}
         />
       )}
+    </div>
+  );
+
+  const renderHalliGalliStep = () => (
+    <div className="auth-step">
+      <h3>Halli Galli</h3>
+      <p>
+        {wordleToken
+          ? "Win the Halli Galli game to continue to security questions."
+          : "Complete Wordle again to start Halli Galli."}
+      </p>
     </div>
   );
 
@@ -362,6 +377,8 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
         return renderCaptchaStep();
       case "wordle":
         return renderWordleStep();
+      case "halli_galli":
+        return renderHalliGalliStep();
       case "security":
         return renderSecurityStep();
       default:

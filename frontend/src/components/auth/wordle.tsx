@@ -143,7 +143,7 @@ export function WordleGame({
           const backendValue = result.feedback.evaluation[i];
           let cssClass = "";
 
-          // Map backend terminology to CSS class names that match our styles
+          // Map backend terminology to the matching CSS class names
           // "in word" becomes "present" to align with Wordle conventions
           switch (backendValue) {
             case "correct":
@@ -325,7 +325,7 @@ export function WordleGame({
               // Complex state machine that determines when each letter should animate and show colors
 
               // shouldStartFlip: Has this letter's animation been triggered?
-              // True when: we're animating this row AND the animation has reached or passed this letter
+              // True when this row is animating and the animation has reached this letter
               // Example: Row 2, Letter 3 starts flipping when animatingLetterIndex >= 3
               const shouldStartFlip =
                 animatingRowIndex === i && animatingLetterIndex >= j;

@@ -80,6 +80,7 @@ class CacheRedisConn(RedisConn):
         new_val = await self.client.incr("global:version")
         return new_val
 
+
 async def get_redis_json(conn: RedisConn, key: str):
     """
     Fetch a JSON value from Redis and deserialize it.
@@ -146,6 +147,13 @@ async def get_auth_state_json(conn: RedisConn, key: str):
     """
 
     return await get_redis_json(conn, key)
+
+
+async def consume_auth_state_json(conn: RedisConn, key: str):
+    """Atomically read and delete a one-use auth-state value."""
+
+    raw_data = await conn.client.getdel(key)
+    return json.loads(raw_data) if raw_data else None
 
 
 async def set_auth_state_json(conn: RedisConn, key: str, value, ttl: int):

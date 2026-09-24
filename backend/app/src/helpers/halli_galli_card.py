@@ -123,20 +123,36 @@ class FruitCreationPlacement(BaseModel):
 
     @property
     def center_x(self) -> float:
-        """Return the horizontal center in card pixels for rendering."""
+        """Return the horizontal center in card pixels for rendering.
+
+        Returns:
+            float: Pixel coordinate measured from the left edge.
+        """
 
         return self.relative_x * CARD_WIDTH
 
     @property
     def center_y(self) -> float:
-        """Return the vertical center in card pixels for rendering."""
+        """Return the vertical center in card pixels for rendering.
+
+        Returns:
+            float: Pixel coordinate measured from the top edge.
+        """
 
         return self.relative_y * CARD_HEIGHT
 
     def to_image_bounds(
         self, visible_hull: tuple[tuple[float, float], ...]
     ) -> "FruitImageBounds":
-        """Transform the cached painted SVG hull into an unchecked image box."""
+        """Transform the cached painted SVG hull into an unchecked image box.
+
+        Args:
+            visible_hull (tuple[tuple[float, float], ...]): Painted SVG outline
+                in the source icon's pixel coordinates.
+
+        Returns:
+            FruitImageBounds: Normalized box before on-card checks.
+        """
 
         image_x = self.center_x - FRUIT_SIZE / 2
         image_y = self.center_y - FRUIT_SIZE / 2
@@ -177,7 +193,14 @@ class FruitCreationPlacement(BaseModel):
     def to_image_position(
         self, visible_hull: tuple[tuple[float, float], ...]
     ) -> "FruitImagePosition":
-        """Return a validated final-image box for an accepted placement."""
+        """Return a validated final-image box for an accepted placement.
+
+        Args:
+            visible_hull (tuple[tuple[float, float], ...]): Painted SVG outline.
+
+        Returns:
+            FruitImagePosition: Normalized box kept for server-side click checks.
+        """
 
         return FruitImagePosition(**self.to_image_bounds(visible_hull).model_dump())
 
@@ -225,7 +248,11 @@ class HalliGalliCard(BaseModel):
 
 
 def find_halli_galli_asset_dir() -> Path:
-    """Find assets in Docker first, then locate them from a local checkout."""
+    """Find assets in Docker first, then locate them from a local checkout.
+
+    Returns:
+        Path: Directory containing the source fruit SVG folders.
+    """
 
     if DOCKER_HALLI_GALLI_DIR.is_dir():
         # Docker copies shared resources to this stable runtime location.
@@ -242,7 +269,14 @@ def find_halli_galli_asset_dir() -> Path:
 
 
 def get_fruit_svgs(fruit: str) -> tuple[str, ...]:
-    """Load and retain every SVG variation for one fruit in process memory."""
+    """Load and retain every SVG variation for one fruit in process memory.
+
+    Args:
+        fruit (str): Fruit folder to load.
+
+    Returns:
+        tuple[str, ...]: SVG source strings for that fruit.
+    """
 
     cached_svgs = FRUIT_SVG_CACHE.get(fruit)
     if cached_svgs is not None:
@@ -262,7 +296,14 @@ def get_fruit_svgs(fruit: str) -> tuple[str, ...]:
 
 
 def load_random_fruit_svg(fruit: str) -> str:
-    """Select a random SVG variation from the cached source assets."""
+    """Select a random SVG variation from the cached source assets.
+
+    Args:
+        fruit (str): Fruit whose source artwork is needed.
+
+    Returns:
+        str: One SVG variation for this fruit.
+    """
 
     return random.choice(get_fruit_svgs(fruit))
 
@@ -270,7 +311,14 @@ def load_random_fruit_svg(fruit: str) -> str:
 def _convex_hull(
     points: set[tuple[float, float]],
 ) -> tuple[tuple[float, float], ...]:
-    """Return the convex hull used for fast affine bounding-box transforms."""
+    """Return the convex hull used for fast affine bounding-box transforms.
+
+    Args:
+        points (set[tuple[float, float]]): Corners of painted source pixels.
+
+    Returns:
+        tuple[tuple[float, float], ...]: Outer points in hull order.
+    """
 
     sorted_points = sorted(points)
     if len(sorted_points) <= 1:
@@ -281,6 +329,16 @@ def _convex_hull(
         first: tuple[float, float],
         second: tuple[float, float],
     ) -> float:
+        """Measure which side of an edge the next hull point lies on.
+
+        Args:
+            origin (tuple[float, float]): Edge starting point.
+            first (tuple[float, float]): Edge ending point.
+            second (tuple[float, float]): Candidate next point.
+
+        Returns:
+            float: Signed turn value used to remove inner points.
+        """
         return (first[0] - origin[0]) * (second[1] - origin[1]) - (
             first[1] - origin[1]
         ) * (second[0] - origin[0])
@@ -301,7 +359,15 @@ def _convex_hull(
 
 
 def get_visible_svg_hull(svg: str) -> tuple[tuple[float, float], ...]:
-    """Cache the convex hull of a fixed SVG's non-transparent source pixels."""
+    """Cache the convex hull of a fixed SVG's non-transparent source pixels.
+
+    Args:
+        svg (str): Source icon before scaling, rotation, or recoloring.
+
+    Returns:
+        tuple[tuple[float, float], ...]: Painted outline used to compute the
+            actual click box after the icon is transformed.
+    """
 
     cached_hull = VISIBLE_SVG_HULL_CACHE.get(svg)
     if cached_hull is not None:
@@ -343,7 +409,14 @@ def get_visible_svg_hull(svg: str) -> tuple[tuple[float, float], ...]:
 
 
 def create_fruit_style(amount: int) -> FruitStyle:
-    """Create subtle, independently testable visual variation for one fruit."""
+    """Create subtle, independently testable visual variation for one fruit.
+
+    Args:
+        amount (int): Fruit count used to choose safe size and rotation ranges.
+
+    Returns:
+        FruitStyle: Scale, flip, rotation, and color changes for one icon.
+    """
 
     # Amount-specific ranges keep sparse cards expressive without making dense
     # layouts impossible to place after rotation and collision checks.
@@ -358,7 +431,14 @@ def create_fruit_style(amount: int) -> FruitStyle:
 
 
 def create_formation_offset(amount: int) -> tuple[float, float]:
-    """Create one shared x/y offset for the card's entire fruit formation."""
+    """Create one shared x/y offset for the card's entire fruit formation.
+
+    Args:
+        amount (int): Fruit count used to choose the shift range.
+
+    Returns:
+        tuple[float, float]: Horizontal and vertical shifts in pixels.
+    """
 
     max_x_shift, max_y_shift = FORMATION_POSITION_SHIFT[amount]
     return (
@@ -368,7 +448,16 @@ def create_formation_offset(amount: int) -> tuple[float, float]:
 
 
 def clamp(value: float, lower: float, upper: float) -> float:
-    """Clamp ``value`` to an inclusive numeric interval."""
+    """Clamp ``value`` to an inclusive numeric interval.
+
+    Args:
+        value (float): Number being limited.
+        lower (float): Smallest accepted value.
+        upper (float): Largest accepted value.
+
+    Returns:
+        float: Value within the given limits.
+    """
 
     return max(lower, min(value, upper))
 
@@ -377,7 +466,15 @@ def image_position_is_valid(
     candidate: FruitImageBounds,
     placed_positions: list[FruitImageBounds],
 ) -> bool:
-    """Check that a painted bounding box stays on-card and clear of others."""
+    """Check that a painted bounding box stays on-card and clear of others.
+
+    Args:
+        candidate (FruitImageBounds): Proposed fruit box after transforms.
+        placed_positions (list[FruitImageBounds]): Boxes already accepted.
+
+    Returns:
+        bool: Whether the new box fits without touching another fruit.
+    """
 
     horizontal_margin = CARD_CORNER_RADIUS / CARD_WIDTH
     vertical_margin = CARD_CORNER_RADIUS / CARD_HEIGHT
@@ -407,7 +504,15 @@ def create_standard_fruit_placements(
     relative_positions: list[tuple[float, float]],
     styles: list[FruitStyle],
 ) -> list[FruitCreationPlacement]:
-    """Return the original unshifted formation when random placement is exhausted."""
+    """Return the original unshifted formation when random placement is exhausted.
+
+    Args:
+        relative_positions (list[tuple[float, float]]): Base fruit centers.
+        styles (list[FruitStyle]): Artwork changes selected for these fruits.
+
+    Returns:
+        list[FruitCreationPlacement]: Original centers with the same styles.
+    """
 
     # The base formations were chosen to be readable before any variation. Keep
     # the already-selected styles so a fallback does not unexpectedly reroll art.
@@ -426,7 +531,18 @@ def create_fruit_placements(
     amount: int,
     visible_hulls: list[tuple[tuple[float, float], ...]],
 ) -> list[FruitCreationPlacement]:
-    """Jitter fruits while enforcing their final painted bounds and spacing."""
+    """Jitter fruits while enforcing their final painted bounds and spacing.
+
+    Args:
+        relative_positions (list[tuple[float, float]]): Base fruit centers.
+        amount (int): Fruit count used for position and style limits.
+        visible_hulls (list[tuple[tuple[float, float], ...]]): Painted outline
+            for each selected source SVG.
+
+    Returns:
+        list[FruitCreationPlacement]: Non-overlapping randomized positions, or
+            the original formation when the retry limit is exhausted.
+    """
 
     if len(relative_positions) != len(visible_hulls):
         raise ValueError("Each fruit position requires one visible SVG hull")
@@ -476,9 +592,25 @@ def create_fruit_placements(
 
 
 def augment_svg_colors(svg: str, style: FruitStyle) -> str:
-    """Apply a small hue, saturation, and lightness shift to SVG hex colors."""
+    """Apply a small hue, saturation, and lightness shift to SVG hex colors.
+
+    Args:
+        svg (str): Selected source fruit SVG.
+        style (FruitStyle): Color changes chosen for this fruit instance.
+
+    Returns:
+        str: SVG with its literal hex colors adjusted.
+    """
 
     def replace_color(match: re.Match) -> str:
+        """Adjust one literal SVG hex color while preserving its format.
+
+        Args:
+            match (re.Match): Hex color matched in the SVG source.
+
+        Returns:
+            str: Shifted color written as a six-digit hex value.
+        """
         hex_color = match.group(1)
         if len(hex_color) == 3:
             # Normalize shorthand (#abc) before converting it through HLS.
@@ -501,7 +633,15 @@ def augment_svg_colors(svg: str, style: FruitStyle) -> str:
 
 
 def create_fruit_element(fruit_svg: str, placement: FruitCreationPlacement) -> str:
-    """Build the SVG image element for one transformed and recolored fruit."""
+    """Build the SVG image element for one transformed and recolored fruit.
+
+    Args:
+        fruit_svg (str): Source SVG variation selected for this fruit.
+        placement (FruitCreationPlacement): Position and visual style to apply.
+
+    Returns:
+        str: Embedded SVG image element for the card foreground.
+    """
 
     styled_svg = augment_svg_colors(fruit_svg, placement.style)
     # Embed the asset so the intermediate SVG remains portable to CairoSVG and
@@ -531,7 +671,14 @@ def create_fruit_element(fruit_svg: str, placement: FruitCreationPlacement) -> s
 
 
 def build_card_svg(fruit_elements: list[str]) -> str:
-    """Build the transparent SVG foreground containing the border and fruits."""
+    """Build the transparent SVG foreground containing the border and fruits.
+
+    Args:
+        fruit_elements (list[str]): Renderable image elements for this card.
+
+    Returns:
+        str: Complete intermediate card SVG without its background.
+    """
 
     # The background is intentionally omitted here: it is added as raster data
     # later, allowing the SVG foreground to stay transparent at rounded corners.
@@ -546,14 +693,25 @@ def build_card_svg(fruit_elements: list[str]) -> str:
 
 
 def render_svg_foreground(card_svg: str) -> Image.Image:
-    """Rasterize a card SVG into a transparent RGBA foreground image."""
+    """Rasterize a card SVG into a transparent RGBA foreground image.
+
+    Args:
+        card_svg (str): Intermediate SVG containing border and fruit icons.
+
+    Returns:
+        Image.Image: Transparent foreground for the final PNG.
+    """
 
     png = cairosvg.svg2png(bytestring=card_svg.encode("utf-8"))
     return Image.open(BytesIO(png)).convert("RGBA")
 
 
 def create_noisy_background() -> Image.Image:
-    """Create a subtly tinted, lightly noisy background clipped to the card."""
+    """Create a subtly tinted, lightly noisy background clipped to the card.
+
+    Returns:
+        Image.Image: RGBA background with transparent rounded corners.
+    """
 
     # Per-channel base variation avoids every card sharing identical flat white.
     base_color = tuple(random.randint(*BACKGROUND_COLOR_RANGE) for _ in range(3))
@@ -577,7 +735,15 @@ def create_noisy_background() -> Image.Image:
 
 
 def compose_card(background: Image.Image, foreground: Image.Image) -> bytes:
-    """Layer the fruit foreground over the generated background and encode PNG."""
+    """Layer the fruit foreground over the generated background and encode PNG.
+
+    Args:
+        background (Image.Image): Tinted card background.
+        foreground (Image.Image): Rasterized border and fruit icons.
+
+    Returns:
+        bytes: Complete flattened PNG for caching and later encryption.
+    """
 
     card = Image.alpha_composite(background, foreground)
     output = BytesIO()
@@ -590,9 +756,13 @@ def create_card(fruit: str, amount: int) -> HalliGalliCard | None:
 
     Fruit SVGs are embedded in an intermediate SVG and then turned into a png.
 
+    Args:
+        fruit (str): Fruit type to draw on the card.
+        amount (int): Number of fruit icons to draw.
+
     Returns:
-        HalliGalliCard: The completed PNG image and its server-side metadata.
-        None: If ``fruit`` or ``amount`` is unsupported.
+        HalliGalliCard | None: Completed PNG and server-side hit boxes, or None
+            when the requested fruit/count is unsupported.
     """
     # Card-generation flow:
     # 1. Validate the requested fruit/count so only supported cards
@@ -642,23 +812,15 @@ def create_card(fruit: str, amount: int) -> HalliGalliCard | None:
     )
 
 
-def generate_random_card() -> HalliGalliCard:
-    """Create one random valid Halli Galli card.
+def pick_random_card() -> tuple[str, int]:
+    """Pick one random valid Halli Galli card.
 
-    A fruit and supported count are selected independently, then delegated to
-    ``create_card`` so the normal rendering, variation, and bound calculation
-    pipeline is used.
+    A fruit and supported count are selected independently.
 
     Returns:
-        HalliGalliCard: A fully rendered card with normalized fruit bounds.
+        tuple[str, int]: The fruit type and amount of fruit on the card.
     """
     random_fruit = random.choice(AVAILABLE_FRUITS)
     random_amount = random.choice(tuple(FRUIT_POSITIONS))
-    card = create_card(random_fruit, random_amount)
 
-    # Both values come from validated constants, so a missing card indicates a
-    # programming error (or svg file lookup error) rather than an expected caller-input failure.
-    if card is None:
-        raise RuntimeError("Could not create a randomly selected Halli Galli card")
-
-    return card
+    return random_fruit, random_amount

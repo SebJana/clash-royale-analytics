@@ -88,6 +88,18 @@ async def lifespan(app: FastAPI):
     await retry_async(redis_conn.connect, name="cache Redis")
     app.state.redis = redis_conn
 
+    # Both clients use the same redis-cache server and keyspace. Card templates
+    # contain raw PNG bytes, so this client disables UTF-8 response decoding
+    # used by the ordinary JSON cache connection.
+    card_image_redis = RedisConn(
+        host=settings.CACHE_REDIS_HOST,
+        port=settings.REDIS_PORT,
+        password=settings.REDIS_PASSWORD,
+        decode_responses=False,
+    )
+    await retry_async(card_image_redis.connect, name="card image Redis")
+    app.state.card_image_redis = card_image_redis
+
     # Challenge state is isolated from evictable response/media cache entries.
     # A cache memory spike can no longer remove a valid CAPTCHA or Wordle game.
     auth_state_redis = RedisConn(
@@ -127,6 +139,7 @@ async def lifespan(app: FastAPI):
     await app.state.cr_api.close()
     mongo_conn.close()
     await redis_conn.close()
+    await card_image_redis.close()
     await auth_state_redis.close()
     await rate_limit_redis.aclose()
 
@@ -145,6 +158,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Halli-Galli-Image-Version"],
 )
 
 # Include routers

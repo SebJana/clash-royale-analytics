@@ -30,9 +30,6 @@ class CaptchaAnswerRequest(BaseModel):
 
 
 class SecurityQuestionsRequest(BaseModel):
-    wordle_token: str = Field(
-        ..., description="Token received by correctly solving the wordle challenge"
-    )
     most_annoying_card: str = Field(
         ...,
         description="Answer to what is the single most annoying card in Clash Royale?",
@@ -48,9 +45,6 @@ class SecurityQuestionsRequest(BaseModel):
 
 
 class WordleAnswerRequest(BaseModel):
-    captcha_token: str = Field(
-        ..., description="Token received by correctly solving the captcha"
-    )
     wordle_id: str = Field(..., description="Id of the Wordle session")
     wordle_guess: str = Field(..., description="Answer to the Wordle challenge")
 
@@ -61,9 +55,3 @@ class NYTWordleAnswerRequest(BaseModel):
     )
     wordle_guess: str = Field(..., description="Answer to todays Wordle challenge")
     timezone: str = Field(..., description="Timezone of the user")
-
-
-class AuthTokenRequest(BaseModel):
-    security_token: str = Field(
-        ..., description="Token received by correctly answering security questions"
-    )

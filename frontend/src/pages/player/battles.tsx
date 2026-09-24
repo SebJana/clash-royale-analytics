@@ -105,8 +105,8 @@ export default function PlayerBattles() {
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        // Only fetch more if the trigger element is visible and we can load more
-        // Also ensure we're not in initial load state to avoid conflicts
+        // Fetch more only when the trigger is visible and more pages are available
+        // Wait until the initial load finishes to avoid overlapping requests
         if (
           entry.isIntersecting &&
           hasNextPage &&
