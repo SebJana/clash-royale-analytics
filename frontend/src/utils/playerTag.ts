@@ -11,6 +11,7 @@ export function validatePlayerTagSyntax(playerTag: string): boolean {
   // Trim whitespace
   const tag = playerTag.trim();
 
+  // TODO check if it starts with EXACTLY one '#' and only contains that one
   // Must start with '#'
   if (!tag.startsWith("#")) {
     return false;

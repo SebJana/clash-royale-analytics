@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -8,6 +8,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { WordleGame } from "./wordle";
+import { HalliGalli } from "./halliGalli";
 import { useAuth } from "../../hooks/useAuthHook";
 import {
   getCaptchaId,
@@ -27,6 +28,8 @@ interface AuthModalProps {
 }
 
 type AuthStep = "captcha" | "wordle" | "halli_galli" | "security" | "complete";
+// TODO let the backend communicate that upon wordle session start and the frontend
+// dynamically reacts to it
 const MAX_WORDLE_GUESSES_ALLOWED = 6; // Standard Wordle guess limit
 
 export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
@@ -168,6 +171,25 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     setCurrentStep("halli_galli");
   };
 
+  const handleHalliGalliWin = useCallback((token: string) => {
+    setHalliGalliToken(token);
+    setCurrentStep("security");
+  }, []);
+
+  const handleWordleExpired = useCallback(() => {
+    // A rejected Wordle token cannot start another game. End this attempt so
+    // the player can open authentication again from the normal entry point.
+    setCurrentStep("captcha");
+    setCaptchaId("");
+    setCaptchaImageUrl("");
+    setCaptchaAnswer("");
+    setCaptchaToken("");
+    setWordleId("");
+    setWordleToken("");
+    setHalliGalliToken("");
+    onClose();
+  }, [onClose]);
+
   const handleSecuritySubmit = async () => {
     const { most_annoying_card, most_skillful_card, most_mousey_card } =
       securityAnswers;
@@ -187,11 +209,14 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const { security_token } = await verifySecurityQuestions(halliGalliToken, {
-        most_annoying_card,
-        most_skillful_card,
-        most_mousey_card,
-      });
+      const { security_token } = await verifySecurityQuestions(
+        halliGalliToken,
+        {
+          most_annoying_card,
+          most_skillful_card,
+          most_mousey_card,
+        },
+      );
 
       const { auth_token } = await getAuthToken(security_token);
       login(auth_token);
@@ -278,16 +303,14 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     </div>
   );
 
-  const renderHalliGalliStep = () => (
-    <div className="auth-step">
-      <h3>Halli Galli</h3>
-      <p>
-        {wordleToken
-          ? "Win the Halli Galli game to continue to security questions."
-          : "Complete Wordle again to start Halli Galli."}
-      </p>
-    </div>
-  );
+  const renderHalliGalliStep = () =>
+    wordleToken ? (
+      <HalliGalli
+        wordleToken={wordleToken}
+        onWin={handleHalliGalliWin}
+        onWordleExpired={handleWordleExpired}
+      />
+    ) : null;
 
   const renderSecurityStep = () => (
     <div className="auth-step">
@@ -390,9 +413,9 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     <Dialog
       open={open}
       onClose={handleClose}
-      maxWidth="md"
+      maxWidth={currentStep === "halli_galli" ? "lg" : "md"}
       fullWidth
-      className="auth-modal"
+      className={`auth-modal ${currentStep === "halli_galli" ? "halli-galli-modal" : ""}`}
     >
       <DialogTitle>Authentication</DialogTitle>
       <DialogContent>

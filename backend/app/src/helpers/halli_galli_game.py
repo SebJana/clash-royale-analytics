@@ -147,11 +147,26 @@ class HalliGalliGame(BaseModel):
     bot_lives: int = Field(ge=0)
     # RTT is used to account for network delay when checking whether a buzz
     # reached the server before the bot deadline. Game creation currently uses
-    # a fixed fallback while calibration enforcement is disabled in its route.
+    # the one-use calibration result consumed when this game starts.
     network_delay_rtt_ms: int = Field(ge=0)
     # Saved after a player win so a lost final response can be recovered from
     # the status route without issuing a different token for the same game.
     completion_token: str | None = None
+    # Keep the last committed score and pile change so status can reconstruct
+    # a round result when its action response never reaches the browser.
+    last_round_index: int | None = None
+    last_round_result: Literal["player_won", "player_lost", "no_halli_galli"] | None = None
+    last_round_reason: Literal[
+        "correct_buzz", "late_buzz", "wrong_card", "wrong_fruit",
+        "false_buzz", "missed_halli_galli", "no_halli_galli"
+    ] | None = None
+    last_round_clear_cards: bool | None = None
+    # A late buzz's delay belongs to the committed result. Keep it for status
+    # recovery, and leave it empty for every other action.
+    last_round_late_by_ms: int | None = None
+    # Send contributing image IDs only after settlement, when the answer is no
+    # longer useful for buzzing. Status keeps them if the action reply is lost.
+    last_round_winning_card_ids: list[str] = Field(default_factory=list)
     rules: HalliGalliRules = Field(default_factory=default_game_rules)
     rounds: dict[int, HalliGalliRound]  # round index -> card metadata
 
@@ -438,6 +453,10 @@ def get_halli_galli_winning_cards(game: HalliGalliGame) -> dict[str, set[int]]:
 
 
 RoundResult = Literal["player_won", "player_lost", "no_halli_galli"]
+RoundReason = Literal[
+    "correct_buzz", "late_buzz", "wrong_card", "wrong_fruit",
+    "false_buzz", "missed_halli_galli", "no_halli_galli"
+]
 
 
 def _validate_round_action(
@@ -691,6 +710,7 @@ def eval_round(
     those without a Halli Galli, so the response does not reveal the answer.
     A buzz must reach the server before the deadline and hit an eligible card
     and fruit. The caller must save the changed game before serving another card.
+    The exact outcome is saved on the game for status recovery.
 
     Args:
         game (HalliGalliGame): Game state to evaluate and advance.
@@ -724,9 +744,47 @@ def eval_round(
         game, has_halli_galli, player_won, clicked_card_id is not None
     )
 
+    # Keep the exact cause with the committed score. A lost HTTP response can
+    # then be recovered without guessing whether a buzz was late or inaccurate.
+    # Check the deadline first so a late click does not misleadingly report a
+    # wrong card or fruit. Only a timely click can receive those reasons.
+    if clicked_card_id is None:
+        reason: RoundReason = "missed_halli_galli" if has_halli_galli else "no_halli_galli"
+    elif now >= deadline:
+        reason = "late_buzz"
+    elif not has_halli_galli:
+        reason = "false_buzz"
+    elif player_won:
+        reason = "correct_buzz"
+    else:
+        eligible = {index for cards in winning_cards.values() for index in cards}
+        if game.rules.require_oldest_winning_card:
+            eligible = {min(eligible)}
+        clicked_eligible = any(
+            game.rounds[index].image_id == clicked_card_id for index in eligible
+        )
+        reason = "wrong_fruit" if clicked_eligible else "wrong_card"
+
     # Any buzz settles and clears the pile, including a wrong buzz. A missed
     # Halli Galli also clears it. Earlier cards then cannot count again.
     current.halli_galli = clicked_card_id is not None or has_halli_galli
+    game.last_round_index = round_index
+    game.last_round_result = result
+    game.last_round_reason = reason
+    game.last_round_clear_cards = current.halli_galli
+    # Only report this after settlement. Exposing the live deadline would let
+    # a client time its buzz instead of reacting to the visible cards.
+    game.last_round_late_by_ms = (
+        max(0, math.ceil((now - deadline) * MILLISECONDS_PER_SECOND))
+        if reason == "late_buzz"
+        else None
+    )
+    winning_indices = sorted({index for cards in winning_cards.values() for index in cards})
+    game.last_round_winning_card_ids = [
+        game.rounds[index].image_id
+        for index in winning_indices
+        if game.rounds[index].image_id is not None
+    ]
     game.current_round += 1
     return result
 

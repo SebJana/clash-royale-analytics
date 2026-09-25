@@ -39,3 +39,5 @@ router.include_router(token.router)
 #    Exchange the security_token for the final auth_token.
 
 # Use relatively strict rate limiting here to try and limit bot attack opportunities
+
+# TODO clear redis auth sessions once they're done (failed or succeeded) Wordle and Halli Galli before TTL or just wait on TTL to clear?

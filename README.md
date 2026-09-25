@@ -68,9 +68,17 @@ APP_API_KEY = ey41eas...
 
 - `JWT_SECRET`: Secret key used for signing JWT tokens for admin authentication. Should be a long, random string for security.
 
-#### Halli Galli WebSocket Origins
+#### Halli Galli connection and card loading
 
-- `HALLI_GALLI_WS_ALLOWED_ORIGINS`: Comma-separated browser origins that may open the Halli Galli latency-calibration WebSocket. For a deployed site, use its public browser origin, for example `https://analytics.example.com`; do not use Docker-internal hostnames or container IP addresses. If users access the site through a public IP rather than a domain, that exact `https://IP_ADDRESS` origin can be listed instead.
+For another device on your home network, run `docker compose up -d --build` and open `http://HOST_LAN_IP`, replacing `HOST_LAN_IP` with the Docker host's private LAN address. `http://HOST_LAN_IP:8000` also works. No certificate or device installation is needed. For frontend development, run `npm start` in `frontend` and open `http://HOST_LAN_IP:5173`; Vite forwards `/api` and its WebSocket connection to the Docker frontend.
+
+After Wordle, the browser opens `/api/auth/halli-galli/calibration` on the same host, using `ws://` for HTTP or `wss://` for HTTPS. A browser WebSocket cannot set the normal Bearer header, so its **first message** contains the Wordle token. The server verifies it, sends numbered probes with random nonces, and measures the matching replies. The returned calibration ID is short lived and can start one game. Game start sends that ID in `X-Halli-Galli-Calibration` and the Wordle token in `Authorization: Bearer`; the server checks that both belong to the same Wordle attempt. Nginx and Vite forward the WebSocket upgrade to the API.
+
+The calibration WebSocket checks the browser's `Origin` before accepting it. `HALLI_GALLI_WS_ALLOWED_ORIGINS` is a comma-separated list of exact origins, including scheme and port; the repository's `.env` lists localhost. An HTTP origin with a private or loopback IP (`10/8`, `172.16/12`, `192.168/16`, `127/8`, or local IPv6) is also accepted automatically **only when it exactly matches the forwarded Host, including the port**. Other HTTP names, public IPs, and all HTTPS origins must be listed explicitly. This allows changing home LAN IPs without opening calibration to unrelated websites.
+
+The game response names the initial cards and how many cards can remain visible. The browser preloads each prepared round once because another card POST would replace its encryption key and image version. Reveal returns the key, image ID, and version; the browser checks the saved ID and version before decrypting. Each encrypted image contains a 12-byte AES-GCM nonce followed by ciphertext and its authentication tag. Decryption uses the browser's `crypto.subtle` on HTTPS or localhost. When that API is unavailable on LAN HTTP, `@noble/ciphers` performs the same authenticated AES-GCM decryption in JavaScript. The PNG is shown through a temporary blob URL and that URL is revoked when the card leaves the pile. The next prepared card is preloaded while play continues.
+
+LAN HTTP supports the game but does **not** protect Wordle tokens, reveal keys, or game traffic in transit. Use it on a home network you trust, without router port forwarding. For an HTTPS host or tunnel, point it at the Docker frontend on port `80`, add its exact browser origin to `HALLI_GALLI_WS_ALLOWED_ORIGINS` in `.env`, and recreate the API container. The host or tunnel must forward WebSocket upgrades. HTTPS protects transport and lets the browser use native Web Crypto; the card encryption alone does not replace HTTPS.
 
 #### Security Questions
 

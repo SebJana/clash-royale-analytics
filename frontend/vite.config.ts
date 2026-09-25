@@ -6,11 +6,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    // A second device can use the host's LAN IP while Vite still forwards API
+    // and calibration WebSocket requests through the Docker frontend proxy.
+    host: "0.0.0.0",
     proxy: {
       "/api": {
         target: "http://localhost:80",
-        changeOrigin: true,
-        secure: false,
+        changeOrigin: false,
+        ws: true,
       },
     },
   },

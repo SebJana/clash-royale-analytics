@@ -1,0 +1,265 @@
+.halli-galli.auth-step {
+  max-width: 100%;
+  margin-top: var(--spacing-sm);
+  gap: var(--spacing-md);
+  box-sizing: border-box;
+}
+.halli-galli.auth-step h3 {
+  color: var(--text-primary);
+  font-size: var(--font-xl);
+  overflow-wrap: break-word;
+}
+.halli-mobile-rules { display: none; }
+
+.halli-loading {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  color: var(--color-primary);
+}
+
+.halli-loading p { color: var(--text-primary); }
+.halli-rules {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-primary);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: rgba(52, 152, 219, .14);
+  color: var(--text-primary);
+  font-size: var(--font-lg);
+  line-height: 1.45;
+  text-align: left;
+}
+.halli-rules p { margin: 0; }
+.halli-rules p + p { margin-top: var(--spacing-sm); }
+.halli-rules p:first-child { font-size: var(--font-xl); font-weight: var(--font-weight-semibold); }
+.halli-rules strong { color: var(--color-accent); font-size: 1.15em; }
+.halli-rules .halli-click-rule {
+  padding: var(--spacing-md);
+  border-radius: var(--radius-sm);
+  background: var(--bg-overlay-medium);
+  font-size: var(--font-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.35;
+}
+.halli-click-rule strong { text-transform: uppercase; }
+
+.halli-lives {
+  display: flex;
+  justify-content: space-around;
+  gap: var(--spacing-lg);
+  width: 100%;
+}
+.halli-lives > div, .halli-lives span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+}
+.halli-lives > div { flex-wrap: wrap; }
+.halli-lives > div:first-child .life-active { color: var(--color-error); }
+.halli-lives > div:last-child .life-active { color: var(--color-primary); }
+.life-empty { color: var(--border-strong); }
+
+.halli-progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--bg-overlay-strong);
+}
+.halli-progress > div {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 50ms linear;
+}
+.halli-progress.is-idle { visibility: hidden; }
+
+.halli-pile {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--visible-cards), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--pile-rows-desktop), minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  height: var(--pile-height-desktop);
+}
+.halli-card {
+  display: block;
+  padding: 0;
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  background: var(--bg-overlay-medium);
+  cursor: pointer;
+  overflow: hidden;
+  width: 100%;
+  max-width: 200px;
+  touch-action: manipulation;
+  animation: halli-card-in 220ms ease-out;
+}
+.halli-card:hover:not(:disabled), .halli-card:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-alt);
+}
+.halli-card:disabled { cursor: default; }
+.halli-card img { display: block; width: 100%; height: auto; user-select: none; }
+.halli-card.is-winning {
+  z-index: 1;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent), 0 0 28px var(--color-accent);
+  animation: halli-winning-wiggle 2100ms ease-in-out both;
+}
+.halli-card.is-winning.player-win {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 4px var(--color-success), 0 0 28px var(--color-success);
+}
+.halli-card.is-wrong {
+  z-index: 2;
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 4px var(--color-error), 0 0 28px var(--color-error);
+  animation: halli-wrong-shake 1800ms ease-in-out both;
+}
+
+.halli-center-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  width: min(90%, 440px);
+  min-height: 140px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  background: rgba(36, 36, 36, .88);
+  color: var(--text-primary);
+  text-align: center;
+  animation: halli-feedback-in 280ms ease-out;
+}
+.halli-center-message h4 {
+  margin: 0;
+  font-size: var(--font-2xl);
+}
+.halli-center-message p { margin: 0; }
+.halli-center-message.good { border-color: var(--color-success); }
+.halli-center-message.bad { border-color: var(--color-error); }
+.halli-center-message.good h4 { color: var(--color-success); }
+.halli-center-message.bad h4 { color: var(--color-error); }
+.halli-center-message .halli-late-icon { color: var(--color-error); }
+.halli-center-message .MuiButton-root { font-size: var(--font-lg); padding: var(--spacing-md) var(--spacing-2xl); }
+.halli-finale {
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  animation: halli-feedback-in 280ms ease-out;
+  font-weight: var(--font-weight-bold);
+}
+.halli-finale.good { color: var(--color-success); background: rgba(76, 175, 80, .13); }
+.halli-finale.bad { color: var(--color-error); background: rgba(239, 68, 68, .13); }
+.halli-finale p { margin-top: 0; }
+
+@keyframes halli-card-in {
+  from { opacity: 0; transform: translateY(-12px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes halli-feedback-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes halli-winning-wiggle {
+  0%, 100% { transform: rotate(0) scale(1); }
+  20%, 60% { transform: rotate(-4deg) scale(1.07); }
+  40%, 80% { transform: rotate(4deg) scale(1.07); }
+}
+@keyframes halli-wrong-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-7px); }
+  40%, 80% { transform: translateX(7px); }
+}
+
+@media (max-width: 600px) {
+  .halli-galli.auth-step {
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: var(--spacing-xs);
+    gap: var(--spacing-xs);
+  }
+  /* Expanded rules need their own height. Let the dialog content scroll while
+     the lives, progress bar, and cards stay below the instructions. */
+  .halli-galli.auth-step:has(.halli-mobile-rules[open]) {
+    height: auto;
+    min-height: 100%;
+  }
+  .halli-galli.auth-step h3 { font-size: var(--font-lg); line-height: 1.2; }
+  /* Keep the full rules on the Start screen. During play, the summary leaves
+     room for every card while the full text remains one click away. */
+  .halli-galli.auth-step:not(.phase-ready):not(.phase-starting) > .halli-rules { display: none; }
+  .halli-galli.auth-step:not(.phase-ready):not(.phase-starting) > .halli-mobile-rules { display: block; }
+  .halli-mobile-rules {
+    width: 100%;
+    flex-shrink: 0;
+    text-align: left;
+    color: var(--text-primary);
+  }
+  .halli-mobile-rules summary {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    background: rgba(52, 152, 219, .14);
+    font-size: var(--font-sm);
+    cursor: pointer;
+  }
+  .halli-mobile-rules > .halli-rules {
+    margin-top: var(--spacing-xs);
+  }
+  .halli-rules { padding: var(--spacing-md); font-size: var(--font-md); }
+  .halli-rules p:first-child { font-size: var(--font-lg); }
+  .halli-rules .halli-click-rule { font-size: var(--font-lg); }
+  .halli-pile {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: repeat(var(--visible-cards-mobile), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--pile-rows-mobile), minmax(0, 1fr));
+    height: auto;
+  }
+  .halli-mobile-rules[open] ~ .halli-pile {
+    flex: none;
+    min-height: 220px;
+    grid-template-rows: repeat(var(--pile-rows-mobile), auto);
+  }
+  /* Card height follows the available grid row. Its width stays within the
+     column and keeps the backend PNG's 320:448 click coordinate ratio. */
+  .halli-card {
+    width: auto;
+    height: min(100%, calc((100vw - 32px) / var(--visible-cards-mobile) * 1.4));
+    max-width: 100%;
+    aspect-ratio: 5 / 7;
+  }
+  .halli-card img { width: 100%; height: 100%; }
+  .halli-mobile-rules[open] ~ .halli-pile .halli-card {
+    width: 100%;
+    height: auto;
+  }
+  .halli-lives { font-size: var(--font-sm); }
+}
+@media (max-width: 480px) {
+  .halli-galli.auth-step h3 { font-size: var(--font-md); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .halli-card, .halli-card.is-winning, .halli-card.is-wrong, .halli-center-message, .halli-finale { animation: none; }
+  .halli-progress > div { transition: none; }
+}

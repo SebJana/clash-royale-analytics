@@ -37,6 +37,18 @@ export type HalliGalliGameResponse = {
 };
 
 export type HalliGalliGameStatus = "playing" | "player_won" | "player_lost";
+export type HalliGalliRoundResult =
+  | "player_won"
+  | "player_lost"
+  | "no_halli_galli";
+export type HalliGalliRoundReason =
+  | "correct_buzz"
+  | "late_buzz"
+  | "wrong_card"
+  | "wrong_fruit"
+  | "false_buzz"
+  | "missed_halli_galli"
+  | "no_halli_galli";
 
 export type HalliGalliStatusResponse = {
   current_round: number;
@@ -45,6 +57,13 @@ export type HalliGalliStatusResponse = {
   game_status: HalliGalliGameStatus;
   halli_galli_token: string | null;
   current_image_id: string | null;
+  prepared_cards: { round_index: number; image_id: string }[];
+  last_round_index: number | null;
+  last_round_result: HalliGalliRoundResult | null;
+  last_round_reason: HalliGalliRoundReason | null;
+  last_round_clear_cards: boolean | null;
+  last_round_late_by_ms: number | null;
+  last_round_winning_card_ids: string[];
 };
 
 export type HalliGalliRevealResponse = {
@@ -65,7 +84,10 @@ export type HalliGalliRoundResponse = {
   bot_lives: number;
   game_status: HalliGalliGameStatus;
   halli_galli_token: string | null;
-  round_result: "player_won" | "player_lost" | "no_halli_galli";
+  round_result: HalliGalliRoundResult;
+  round_reason: HalliGalliRoundReason;
+  late_by_ms: number | null;
+  winning_card_ids: string[];
   clear_cards: boolean;
   next_card: { round_index: number; image_id: string } | null;
   preloaded_card: { round_index: number; image_id: string } | null;

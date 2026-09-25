@@ -34,18 +34,20 @@ export async function getCaptchaImage(captchaId: string): Promise<Blob> {
 
 // Step 1.3: Verify captcha and get captcha token
 export async function verifyCaptcha(
-  request: CaptchaVerifyRequest
+  request: CaptchaVerifyRequest,
 ): Promise<CaptchaTokenResponse> {
   const response = await api.post<CaptchaTokenResponse>(
     "/auth/verify_captcha",
-    request
+    request,
   );
   return response.data;
 }
 
 // Step 2: Wordle
 // Step 2.1: Get wordle challenge ID
-export async function getWordleId(captchaToken: string): Promise<WordleResponse> {
+export async function getWordleId(
+  captchaToken: string,
+): Promise<WordleResponse> {
   const response = await api.get<WordleResponse>("/auth/wordle_id", {
     headers: {
       Authorization: `Bearer ${captchaToken}`,
@@ -57,7 +59,7 @@ export async function getWordleId(captchaToken: string): Promise<WordleResponse>
 // Step 2.2: Submit wordle guess and get evaluation/feedback
 export async function submitWordleGuess(
   captchaToken: string,
-  request: WordleVerifyRequest
+  request: WordleVerifyRequest,
 ): Promise<{
   evaluation: unknown;
   remaining_guesses: number;
@@ -79,14 +81,19 @@ export async function submitWordleGuess(
 // to schedule the next one.
 export async function getHalliGalliGame(
   wordleToken: string,
-  calibrationId: string
+  calibrationId: string,
 ): Promise<HalliGalliGameResponse> {
-  const response = await api.get<HalliGalliGameResponse>("/auth/halli_galli_id", {
-    headers: {
-      Authorization: `Bearer ${wordleToken}`,
-      "X-Halli-Galli-Calibration": calibrationId,
+  const response = await api.get<HalliGalliGameResponse>(
+    "/auth/halli_galli_id",
+    {
+      // Initial card generation can take longer than the normal API timeout.
+      timeout: 20000,
+      headers: {
+        Authorization: `Bearer ${wordleToken}`,
+        "X-Halli-Galli-Calibration": calibrationId,
+      },
     },
-  });
+  );
   return response.data;
 }
 
@@ -95,12 +102,12 @@ export async function getHalliGalliGame(
 // the response with the highest version for the later reveal.
 export async function getHalliGalliCard(
   gameId: string,
-  roundIndex: number
+  roundIndex: number,
 ): Promise<{ image: Blob; imageVersion: number }> {
   const response = await api.post<Blob>(
     `/auth/halli_galli_card/${gameId}/${roundIndex}`,
     undefined,
-    { responseType: "blob" }
+    { responseType: "blob", timeout: 10000 },
   );
   return {
     image: response.data,
@@ -111,10 +118,10 @@ export async function getHalliGalliCard(
 // Read the saved outcome and lives after a lost action response. A finished
 // player win also returns the same Halli Galli token saved with the game.
 export async function getHalliGalliStatus(
-  gameId: string
+  gameId: string,
 ): Promise<HalliGalliStatusResponse> {
   const response = await api.get<HalliGalliStatusResponse>(
-    `/auth/halli_galli_status/${gameId}`
+    `/auth/halli_galli_status/${gameId}`,
   );
   return response.data;
 }
@@ -123,11 +130,11 @@ export async function getHalliGalliStatus(
 // server's round timer once; retrying it returns the same key and version.
 export async function revealHalliGalliRound(
   gameId: string,
-  roundIndex: number
+  roundIndex: number,
 ): Promise<HalliGalliRevealResponse> {
   const response = await api.post<HalliGalliRevealResponse>(
     `/auth/halli_galli_action/${gameId}/${roundIndex}`,
-    { action: "reveal" }
+    { action: "reveal" },
   );
   return response.data;
 }
@@ -138,11 +145,16 @@ export async function buzzHalliGalliRound(
   roundIndex: number,
   clickedCardId: string,
   clickX: number,
-  clickY: number
+  clickY: number,
 ): Promise<HalliGalliRoundResponse> {
   const response = await api.post<HalliGalliRoundResponse>(
     `/auth/halli_galli_action/${gameId}/${roundIndex}`,
-    { action: "buzz", clicked_card_id: clickedCardId, click_x: clickX, click_y: clickY }
+    {
+      action: "buzz",
+      clicked_card_id: clickedCardId,
+      click_x: clickX,
+      click_y: clickY,
+    },
   );
   return response.data;
 }
@@ -151,11 +163,11 @@ export async function buzzHalliGalliRound(
 // finished round returns lives, whether cards should clear, and the next IDs.
 export async function nextHalliGalliRound(
   gameId: string,
-  roundIndex: number
+  roundIndex: number,
 ): Promise<HalliGalliRoundResponse> {
   const response = await api.post<HalliGalliRoundResponse>(
     `/auth/halli_galli_action/${gameId}/${roundIndex}`,
-    { action: "next" }
+    { action: "next" },
   );
   return response.data;
 }
@@ -163,7 +175,7 @@ export async function nextHalliGalliRound(
 // Step 4: Verify security questions using the Halli Galli win token.
 export async function verifySecurityQuestions(
   halliGalliToken: string,
-  request: SecurityQuestionsRequest
+  request: SecurityQuestionsRequest,
 ): Promise<SecurityTokenResponse> {
   const response = await api.post<SecurityTokenResponse>(
     "/auth/verify_security_questions",
@@ -172,14 +184,14 @@ export async function verifySecurityQuestions(
       headers: {
         Authorization: `Bearer ${halliGalliToken}`,
       },
-    }
+    },
   );
   return response.data;
 }
 
 // Step 5: Get final auth token
 export async function getAuthToken(
-  securityToken: string
+  securityToken: string,
 ): Promise<AuthTokenResponse> {
   const response = await api.post<AuthTokenResponse>("/auth/token", undefined, {
     headers: {

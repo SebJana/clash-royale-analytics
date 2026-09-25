@@ -37,7 +37,7 @@ export function WordleGame({
   const [evaluations, setEvaluations] = useState<string[][]>([]);
   const [currentGuess, setCurrentGuess] = useState("");
   const [gameStatus, setGameStatus] = useState<"playing" | "won" | "lost">(
-    "playing"
+    "playing",
   );
   const [solution, setSolution] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,7 +47,7 @@ export function WordleGame({
 
   // Animation state management for flip reveal
   const [animatingRowIndex, setAnimatingRowIndex] = useState<number | null>(
-    null
+    null,
   );
   const [animatingLetterIndex, setAnimatingLetterIndex] = useState(-1);
   const [completedLetterIndex, setCompletedLetterIndex] = useState(-1); // Controls when colors show
@@ -72,26 +72,35 @@ export function WordleGame({
       // Calculation: (letter_index * delay) + (80% of flip_duration)
       // This reveals color while card is rotating back to face, creating smooth reveal
       // Example: Letter 2 shows color at 800ms + 640ms = 1440ms
-      setTimeout(() => {
-        setCompletedLetterIndex(i);
-      }, i * FLIP_DELAY_LETTER_MS + FLIP_DURATION_MS * 0.8);
+      setTimeout(
+        () => {
+          setCompletedLetterIndex(i);
+        },
+        i * FLIP_DELAY_LETTER_MS + FLIP_DURATION_MS * 0.8,
+      );
     }
 
     // Clean up after all animations finish
     // Calculation: (5 letters * 400ms delay) + 5000ms buffer = 7000ms total
     // Buffer ensures all flip animations (800ms each) complete before cleanup
-    setTimeout(() => {
-      setAnimatingRowIndex(null);
-      setAnimatingLetterIndex(-1);
-      setCompletedLetterIndex(-1);
-      setIsAnimationRunning(false);
-    }, WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 5000);
+    setTimeout(
+      () => {
+        setAnimatingRowIndex(null);
+        setAnimatingLetterIndex(-1);
+        setCompletedLetterIndex(-1);
+        setIsAnimationRunning(false);
+      },
+      WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 5000,
+    );
 
     // Safety unlock - Shorter timeout to prevent stuck input if main cleanup fails
     // Uses 1000ms buffer instead of 5000ms as emergency fallback
-    setTimeout(() => {
-      setIsAnimationRunning(false);
-    }, WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 1000);
+    setTimeout(
+      () => {
+        setIsAnimationRunning(false);
+      },
+      WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 1000,
+    );
   }, []);
 
   // Emergency timeout to prevent permanent input lock
@@ -261,7 +270,7 @@ export function WordleGame({
       currentGuess.length,
       isSubmitting,
       isAnimationRunning,
-    ]
+    ],
   );
 
   // Handle actual keyboard input for typing letters, backspace, and enter
@@ -297,9 +306,7 @@ export function WordleGame({
 
   return (
     <div className="wordle-game">
-      <h3>
-        Solve the Wordle to prove you're worthy of managing player tracking
-      </h3>
+      <h3>Solve the Wordle to prove your reasoning skills</h3>
 
       <div className="wordle-grid">
         {/* Render game grid with rows for each guess attempt */}

@@ -46,7 +46,12 @@ from helpers.jwt import (
     create_access_token,
     get_access_token_claims,
 )
-from redis_service import RedisConn, build_auth_state_key, set_auth_state_json
+from redis_service import (
+    RedisConn,
+    build_auth_state_key,
+    set_auth_state_json,
+    consume_auth_state_json,
+)
 from routers.auth_routes.common import round_token_scheme
 
 router = APIRouter()
@@ -67,13 +72,13 @@ class HalliGalliActionRequest(BaseModel):
 
 
 def _halli_galli_status(game: HalliGalliGame) -> dict:
-    """Return the progress that the frontend needs after every game action.
+    """Return progress and the last committed round for response recovery.
 
     Args:
         game (HalliGalliGame): Saved game whose progress is being reported.
 
     Returns:
-        dict: Current round, both life counts, outcome, and the win token if any.
+        dict: Current round, life counts, outcome, win token, and last score.
     """
     if game.bot_lives == 0:
         game_status = "player_won"
@@ -91,6 +96,12 @@ def _halli_galli_status(game: HalliGalliGame) -> dict:
         "halli_galli_token": (
             game.completion_token if game_status == "player_won" else None
         ),
+        "last_round_index": game.last_round_index,
+        "last_round_result": game.last_round_result,
+        "last_round_reason": game.last_round_reason,
+        "last_round_clear_cards": game.last_round_clear_cards,
+        "last_round_late_by_ms": game.last_round_late_by_ms,
+        "last_round_winning_card_ids": game.last_round_winning_card_ids,
     }
 
 
@@ -98,6 +109,7 @@ def _halli_galli_status(game: HalliGalliGame) -> dict:
 async def get_halli_galli_id(
     auth_state_conn: AuthStateConn,
     card_image_conn: CardImageConn,
+    response: Response,
     credentials: HTTPAuthorizationCredentials | None = Depends(round_token_scheme),
     calibration_id: str | None = Header(
         default=None,
@@ -112,9 +124,8 @@ async def get_halli_galli_id(
     Args:
         auth_state_conn (AuthStateConn): Versionless auth-state Redis connection.
         card_image_conn (CardImageConn): Binary cache connection for card images.
-        calibration_id (str | None): ID from the calibration request header.
-            It is required for now, but the temporary fallback below does not
-            validate or consume it yet.
+        response (Response): HTTP response whose cache policy is set here.
+        calibration_id (str | None): One-use ID from the calibration request.
 
     Returns:
         dict: Game ID, public rules, next-card interval, initial image IDs,
@@ -134,10 +145,6 @@ async def get_halli_galli_id(
     if not calibration_id:
         raise HTTPException(status_code=401, detail="Missing Halli Galli calibration")
 
-    # NOTE TODO: use the stored calibration result instead of the fixed 15 ms
-    # fallback. The block below is disabled, so a nonempty header is currently
-    # enough to pass this check and the measured RTT is not used for the game.
-    """
     calibration_key = build_auth_state_key("halli_galli_calibration", calibration_id)
     calibration = await consume_auth_state_json(auth_state_conn, calibration_key)
     if (
@@ -149,8 +156,6 @@ async def get_halli_galli_id(
     network_delay_rtt_ms = calibration.get("network_delay_rtt_ms")
     if type(network_delay_rtt_ms) is not int or network_delay_rtt_ms < 0:
         raise HTTPException(status_code=401, detail="Invalid Halli Galli calibration")
-    """
-    network_delay_rtt_ms = 15
 
     # Pick the current card plus the configured number of future cards before
     # returning the game ID. This saves references to raw pool templates, not
@@ -169,6 +174,11 @@ async def get_halli_galli_id(
         ttl=settings.CACHE_TTL_HALLI_GALLI,
     )
 
+    # The game ID grants access to later routes. "no-store" tells browsers and
+    # proxies not to retain it; "no-cache" would still allow storage. FastAPI
+    # copies headers from this injected Response onto the JSON made from the
+    # dict below, so the header has to be set before returning that dict.
+    response.headers["Cache-Control"] = "no-store"
     return {
         "halli_galli_id": game_id,
         "rules": get_public_game_rules(game_session).model_dump(mode="json"),
@@ -251,32 +261,45 @@ async def get_halli_galli_card(
 
 
 @router.get("/halli_galli_status/{game_id}")
-async def get_halli_galli_status(game_id: str, auth_state_conn: AuthStateConn):
-    """Read life counts and outcome after an action response is lost.
+async def get_halli_galli_status(
+    game_id: str, auth_state_conn: AuthStateConn, response: Response
+):
+    """Read saved progress and prepared card IDs after an action response is lost.
 
     Args:
         game_id (str): ID returned when this game started.
         auth_state_conn (AuthStateConn): Redis connection holding game state.
+        response (Response): HTTP response whose cache policy is set here.
 
     Returns:
-        dict: Current round, life counts, outcome, current image ID, and a
-            saved completion token when the player won.
+        dict: Current round, last score, life counts, outcome, prepared image
+            IDs, and a saved completion token when the player won.
     """
     game_key = build_auth_state_key("halli_galli", game_id)
     game_data = await auth_state_conn.client.get(game_key)
     if game_data is None:
         raise HTTPException(status_code=404, detail="Halli Galli game not found")
     game = HalliGalliGame.model_validate_json(game_data)
-    # A finished game has no next card to show. Keep only its life counts,
-    # outcome, and saved win token in the status response.
+    # A finished game has no next card to show. Active games return their
+    # prepared IDs so a lost action reply cannot strand the preload window.
     current = (
         game.rounds.get(game.current_round)
         if game.player_lives > 0 and game.bot_lives > 0
         else None
     )
+    # This GET can return the saved win token. Its URL stays the same throughout
+    # the game, so a cache must not keep or replay any status response for it.
+    response.headers["Cache-Control"] = "no-store"
     return {
         **_halli_galli_status(game),
         "current_image_id": current.image_id if current is not None else None,
+        "prepared_cards": [
+            {"round_index": index, "image_id": card.image_id}
+            for index, card in sorted(game.rounds.items())
+            if current is not None
+            and index >= game.current_round
+            and card.image_id is not None
+        ],
     }
 
 
@@ -388,6 +411,9 @@ async def _handle_round_end(
 
     response: dict[str, object] = {
         "round_result": result,
+        "round_reason": game.last_round_reason,
+        "late_by_ms": game.last_round_late_by_ms,
+        "winning_card_ids": game.last_round_winning_card_ids,
         "clear_cards": game.rounds[round_index].halli_galli,
         "next_card": None,
         "preloaded_card": None,
@@ -430,6 +456,7 @@ async def act_on_halli_galli_round(
     req: HalliGalliActionRequest,
     auth_state_conn: AuthStateConn,
     card_image_conn: CardImageConn,
+    response: Response,
 ):
     """reveal, buzz, or move on using one saved current round.
 
@@ -443,6 +470,7 @@ async def act_on_halli_galli_round(
         req (HalliGalliActionRequest): Action and optional buzz coordinates.
         auth_state_conn (AuthStateConn): Redis connection holding game state.
         card_image_conn (CardImageConn): Binary cache for future raw cards.
+        response (Response): HTTP response whose cache policy is set here.
 
     Returns:
         dict: Reveal key or round result, plus lives and game status.
@@ -469,7 +497,9 @@ async def act_on_halli_galli_round(
                 )
 
             try:
-                response = await _apply_action(game, round_index, req, card_image_conn)
+                action_response = await _apply_action(
+                    game, round_index, req, card_image_conn
+                )
             except ValueError as error:
                 raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -482,5 +512,9 @@ async def act_on_halli_galli_round(
             except WatchError:
                 continue
 
-        return {**_halli_galli_status(game), **response}
+        # Reveal carries a decryption key and a final buzz carries a token.
+        # Set the header on FastAPI's injected Response so the returned JSON
+        # cannot be stored by a browser or a proxy configured to cache POSTs.
+        response.headers["Cache-Control"] = "no-store"
+        return {**_halli_galli_status(game), **action_response}
     raise HTTPException(status_code=409, detail="Game changed; retry action")

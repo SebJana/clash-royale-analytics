@@ -67,6 +67,11 @@ class Settings:
     # Longer game windows still produce a longer interval automatically.
     HALLI_GALLI_MIN_NEXT_CARD_INTERVAL_MS = 3000
 
+    # TODO make oldest and youngest randomly decided by the runtime
+    # Also randomly decide how many fruit at once (5,6,7) win?
+
+    # TODO possibly add a little buffer to the target fruit (5% ish bigger hitbox)?
+
     # Require the oldest card that contributes to any winning fruit count.
     # Also require a click on a fruit at the edge chosen when the game starts.
     HALLI_GALLI_REQUIRE_OLDEST_WINNING_CARD = True

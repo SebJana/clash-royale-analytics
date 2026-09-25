@@ -57,6 +57,7 @@ class ClashRoyaleAPI:
         # Strip the tag
         tag = player_tag.strip()
 
+        # TODO check if it starts with EXACTLY one '#' and only contains that one
         # Missing the starting code symbol
         if not tag.startswith("#"):
             return False
