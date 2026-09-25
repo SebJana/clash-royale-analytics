@@ -40,10 +40,9 @@ class ClashRoyaleAPI:
 
     # --- helpers -------------------------------------------------------------
     @staticmethod
-    def check_tag_syntax(player_tag: str):
+    def check_tag_syntax(player_tag: str) -> bool:
         """
-        Checks wether the player tag starts with a '#' and has the correct length
-        and matches the Supercell alphabet.
+        Check for one leading '#', 4-12 tag characters, and the Supercell alphabet.
 
         Args:
             player_tag (str): The player tag starting with '#' (e.g., "#YYRJQY28")
@@ -52,20 +51,16 @@ class ClashRoyaleAPI:
             bool: True if valid, False otherwise
         """
 
-        ALPHABET = set("0289PYLQGRJCUV")  # Supercell-Tag-Alphabet
-
         # Strip the tag
         tag = player_tag.strip()
 
-        # TODO check if it starts with EXACTLY one '#' and only contains that one
-        # Missing the starting code symbol
-        if not tag.startswith("#"):
+        if not tag.startswith("#") or tag.count("#") != 1:
             return False
 
         core = tag[1:]  # Part without the leading '#'
 
-        # TODO check actual max or min length
-        # Invalid length
+        # NOTE Match the frontend's current 4-12 limit. Update both validators if Clash
+        # Royale starts (or already is) issuing shorter or longer tags.
         if len(core) < 4 or len(core) > 12:
             return False
 
