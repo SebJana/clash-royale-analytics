@@ -28,9 +28,9 @@ PERCENT_DENOMINATOR = 100
 FRUIT_EDGE_COMPARISON_EPSILON = 1e-12
 # Choose one target direction when the game starts and keep it for that game.
 # The direction is only enforced when target-fruit checking is enabled.
-# Otherwise, the click only needs a winning card ID (and the oldest card if
-# that separate rule is enabled).
+# Otherwise, the click only needs the winning card chosen for this game.
 TARGET_FRUIT_EDGES = ("left", "right", "top", "bottom")
+WINNING_CARD_AGES = ("oldest", "newest")
 
 """Server-side state and rules for the Halli Galli challenge.
 
@@ -40,7 +40,7 @@ total equals the configured winning amount exactly. A buzz or a missed Halli
 Galli clears the pile, so earlier cards no longer count in later rounds.
 
 The game is initialized with a server-selected network RTT and its own rule set,
-including a randomly chosen target fruit edge.
+including a randomly chosen winning card age and target fruit edge.
 The rules are saved with the game, and only the display rules are sent to the client,
 so later setting changes cannot alter a game already in progress. Cards are picked ahead
 for image preloading: startup prepares the current card and the configured
@@ -56,7 +56,7 @@ early request for the next card does not reveal whether the player should buzz.
 
 Evaluation accepts either a buzz or a request to move on. A buzz must arrive
 before the deadline, name a winning card in the current round, and satisfy the
-configured oldest-card and target-fruit rules. A wrong or late buzz costs the
+configured winning-card age and target-fruit rules. A wrong or late buzz costs the
 player a life; a correct one costs the bot a life. Moving on after the deadline
 costs the player a life if a Halli Galli was missed. The helper advances the
 round after scoring, while the gameplay route must save the changed game
@@ -101,11 +101,12 @@ class HalliGalliRules(BaseModel):
     # the currently displayed card is prepared in addition to this number.
     max_preloaded_cards: int = Field(ge=1)
     winning_fruit_count: int = Field(ge=1)
-    require_oldest_winning_card: bool
+    winning_card_age: Literal["oldest", "newest"]
     require_target_fruit: bool
     target_fruit_edge: Literal["left", "right", "top", "bottom"]
     target_fruit_buffer: float = Field(ge=0, le=1)
-    round_window_seconds: float = Field(gt=0)
+    target_fruit_hitbox_padding: float = Field(default=0, ge=0, le=1)
+    round_window_ms: int = Field(gt=0)
     round_jitter_percent: float = Field(ge=0, le=100)
 
 
@@ -115,13 +116,13 @@ class HalliGalliPublicRules(BaseModel):
     visible_card_count: int
     max_preloaded_cards: int
     winning_fruit_count: int
-    require_oldest_winning_card: bool
+    winning_card_age: Literal["oldest", "newest"]
     require_target_fruit: bool
     target_fruit_edge: Literal["left", "right", "top", "bottom"]
 
 
 def default_game_rules() -> HalliGalliRules:
-    """Copy the server settings and choose one target edge for this game.
+    """Copy settings and choose a winning card age and target edge for this game.
 
     Returns:
         HalliGalliRules: Rule values to keep for the lifetime of one game.
@@ -130,11 +131,12 @@ def default_game_rules() -> HalliGalliRules:
         visible_card_count=settings.HALLI_GALLI_GAME_ROUND_CARDS,
         max_preloaded_cards=settings.HALLI_GALLI_MAX_PRELOADED_CARDS,
         winning_fruit_count=settings.HALLI_GALLI_WINNING_FRUIT_COUNT,
-        require_oldest_winning_card=settings.HALLI_GALLI_REQUIRE_OLDEST_WINNING_CARD,
+        winning_card_age=random.choice(WINNING_CARD_AGES),
         require_target_fruit=settings.HALLI_GALLI_REQUIRE_TARGET_FRUIT,
         target_fruit_edge=random.choice(TARGET_FRUIT_EDGES),
         target_fruit_buffer=settings.HALLI_GALLI_TARGET_FRUIT_BUFFER,
-        round_window_seconds=settings.HALLI_GALLI_ROUND_WINDOW_SECONDS,
+        target_fruit_hitbox_padding=settings.HALLI_GALLI_TARGET_FRUIT_HITBOX_PADDING,
+        round_window_ms=settings.HALLI_GALLI_ROUND_WINDOW_MS,
         round_jitter_percent=settings.HALLI_GALLI_ROUND_JITTER_PERCENT,
     )
 
@@ -212,7 +214,7 @@ def get_public_game_rules(game: HalliGalliGame) -> HalliGalliPublicRules:
         visible_card_count=rules.visible_card_count,
         max_preloaded_cards=rules.max_preloaded_cards,
         winning_fruit_count=rules.winning_fruit_count,
-        require_oldest_winning_card=rules.require_oldest_winning_card,
+        winning_card_age=rules.winning_card_age,
         require_target_fruit=rules.require_target_fruit,
         target_fruit_edge=rules.target_fruit_edge,
     )
@@ -513,17 +515,17 @@ def _network_delay_allowance_seconds(game: HalliGalliGame) -> float:
     )
 
 
-def _round_jitter_range_seconds(game: HalliGalliGame) -> float:
+def _round_jitter_range_ms(game: HalliGalliGame) -> float:
     """Calculate the largest timing change allowed by this game's jitter.
 
     Args:
         game (HalliGalliGame): Game holding its saved window and jitter percent.
 
     Returns:
-        float: Maximum amount of time added to or removed from a round.
+        float: Maximum milliseconds added to or removed from a round.
     """
     return (
-        game.rules.round_window_seconds
+        game.rules.round_window_ms
         * game.rules.round_jitter_percent
         / PERCENT_DENOMINATOR
     )
@@ -546,10 +548,9 @@ def get_next_card_interval_ms(game: HalliGalliGame) -> int:
     Returns:
         int: Milliseconds to wait between next-card reveal/preload cycles.
     """
-    longest_window_seconds = (
-        game.rules.round_window_seconds + _round_jitter_range_seconds(game)
+    longest_window_ms = math.ceil(
+        game.rules.round_window_ms + _round_jitter_range_ms(game)
     )
-    longest_window_ms = math.ceil(longest_window_seconds * MILLISECONDS_PER_SECOND)
     return max(settings.HALLI_GALLI_MIN_NEXT_CARD_INTERVAL_MS, longest_window_ms)
 
 
@@ -574,7 +575,7 @@ def _round_deadline(game: HalliGalliGame, current: HalliGalliRound) -> float:
     # without adding new random jitter to a round that is already open.
     return (
         current.revelation_timestamp
-        + game.rules.round_window_seconds
+        + game.rules.round_window_ms / MILLISECONDS_PER_SECOND
         + _network_delay_allowance_seconds(game)
     )
 
@@ -588,7 +589,8 @@ def _hit_target_fruit(
     """Check whether the click hits a fruit at the configured card edge.
 
     The positions are normalized boxes from the rendered image. Compare the
-    visible edge of each box, and accept near ties within the configured buffer.
+    visible edge of each box, and accept near ties within the configured edge
+    buffer. The click box has separate padding proportional to the fruit size.
 
     Args:
         card (HalliGalliRound): Card whose fruit boxes are being checked.
@@ -628,10 +630,24 @@ def _hit_target_fruit(
     return any(
         abs(edge - target_edge)
         <= rules.target_fruit_buffer + FRUIT_EDGE_COMPARISON_EPSILON
-        and position.x <= click_x <= position.x + position.width
-        and position.y <= click_y <= position.y + position.height
+        and position.x - position.width * rules.target_fruit_hitbox_padding
+        <= click_x
+        <= position.x + position.width * (1 + rules.target_fruit_hitbox_padding)
+        and position.y - position.height * rules.target_fruit_hitbox_padding
+        <= click_y
+        <= position.y + position.height * (1 + rules.target_fruit_hitbox_padding)
         for position, edge in zip(card.fruit_positions, edges)
     )
+
+
+def _required_winning_card_index(
+    game: HalliGalliGame, winning_cards: dict[str, set[int]]
+) -> int | None:
+    """Select the oldest or newest visible card contributing to a win."""
+    eligible = {index for cards in winning_cards.values() for index in cards}
+    if not eligible:
+        return None
+    return min(eligible) if game.rules.winning_card_age == "oldest" else max(eligible)
 
 
 def _clicked_winning_card(
@@ -643,7 +659,7 @@ def _clicked_winning_card(
 ) -> bool:
     """Check the clicked image ID against the current round's winning cards.
 
-    Optionally require the oldest contributing card and a hit on its target fruit.
+    Require the chosen contributing card and optionally a hit on its target fruit.
 
     Args:
         game (HalliGalliGame): Game containing the visible cards and image IDs.
@@ -654,22 +670,21 @@ def _clicked_winning_card(
         click_y (float | None): Vertical click position normalized to the card.
 
     Returns:
-        bool: Whether the ID and optional fruit hit match an eligible card.
+        bool: Whether the ID and optional fruit hit match the required card.
     """
     # The winning indices only refer to cards visible in the current round.
-    eligible_indices = {index for cards in winning_cards.values() for index in cards}
-    if not eligible_indices:
+    selected_index = _required_winning_card_index(game, winning_cards)
+    if selected_index is None:
         return False
-    if game.rules.require_oldest_winning_card:
-        eligible_indices = {min(eligible_indices)}
 
-    return any(
-        game.rounds[index].image_id == clicked_card_id
+    return (
+        game.rounds[selected_index].image_id == clicked_card_id
         and (
             not game.rules.require_target_fruit
-            or _hit_target_fruit(game.rounds[index], game.rules, click_x, click_y)
+            or _hit_target_fruit(
+                game.rounds[selected_index], game.rules, click_x, click_y
+            )
         )
-        for index in eligible_indices
     )
 
 
@@ -757,12 +772,9 @@ def eval_round(
     elif player_won:
         reason = "correct_buzz"
     else:
-        eligible = {index for cards in winning_cards.values() for index in cards}
-        if game.rules.require_oldest_winning_card:
-            eligible = {min(eligible)}
-        clicked_eligible = any(
-            game.rounds[index].image_id == clicked_card_id for index in eligible
-        )
+        selected_index = _required_winning_card_index(game, winning_cards)
+        assert selected_index is not None
+        clicked_eligible = game.rounds[selected_index].image_id == clicked_card_id
         reason = "wrong_fruit" if clicked_eligible else "wrong_card"
 
     # Any buzz settles and clears the pile, including a wrong buzz. A missed
@@ -836,7 +848,7 @@ def reveal_card(game: HalliGalliGame) -> str:
     # deadline, so an early next-card response cannot reveal a winning count.
     if current.revelation_timestamp is None:
         revealed_at = time.monotonic()
-        jitter_range = _round_jitter_range_seconds(game)
+        jitter_range = _round_jitter_range_ms(game)
         jitter = random.uniform(
             -jitter_range,
             jitter_range,
@@ -844,7 +856,8 @@ def reveal_card(game: HalliGalliGame) -> str:
         current.revelation_timestamp = revealed_at
         current.buzz_deadline_timestamp = (
             revealed_at
-            + max(0.0, game.rules.round_window_seconds + jitter)
+            + max(0.0, game.rules.round_window_ms + jitter)
+            / MILLISECONDS_PER_SECOND
             + _network_delay_allowance_seconds(game)
         )
     return current.encryption_key

@@ -131,6 +131,11 @@ function HomePage() {
 
   const handleUntrackPlayerClick = async () => {
     if (!untrackedPlayerTag) return;
+    if (!validatePlayerTagSyntax(untrackedPlayerTag)) {
+      setUntrackingError("Invalid player tag. Enter a tag like #YYRJQY28.");
+      setUntrackingSuccess(null);
+      return;
+    }
 
     // Check if user is authenticated
     if (!checkAuthStatus()) {

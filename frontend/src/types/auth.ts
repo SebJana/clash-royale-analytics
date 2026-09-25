@@ -19,7 +19,7 @@ export type HalliGalliPublicRules = {
   visible_card_count: number;
   max_preloaded_cards: number;
   winning_fruit_count: number;
-  require_oldest_winning_card: boolean;
+  winning_card_age: "oldest" | "newest";
   require_target_fruit: boolean;
   target_fruit_edge: "left" | "right" | "top" | "bottom";
 };

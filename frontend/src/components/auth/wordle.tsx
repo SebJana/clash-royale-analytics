@@ -405,7 +405,7 @@ export function WordleGame({
             {gameStatus === "won" ? (
               <>
                 <h2>🎉 Solved! 🎉</h2>
-                <p>Congratulations! You've proven your worth!</p>
+                <p>Nice work! Next up: Halli Galli.</p>
                 <p>
                   <a
                     href={`https://dictionary.cambridge.org/dictionary/english/${solution}`}

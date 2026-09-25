@@ -4,11 +4,6 @@
   gap: var(--spacing-md);
   box-sizing: border-box;
 }
-.halli-galli.auth-step h3 {
-  color: var(--text-primary);
-  font-size: var(--font-xl);
-  overflow-wrap: break-word;
-}
 .halli-mobile-rules { display: none; }
 
 .halli-loading {
@@ -204,7 +199,6 @@
     height: auto;
     min-height: 100%;
   }
-  .halli-galli.auth-step h3 { font-size: var(--font-lg); line-height: 1.2; }
   /* Keep the full rules on the Start screen. During play, the summary leaves
      room for every card while the full text remains one click away. */
   .halli-galli.auth-step:not(.phase-ready):not(.phase-starting) > .halli-rules { display: none; }
@@ -255,9 +249,6 @@
     height: auto;
   }
   .halli-lives { font-size: var(--font-sm); }
-}
-@media (max-width: 480px) {
-  .halli-galli.auth-step h3 { font-size: var(--font-md); }
 }
 @media (prefers-reduced-motion: reduce) {
   .halli-card, .halli-card.is-winning, .halli-card.is-wrong, .halli-center-message, .halli-finale { animation: none; }

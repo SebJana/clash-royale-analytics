@@ -56,29 +56,30 @@ class Settings:
     # and the number of cards shown, since these determine how often a win occurs.
     HALLI_GALLI_WINNING_FRUIT_COUNT = 5
 
-    # Base reaction time before adding jitter and the calibrated network delay.
+    # Base reaction time in milliseconds before adding jitter and the calibrated
+    # network delay.
     # Every round receives a deadline, including those without a winning count.
     # An early next-card request is therefore handled the same way in both cases.
-    HALLI_GALLI_ROUND_WINDOW_SECONDS = 1.5
+    HALLI_GALLI_ROUND_WINDOW_MS = 1500
     # Sample uniformly within plus or minus this percentage of the base time.
-    # At 2 seconds and 12.5%, the sampled window is 1.75 to 2.25 seconds.
+    # At 2000 ms and 12.5%, the sampled window is 1750 to 2250 ms.
     HALLI_GALLI_ROUND_JITTER_PERCENT = 12.5
     # Do not ask the frontend to reveal the next card more often than this.
     # Longer game windows still produce a longer interval automatically.
     HALLI_GALLI_MIN_NEXT_CARD_INTERVAL_MS = 3000
 
-    # TODO make oldest and youngest randomly decided by the runtime
-    # Also randomly decide how many fruit at once (5,6,7) win?
+    # TODO Also randomly decide how many fruit at once (5,6,7) win?
 
-    # TODO possibly add a little buffer to the target fruit (5% ish bigger hitbox)?
-
-    # Require the oldest card that contributes to any winning fruit count.
-    # Also require a click on a fruit at the edge chosen when the game starts.
-    HALLI_GALLI_REQUIRE_OLDEST_WINNING_CARD = True
+    # When enabled, require a click on a fruit at the edge chosen for the game.
+    # When disabled, a click anywhere on the required winning card is enough;
+    # that card is still randomly chosen as oldest or newest when the game starts.
     HALLI_GALLI_REQUIRE_TARGET_FRUIT = True
     # Fruits whose relevant edges are this close to the extreme also count.
     # The value is normalized to card width for left/right and height for top/bottom.
     HALLI_GALLI_TARGET_FRUIT_BUFFER = 0.05
+    # Expand each side of the target fruit's hitbox by X% of that fruit's
+    # bounding-box width or height to allow slightly imprecise clicks.
+    HALLI_GALLI_TARGET_FRUIT_HITBOX_PADDING = 0.05
 
     # Number of mistakes the player can make before losing the game.
     # A mistake includes buzzing incorrectly or failing to beat the bot.

@@ -493,21 +493,12 @@ export function HalliGalli({
       <p>
         Buzz when one fruit totals exactly{" "}
         <strong>{game.rules.winning_fruit_count}</strong> across the visible
-        cards. Up to <strong>{game.rules.visible_card_count}</strong> cards
-        count.
+        cards. Every visible card counts, including all{" "}
+        <strong>{game.rules.visible_card_count}</strong> once they are shown.
       </p>
       <p className="halli-click-rule">
-        {game.rules.require_oldest_winning_card ? (
-          <>
-            Click the <strong>oldest</strong> card of the{" "}
-            <strong>winning fruit</strong>.{" "}
-          </>
-        ) : (
-          <>
-            Click <strong>any</strong> card of the{" "}
-            <strong>winning fruit</strong>.{" "}
-          </>
-        )}
+        Click the <strong>{game.rules.winning_card_age}</strong> card of the{" "}
+        <strong>winning fruit</strong>.{" "}
         {game.rules.require_target_fruit ? (
           <>
             Click the <strong>{game.rules.target_fruit_edge}most</strong> fruit
@@ -542,9 +533,7 @@ export function HalliGalli({
           <details className="halli-mobile-rules">
             <summary>
               Buzz at {game.rules.winning_fruit_count} ·{" "}
-              {game.rules.require_oldest_winning_card
-                ? "oldest winning card"
-                : "any winning card"}{" "}
+              {game.rules.winning_card_age} winning card{" "}
               ·{" "}
               {game.rules.require_target_fruit
                 ? `${game.rules.target_fruit_edge}most fruit`
