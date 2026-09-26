@@ -5,7 +5,8 @@
 }
 
 .deck-component-deck-row .card-component-card {
-  flex: 1; /* Each card takes equal share of available width */
+  flex: 1 1 0; /* Each card takes equal share of available width */
+  min-width: 0;
 }
 
 .deck-component-copy-button {

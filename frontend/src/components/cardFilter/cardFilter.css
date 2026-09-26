@@ -53,6 +53,17 @@
   transform: rotate(180deg);
 }
 
+.card-filter-container .filter-search {
+  margin-top: var(--spacing-md);
+}
+
+.card-filter-empty {
+  grid-column: 1 / -1;
+  margin: var(--spacing-md) 0;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 .card-filter-component-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, 70px);
@@ -77,7 +88,8 @@
   background: none;
   cursor: pointer;
   padding: 2px;
-  transition: transform var(--transition-fast),
+  transition:
+    transform var(--transition-fast),
     box-shadow var(--transition-fast);
 }
 

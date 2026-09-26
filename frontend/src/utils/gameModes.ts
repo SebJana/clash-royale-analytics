@@ -1,4 +1,28 @@
 /**
+ * Omit the game mode filter when every available raw mode is selected.
+ * The UI keeps the explicit selection so individual modes can still be removed.
+ * This keeps the request URL short and lets the server use the same cache entry
+ * as an unfiltered request when game modes do not affect the result.
+ */
+export function gameModesForQuery(
+  selected: string[],
+  available: Record<string, string> | undefined,
+): string[] {
+  const availableNames = Object.keys(available ?? {});
+  const selectedNames = new Set(selected);
+  // Only omit the filter when the selected names exactly match the available names.
+  // The size check also prevents extra or stale selected modes from being ignored.
+  if (
+    availableNames.length > 0 &&
+    selectedNames.size === availableNames.length &&
+    availableNames.every((name) => selectedNames.has(name))
+  ) {
+    return [];
+  }
+  return selected;
+}
+
+/**
  * Builds a mapping from internal game mode names (as provided by the API/DB)
  * to user-friendly display names.
  *
@@ -13,7 +37,7 @@
  *
  */
 export function internalNamesToDisplayNames(
-  gameModes: Record<string, string>
+  gameModes: Record<string, string>,
 ): Map<string, string> {
   const internalAndDisplayNames = new Map<string, string>();
 
@@ -30,7 +54,7 @@ export function internalNamesToDisplayNames(
 /**
  * Maps an internal game mode name into a user-friendly display name.
  *
- * Handles special cases like Ranked, Clan Wars, and Friendly modes ...
+ * Handles special cases like Ranked and Clan Wars modes ...
  * and falls back to a generic transformation (underscores → spaces,
  * split camel case, collapse spaces, and trim) for non-mapped game modes.
  *
@@ -42,6 +66,18 @@ export function internalNamesToDisplayNames(
  * // "Ranked 1v1"
  */
 export function mapInternalNameToDisplayName(internalName: string): string {
+  const splitName = internalName
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Friendly modes use their split raw names instead of one shared "Friendly" label.
+  if (internalName.includes("Friendly")) {
+    return splitName;
+  }
+  // TODO: Consider showing split raw names for the other grouped modes too.
+  // Some names are very close together, so their labels need to stay distinguishable.
   if (internalName.startsWith("Ranked1v1_")) {
     return "Ranked 1v1";
   }
@@ -51,20 +87,13 @@ export function mapInternalNameToDisplayName(internalName: string): string {
   if (internalName.startsWith("ClanWar_BoatBattle")) {
     return "Clan Wars Boat Battle";
   }
-  if (internalName.includes("Friendly")) {
-    return "Friendly";
-  }
   if (internalName.startsWith("Challenge_AllCards_EventDeck_NoSet")) {
     return "CRL 20-Win";
   }
   // Add new mappings here
 
-  // Fallback: underscores to spaces, split camel case, collapse and trim
-  return internalName
-    .replace(/_/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/\s+/g, " ")
-    .trim();
+  // Fallback: show the split raw name for other unmapped modes.
+  return splitName;
 }
 
 /**
@@ -75,7 +104,7 @@ export function mapInternalNameToDisplayName(internalName: string): string {
  * @returns A list of all unique internal names (keys) from the map.
  */
 export function internalDisplayMapToInternalNamesList(
-  internalAndDisplay: Map<string, string>
+  internalAndDisplay: Map<string, string>,
 ): string[] {
   const internalNames = new Set<string>(); // Use set to ensure unique values
 
@@ -94,7 +123,7 @@ export function internalDisplayMapToInternalNamesList(
  * @returns A list of all unique display names (values) from the map.
  */
 export function internalDisplayMapToDisplayNamesList(
-  internalAndDisplay: Map<string, string>
+  internalAndDisplay: Map<string, string>,
 ): string[] {
   const displayNames = new Set<string>(); // Use set to ensure unique values
 

@@ -95,7 +95,9 @@
 }
 
 .deck-section {
-  flex: 0 0 auto;
+  flex: 0 1 700px;
+  width: 100%;
+  min-width: 0;
   max-width: 700px;
 }
 

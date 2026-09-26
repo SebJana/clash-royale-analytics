@@ -5,6 +5,7 @@ import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { getCurrentFilterState } from "../../utils/filter";
+import { gameModesForQuery } from "../../utils/gameModes";
 import { useEffect, useState } from "react";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import type { ChartConfig } from "../../types/chart";
@@ -38,7 +39,7 @@ import "./plots.css";
  */
 function getDataArrayForKey<T extends keyof Days>(
   stats: DailyStats | undefined,
-  key: T
+  key: T,
 ): Days[T][] {
   // Early return with empty array if stats is null/undefined to avoid runtime errors
   if (!stats) return [];
@@ -105,7 +106,7 @@ export default function PlayerPlots() {
 
   // State to store applied filters from FilterContainer
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(
-    getCurrentFilterState()
+    getCurrentFilterState(),
   );
 
   // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
@@ -138,6 +139,9 @@ export default function PlayerPlots() {
   // Fetch card statistics only when game modes are properly initialized
   // Uses applied filter values (not selected ones) to ensure query stability
   // Passes null for game modes to disable the query until gameModesInitialized is true
+  const queryGameModes = gameModesInitialized
+    ? gameModesForQuery(appliedFilters.gameModes, gameModes)
+    : null;
   const {
     data: stats,
     isLoading: statsLoading,
@@ -147,11 +151,11 @@ export default function PlayerPlots() {
     playerTag,
     appliedFilters.startDate,
     appliedFilters.endDate,
-    gameModesInitialized ? appliedFilters.gameModes : null // Use applied filters for the query
+    queryGameModes,
   );
 
-  // Create cache key from applied filters for loading state dependency
-  const modesKey = appliedFilters.gameModes.join("|");
+  // Use the modes actually sent to the API for the loading state dependency.
+  const modesKey = queryGameModes?.join("|") ?? "";
 
   // Loading state management
   // Determines when to show loading spinner vs content

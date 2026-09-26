@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { Card, CardMeta } from "../../types/cards";
 import { CardComponent } from "../card/card";
 import { ChevronUp } from "lucide-react";
+import { FilterSearch } from "../filterSearch/filterSearch";
 import "./cardFilter.css";
 
 /**
@@ -37,10 +38,18 @@ function sortCards(cards: CardMeta[]): CardMeta[] {
 function createCard(
   cardId: number,
   cardName: string,
-  cardEvolutionLevel: number
+  cardEvolutionLevel: number,
 ): Card {
+  let variantName = cardName;
+
+  if (cardEvolutionLevel === 1) {
+    variantName = `Evolution ${cardName}`;
+  } else if (cardEvolutionLevel === 2) {
+    variantName = `Hero ${cardName}`;
+  }
+
   const card: Card = {
-    name: cardName, // name is irrelevant to the card display
+    name: variantName,
     id: cardId,
   };
 
@@ -61,8 +70,8 @@ function createCard(
 function createCardList(cards: CardMeta[]): Card[] {
   const cardList: Card[] = [];
 
-  // NOTE if evolutions ever end up getting another level, this has to be adjusted
-  // maxEvolutionLevel = 1 if evo, = 2 if hero and = 3 if both
+  // NOTE: maxEvolutionLevel 3 creates both Evolution (level 1) and Hero (level 2).
+  // If more variant levels are added, update these loops and the names in createCard.
 
   // Add in multiple loops, so that order of cards stays how it was previously sorted
 
@@ -80,7 +89,7 @@ function createCardList(cards: CardMeta[]): Card[] {
   for (const card of cards) {
     const maxEvoLvl = card.maxEvolutionLevel ?? 0;
     if (maxEvoLvl === 2 || maxEvoLvl === 3) {
-      // Regular Evolution (Level 1)
+      // Hero Evolution (Level 2)
       const c = createCard(card.id, card.name, 2);
       cardList.push(c);
     }
@@ -112,9 +121,17 @@ export function CardFilter({
   const cardOptions = createCardList(sortedCards);
 
   const [isExpanded, setIsExpanded] = useState(false); // init with hidden option
+  const [searchTerm, setSearchTerm] = useState("");
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase();
+  const filteredCardOptions = normalizedSearch
+    ? cardOptions.filter((card) =>
+        card.name.toLocaleLowerCase().includes(normalizedSearch),
+      )
+    : cardOptions;
+
   // Keep track of the selected matching mode
   const [localFilterMode, setLocalFilterMode] = useState(
-    includeCardFilterMode ?? true
+    includeCardFilterMode ?? true,
   );
 
   // Sync local state with prop changes, so that the parent component knows the selected option
@@ -136,7 +153,7 @@ export function CardFilter({
     selected.some(
       (s) =>
         s.id === card.id &&
-        (s.evolutionLevel ?? 0) === (card.evolutionLevel ?? 0)
+        (s.evolutionLevel ?? 0) === (card.evolutionLevel ?? 0),
     );
 
   const toggle = (card: Card) => {
@@ -149,12 +166,10 @@ export function CardFilter({
           (s) =>
             !(
               // CardId and Evo Level have to match, then remove that card
-              (
-                s.id === card.id &&
-                (s.evolutionLevel ?? 0) === (card.evolutionLevel ?? 0)
-              )
-            )
-        )
+              s.id === card.id &&
+              (s.evolutionLevel ?? 0) === (card.evolutionLevel ?? 0)
+            ),
+        ),
       );
     } else {
       // Append this card to the selection
@@ -209,20 +224,32 @@ export function CardFilter({
           </div>
         </div>
       )}
+      {isExpanded && (
+        <FilterSearch
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Search cards"
+        />
+      )}
       <div
         id="card-filter-grid"
         className={`card-filter-component-grid ${!isExpanded ? "hidden" : ""}`}
       >
-        {cardOptions.map((c, i) => (
+        {filteredCardOptions.map((c, i) => (
           <button
             key={`${c.id}-${i}`}
             type="button"
             className={`card-filter-item ${isSelected(c) ? "is-selected" : ""}`}
             onClick={() => toggle(c)}
+            aria-label={c.name}
+            title={c.name}
           >
             <CardComponent card={c} cards={cards ?? []} showTooltip={false} />
           </button>
         ))}
+        {filteredCardOptions.length === 0 && (
+          <p className="card-filter-empty">No cards found.</p>
+        )}
         <div className="card-filter-component-actions">
           <button
             type="button"

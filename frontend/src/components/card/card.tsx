@@ -37,6 +37,8 @@ export const CardComponent = memo(function CardComponent({
         src={outlineImg}
         alt={`outline`}
         loading="lazy"
+        width={285}
+        height={420}
         className="card-component-outline"
       />
       <img

@@ -9,8 +9,15 @@ import { useGameModes } from "../../hooks/useGameModes";
 import { round } from "../../utils/number";
 import { pluralize } from "../../utils/plural";
 import { getCurrentFilterState } from "../../utils/filter";
+import { gameModesForQuery } from "../../utils/gameModes";
 import { datetimeToLocale } from "../../utils/datetime";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { RefObject } from "react";
 import { StatCard } from "../../components/statCard/statCard";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
@@ -70,6 +77,17 @@ function VirtualDeckList({
     scrollMargin, // Distance from the top of the page to the start of the deck list
   });
 
+  // Filtering can reuse a mounted row for a different deck. Measure it again
+  // immediately so a stale row height does not shift decks into each other.
+  // Scrolling a row out and back in does the same measurement on remount.
+  const measureRow = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (element && !decks[Number(element.dataset.index)]) return;
+      virtualizer.measureElement(element);
+    },
+    [decks, virtualizer],
+  );
+
   useLayoutEffect(() => {
     // Measuring rows above the viewport can interrupt the Back to Top animation.
     virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (
@@ -110,11 +128,6 @@ function VirtualDeckList({
     };
   }, []);
 
-  // Recalculate row positions when filtering or match mode changes row heights.
-  useEffect(() => {
-    virtualizer.measure();
-  }, [decks, showMatch, virtualizer]);
-
   return (
     // Keep the full scroll height even though only nearby rows are rendered.
     <div
@@ -128,7 +141,7 @@ function VirtualDeckList({
           <div
             key={virtualRow.key}
             data-index={virtualRow.index}
-            ref={virtualizer.measureElement}
+            ref={measureRow}
             className="decks-deck-row"
             style={{
               position: "absolute",
@@ -299,6 +312,9 @@ export default function PlayerDecks() {
   // Fetch deck statistics only when game modes are properly initialized
   // Uses applied filter values (not selected ones) to ensure query stability
   // Passes null for game modes to disable the query until gameModesInitialized is true
+  const queryGameModes = gameModesInitialized
+    ? gameModesForQuery(appliedFilters.gameModes, gameModes)
+    : null;
   const {
     data: deckStats,
     isLoading: decksLoading,
@@ -308,7 +324,7 @@ export default function PlayerDecks() {
     playerTag,
     appliedFilters.startDate,
     appliedFilters.endDate,
-    gameModesInitialized ? appliedFilters.gameModes : null, // Use applied filters for the query
+    queryGameModes,
   );
 
   // Helper function to check if a deck contains a specific card
@@ -414,8 +430,8 @@ export default function PlayerDecks() {
     // Either return the Deck (include mode) or the Deck and its score (match mode)
   })() as (Deck | DeckWithMatchScore)[];
 
-  // Create cache key from applied filters for loading state dependency
-  const modesKey = appliedFilters.gameModes.join("|");
+  // Use the modes actually sent to the API for the loading state dependency.
+  const modesKey = queryGameModes?.join("|") ?? "";
 
   // Loading state management
   // Determines when to show loading spinner vs content
