@@ -108,6 +108,10 @@ class Settings:
     # but also gives an AI attack bot more time if it deliberately slows traffic.
     # It remains above the roughly 269 ms broad-Internet P90 reported by
     # CAIDA's Frankfurt monitor.
+    # TODO: Revisit accessibility for very high-latency players. At about
+    # 950 ms RTT, this cap credits only 500 ms, and the 1-second probe timeout
+    # leaves little room for variation. Evaluate a fairer allowance and probe
+    # timeout without rewarding clients that deliberately delay replies.
     HALLI_GALLI_CALIBRATION_MAX_RTT_MS = 500
     # Browser origins permitted to open the calibration WebSocket. Configure the
     # production frontend origin with HALLI_GALLI_WS_ALLOWED_ORIGINS.

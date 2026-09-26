@@ -6,6 +6,7 @@ import {
   DialogActions,
   Button,
   CircularProgress,
+  useMediaQuery,
 } from "@mui/material";
 import { WordleGame } from "./wordle";
 import { HalliGalli } from "./halliGalli";
@@ -33,6 +34,7 @@ type AuthStep = "captcha" | "wordle" | "halli_galli" | "security" | "complete";
 const MAX_WORDLE_GUESSES_ALLOWED = 6; // Standard Wordle guess limit
 
 export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
+  const isNarrowScreen = useMediaQuery("(max-width:600px)");
   const [currentStep, setCurrentStep] = useState<AuthStep>("captcha");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -256,7 +258,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
 
   const renderCaptchaStep = () => (
     <div className="auth-step">
-      <h3>Prove that you are not a robot</h3>
+      <h3 className="auth-stage-heading">Prove that you are not a robot</h3>
       {captchaImageUrl && (
         <div className="captcha-container">
           <img src={captchaImageUrl} alt="Captcha" className="captcha-image" />
@@ -314,7 +316,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
 
   const renderSecurityStep = () => (
     <div className="auth-step">
-      <h3>
+      <h3 className="auth-stage-heading">
         Answer these questions to prove that you have elite Clash Royale
         Knowledge
       </h3>
@@ -412,16 +414,21 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   return (
     <Dialog
       open={open}
-      onClose={handleClose}
+      scroll={isNarrowScreen ? "body" : "paper"}
+      disableEscapeKeyDown
       maxWidth={currentStep === "halli_galli" ? "lg" : "md"}
       fullWidth
-      className={`auth-modal ${currentStep === "halli_galli" ? "halli-galli-modal" : ""}`}
+      className={`auth-modal ${currentStep === "halli_galli" ? "halli-galli-modal" : currentStep === "wordle" ? "wordle-modal" : ""}`}
     >
       <DialogTitle>Authentication</DialogTitle>
       <DialogContent>
         {loading && (
           <div className="loading-overlay">
-            <CircularProgress />
+            <CircularProgress
+              className="auth-loading-spinner"
+              size={36}
+              aria-label="Loading"
+            />
           </div>
         )}
         {error && <div className="error-message">{error}</div>}

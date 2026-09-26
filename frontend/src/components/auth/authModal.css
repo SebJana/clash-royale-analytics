@@ -1,4 +1,6 @@
 .auth-modal .MuiDialog-paper {
+  display: flex;
+  flex-direction: column;
   background-color: var(--bg-primary);
   color: var(--text-primary);
 }
@@ -16,18 +18,27 @@
   overflow-y: auto;
 }
 
+.auth-modal.wordle-modal .MuiDialog-paper {
+  margin: var(--spacing-sm);
+  max-height: calc(100dvh - 16px);
+}
+.auth-modal.wordle-modal .MuiDialogContent-root {
+  padding: var(--spacing-sm);
+}
+.auth-modal.wordle-modal .MuiDialogTitle-root {
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+.auth-modal.wordle-modal .auth-step {
+  margin-top: 0;
+  padding: var(--spacing-sm);
+  gap: var(--spacing-sm);
+}
+
 @media (max-width: 600px) {
   /* Halli Galli already names the challenge inside the dialog. Reuse the
      title row for cards on narrow screens, while keeping Cancel available. */
   .auth-modal.halli-galli-modal .MuiDialogTitle-root {
     display: none;
-  }
-  .auth-modal.halli-galli-modal .MuiDialog-paper {
-    width: calc(100vw - 8px);
-    max-width: calc(100vw - 8px);
-    height: calc(100dvh - 8px);
-    max-height: calc(100dvh - 8px);
-    margin: 4px;
   }
   .auth-modal.halli-galli-modal .MuiDialogContent-root {
     display: flex;
@@ -49,11 +60,13 @@
 
 .auth-modal .MuiDialogContent-root {
   padding: var(--spacing-xl);
-  min-height: 400px;
+  min-height: 0;
+  overflow-y: auto;
   position: relative;
 }
 
 .auth-modal .MuiDialogActions-root {
+  flex-shrink: 0;
   padding: var(--spacing-lg);
   border-top: 1px solid var(--border-light);
   background-color: var(--bg-overlay-light);
@@ -65,6 +78,40 @@
   background-color: rgba(244, 67, 54, 0.08) !important;
   border-color: var(--color-error) !important;
   color: var(--color-error) !important;
+}
+
+.auth-modal .auth-outcome-button,
+.auth-modal .MuiButton-root.auth-outcome-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  min-height: 44px;
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: var(--font-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.25;
+  text-transform: none;
+}
+.auth-modal .auth-outcome-button svg {
+  display: block;
+  flex: none;
+}
+.auth-modal .auth-outcome-button.is-success,
+.auth-modal .MuiButton-root.auth-outcome-button.is-success {
+  background-color: var(--color-success);
+  color: #fff;
+}
+.auth-modal .auth-outcome-button.is-retry,
+.auth-modal .MuiButton-root.auth-outcome-button.is-retry {
+  background-color: var(--color-error);
+  color: #fff;
+}
+.auth-modal .auth-outcome-button.is-success:hover,
+.auth-modal .MuiButton-root.auth-outcome-button.is-success:hover,
+.auth-modal .auth-outcome-button.is-retry:hover,
+.auth-modal .MuiButton-root.auth-outcome-button.is-retry:hover {
+  filter: brightness(0.94);
 }
 
 .auth-step {
@@ -79,14 +126,20 @@
   border: 1px solid var(--border-light);
   max-width: 500px;
   width: 100%;
+  box-sizing: border-box;
   margin: var(--spacing-xl) auto 0 auto;
 }
 
-.auth-step h3 {
-  margin: 0;
+.auth-step .auth-stage-heading {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 32ch;
+  margin: 0 auto var(--spacing-xs);
   color: var(--color-primary);
   font-size: var(--font-2xl);
   font-weight: var(--font-weight-bold);
+  line-height: 1.35;
+  text-wrap: balance;
 }
 
 .captcha-container {
@@ -107,6 +160,7 @@
 
 .captcha-container input {
   width: 100%;
+  box-sizing: border-box;
   padding: var(--spacing-md) var(--spacing-lg);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
@@ -243,8 +297,8 @@
   margin: 0;
 }
 
-.loading-overlay .MuiCircularProgress-circle {
-  stroke: var(--color-accent);
+.auth-loading-spinner {
+  color: var(--color-accent);
 }
 
 .error-message {
@@ -283,11 +337,6 @@
     gap: var(--spacing-md);
   }
 
-  .auth-step h3 {
-    font-size: var(--font-lg);
-    line-height: 1.2;
-  }
-
   .error-message {
     width: calc(100% - 2 * var(--spacing-md));
     max-width: 450px;
@@ -317,7 +366,8 @@
   }
 
   .auth-modal .MuiDialogActions-root {
-    padding: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-sm)
+      max(var(--spacing-sm), env(safe-area-inset-bottom));
   }
 
   .auth-step {
@@ -329,12 +379,12 @@
     box-sizing: border-box;
   }
 
-  .auth-step h3 {
-    font-size: var(--font-md);
-    line-height: 1.2;
-    margin-bottom: var(--spacing-xs);
-    word-wrap: break-word;
-    max-width: 100%;
+  .auth-step .auth-stage-heading {
+    max-width: 26ch;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-xl);
+    line-height: 1.4;
   }
 
   .auth-step p {
@@ -406,5 +456,40 @@
     margin: 0 auto var(--spacing-sm) auto;
     word-wrap: break-word;
     box-sizing: border-box;
+  }
+}
+
+@media (max-width: 600px) {
+  .auth-modal .MuiDialog-container.MuiDialog-scrollBody {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: safe center;
+  }
+
+  .auth-modal .MuiDialog-container.MuiDialog-scrollBody::after {
+    display: none;
+  }
+
+  .auth-modal .MuiDialog-paper.MuiDialog-paperScrollBody,
+  .auth-modal.halli-galli-modal .MuiDialog-paper.MuiDialog-paperScrollBody {
+    flex-shrink: 0;
+    width: calc(100vw - 8px);
+    max-width: calc(100vw - 8px);
+    height: auto;
+    max-height: none;
+    margin: var(--spacing-xs) auto;
+    overflow-y: visible;
+  }
+
+  .auth-modal .MuiDialogContent-root,
+  .auth-modal.halli-galli-modal .MuiDialogContent-root {
+    overflow-y: visible;
+  }
+
+  .auth-modal.halli-galli-modal .halli-galli.auth-step {
+    flex: none;
+    height: auto;
+    min-height: 0;
   }
 }

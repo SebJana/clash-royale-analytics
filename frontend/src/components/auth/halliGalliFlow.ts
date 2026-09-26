@@ -51,13 +51,6 @@ export function addVisibleCard(
   return [...cards, card].slice(-limit);
 }
 
-/** A scored active round waits for the player before revealing its next card. */
-export function needsManualStart(result: HalliGalliRoundResponse): boolean {
-  return (
-    result.game_status === "playing" && result.round_result !== "no_halli_galli"
-  );
-}
-
 /**
  * Give one buzz or timed advance ownership of a round. An early next-card 409
  * releases that ownership so the same round can try again after its deadline.

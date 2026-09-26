@@ -136,6 +136,7 @@ function HomePage() {
       setUntrackingSuccess(null);
       return;
     }
+    setUntrackingError(null);
 
     // Check if user is authenticated
     if (!checkAuthStatus()) {
@@ -144,7 +145,6 @@ function HomePage() {
     }
 
     setUntrackingPlayer(true);
-    setUntrackingError(null);
     setUntrackingSuccess(null);
 
     try {
@@ -268,7 +268,11 @@ function HomePage() {
               type="text"
               placeholder="Enter player tag... (e.g. #YYRJQY28)"
               value={untrackedPlayerTag}
-              onChange={(e) => setUntrackedPlayerTag(e.target.value)}
+              onChange={(e) => {
+                const tag = e.target.value;
+                setUntrackedPlayerTag(tag);
+                if (validatePlayerTagSyntax(tag)) setUntrackingError(null);
+              }}
             />
             <button
               className="remove-button"

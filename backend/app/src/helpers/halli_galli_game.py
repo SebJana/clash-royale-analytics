@@ -166,8 +166,8 @@ class HalliGalliGame(BaseModel):
     # A late buzz's delay belongs to the committed result. Keep it for status
     # recovery, and leave it empty for every other action.
     last_round_late_by_ms: int | None = None
-    # Send contributing image IDs only after settlement, when the answer is no
-    # longer useful for buzzing. Status keeps them if the action reply is lost.
+    # Send the required winning card only after settlement, when the answer is
+    # no longer useful for buzzing. Status keeps it if the action reply is lost.
     last_round_winning_card_ids: list[str] = Field(default_factory=list)
     rules: HalliGalliRules = Field(default_factory=default_game_rules)
     rounds: dict[int, HalliGalliRound]  # round index -> card metadata
@@ -534,13 +534,13 @@ def _round_jitter_range_ms(game: HalliGalliGame) -> float:
 def get_next_card_interval_ms(game: HalliGalliGame) -> int:
     """Return a frontend interval beyond this game's latest possible deadline.
 
-    After the initial preload, the frontend can start this interval when each
-    card is revealed, then request the next reveal and refill its background
-    preload. Use the maximum percentage-jittered window, clamped to the
-    configured minimum. The client starts this timer after receiving the
-    reveal, so network transit has already begun to elapse and needs no
-    additional allowance here. The same interval applies whether or not a
-    fruit wins.
+    After the initial preload, the frontend uses this interval for ordinary
+    next-card actions and for the countdown after resuming a paused game.
+    Scored rounds also keep their answer visible for a short feedback period.
+    Use the maximum percentage-jittered window, clamped to the configured
+    minimum. The client starts its card timer after receiving the reveal and
+    decrypting the image, so network transit has already begun to elapse and
+    needs no additional allowance here.
 
     Args:
         game (HalliGalliGame): Game whose round timing was chosen at startup.
@@ -748,12 +748,14 @@ def eval_round(
 
     winning_cards = get_halli_galli_winning_cards(game)
     has_halli_galli = bool(winning_cards)
-    player_won = (
+    clicked_winning_card = (
         clicked_card_id is not None
-        and now < deadline
         and _clicked_winning_card(
             game, winning_cards, clicked_card_id, click_x, click_y
         )
+    )
+    player_won = (
+        clicked_winning_card and now < deadline
     )
     result = _score_round(
         game, has_halli_galli, player_won, clicked_card_id is not None
@@ -761,15 +763,15 @@ def eval_round(
 
     # Keep the exact cause with the committed score. A lost HTTP response can
     # then be recovered without guessing whether a buzz was late or inaccurate.
-    # Check the deadline first so a late click does not misleadingly report a
-    # wrong card or fruit. Only a timely click can receive those reasons.
+    # Report an incorrect click as such even if it arrived after the deadline.
+    # Only a click on the required card and fruit can receive a late-buzz reason.
     if clicked_card_id is None:
         reason: RoundReason = "missed_halli_galli" if has_halli_galli else "no_halli_galli"
-    elif now >= deadline:
-        reason = "late_buzz"
     elif not has_halli_galli:
         reason = "false_buzz"
-    elif player_won:
+    elif clicked_winning_card and now >= deadline:
+        reason = "late_buzz"
+    elif clicked_winning_card:
         reason = "correct_buzz"
     else:
         selected_index = _required_winning_card_index(game, winning_cards)
@@ -791,12 +793,13 @@ def eval_round(
         if reason == "late_buzz"
         else None
     )
-    winning_indices = sorted({index for cards in winning_cards.values() for index in cards})
-    game.last_round_winning_card_ids = [
-        game.rounds[index].image_id
-        for index in winning_indices
-        if game.rounds[index].image_id is not None
-    ]
+    required_index = _required_winning_card_index(game, winning_cards)
+    required_image_id = (
+        game.rounds[required_index].image_id if required_index is not None else None
+    )
+    game.last_round_winning_card_ids = (
+        [required_image_id] if required_image_id is not None else []
+    )
     game.current_round += 1
     return result
 

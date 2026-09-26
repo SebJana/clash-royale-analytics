@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { PartyPopper, RotateCcw } from "lucide-react";
 import { isValidGuess } from "../../utils/wordle";
 import "./wordle.css";
 
@@ -306,7 +307,9 @@ export function WordleGame({
 
   return (
     <div className="wordle-game">
-      <h3>Solve the Wordle to prove your reasoning skills</h3>
+      <h3 className="auth-stage-heading">
+        Solve the Wordle to prove your reasoning skills
+      </h3>
 
       <div className="wordle-grid">
         {/* Render game grid with rows for each guess attempt */}
@@ -404,8 +407,10 @@ export function WordleGame({
           <div className="popup-content">
             {gameStatus === "won" ? (
               <>
-                <h2>🎉 Solved! 🎉</h2>
-                <p>Nice work! Next up: Halli Galli.</p>
+                <h2 className="wordle-solved-title">
+                  <PartyPopper size={26} aria-hidden="true" /> Solved!
+                </h2>
+                <p>You've proven your puzzle-solving skills.</p>
                 <p>
                   <a
                     href={`https://dictionary.cambridge.org/dictionary/english/${solution}`}
@@ -417,7 +422,7 @@ export function WordleGame({
                   </a>
                 </p>
                 <button
-                  className="popup-button continue-button"
+                  className="popup-button auth-outcome-button is-success"
                   onClick={() => {
                     setShowGameEndPopup(false);
                     onSuccess?.();
@@ -444,7 +449,7 @@ export function WordleGame({
                   </a>
                 </p>
                 <button
-                  className="popup-button retry-button"
+                  className="popup-button auth-outcome-button is-retry"
                   onClick={() => {
                     setShowGameEndPopup(false);
                     // Reset game state for retry
@@ -457,7 +462,8 @@ export function WordleGame({
                     onFailure();
                   }}
                 >
-                  Try Again
+                  <RotateCcw size={18} aria-hidden="true" />
+                  <span>Try Again</span>
                 </button>
               </>
             )}
