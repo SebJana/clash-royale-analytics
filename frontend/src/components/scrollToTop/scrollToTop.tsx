@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { ChevronUp } from "lucide-react";
 import "./scrollToTop.css";
 
-export function ScrollToTopButton() {
+export function ScrollToTopButton({
+  onScrollStart,
+}: Readonly<{ onScrollStart?: () => void }>) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -11,11 +13,13 @@ export function ScrollToTopButton() {
       setVisible(scrolled > 2000); // show after 2000px scroll
     };
 
+    toggleVisible();
     window.addEventListener("scroll", toggleVisible);
     return () => window.removeEventListener("scroll", toggleVisible);
   }, []);
 
   const scrollToTop = () => {
+    onScrollStart?.();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 

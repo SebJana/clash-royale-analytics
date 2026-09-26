@@ -1,6 +1,7 @@
 import { useCards } from "../../hooks/useCards";
 import { useParams } from "react-router-dom";
 import { useDeckStats } from "../../hooks/useDeckStats";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { DeckComponent } from "../../components/deck/deck";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -9,13 +10,14 @@ import { round } from "../../utils/number";
 import { pluralize } from "../../utils/plural";
 import { getCurrentFilterState } from "../../utils/filter";
 import { datetimeToLocale } from "../../utils/datetime";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { StatCard } from "../../components/statCard/statCard";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
 import { SortByContainer } from "../../components/sortByContainer/sortByContainer";
-import type { Card } from "../../types/cards";
+import type { Card, CardMeta } from "../../types/cards";
 import type { Deck } from "../../types/deckStats";
 import "./decks.css";
 
@@ -43,9 +45,184 @@ function calculateAndFormatUsageRate(
   return `${roundedUsageRate}%`;
 }
 
+function VirtualDeckList({
+  decks,
+  cards,
+  totalBattles,
+  showMatch,
+  scrollingToTopRef,
+}: Readonly<{
+  decks: (Deck | DeckWithMatchScore)[];
+  cards: CardMeta[];
+  totalBattles: number;
+  showMatch: boolean;
+  scrollingToTopRef: RefObject<boolean>;
+}>) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+
+  // Only render deck rows near the visible part of the page.
+  // Row heights are measured after rendering because they vary with screen width.
+  const virtualizer = useWindowVirtualizer({
+    count: decks.length, // Total number of decks the user can scroll through
+    estimateSize: () => 420, // Initial row height in pixels, before its actual height is measured
+    overscan: 3, // Render three extra rows above and below the visible area
+    scrollMargin, // Distance from the top of the page to the start of the deck list
+  });
+
+  useLayoutEffect(() => {
+    // Measuring rows above the viewport can interrupt the Back to Top animation.
+    virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (
+      item,
+      _delta,
+      instance,
+    ) =>
+      !scrollingToTopRef.current && item.start < (instance.scrollOffset ?? 0);
+    return () => {
+      virtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined;
+    };
+  }, [virtualizer, scrollingToTopRef]);
+
+  useLayoutEffect(() => {
+    const updateScrollMargin = () => {
+      if (listRef.current) {
+        setScrollMargin(
+          listRef.current.getBoundingClientRect().top + window.scrollY,
+        );
+      }
+    };
+    updateScrollMargin();
+    // Expanding the filters moves the list without resizing the window.
+    const resizeObserver = new ResizeObserver(updateScrollMargin);
+    const content = listRef.current?.closest(".decks-content");
+    if (content) {
+      resizeObserver.observe(content);
+      content
+        .querySelectorAll(
+          ".filter-component-container, .sort-by-container, .decks-general-stats",
+        )
+        .forEach((element) => resizeObserver.observe(element));
+    }
+    window.addEventListener("resize", updateScrollMargin);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateScrollMargin);
+    };
+  }, []);
+
+  // Recalculate row positions when filtering or match mode changes row heights.
+  useEffect(() => {
+    virtualizer.measure();
+  }, [decks, showMatch, virtualizer]);
+
+  return (
+    // Keep the full scroll height even though only nearby rows are rendered.
+    <div
+      ref={listRef}
+      className="decks-virtual-list"
+      style={{ height: virtualizer.getTotalSize() }}
+    >
+      {virtualizer.getVirtualItems().map((virtualRow) => {
+        const d = decks[virtualRow.index];
+        return (
+          <div
+            key={virtualRow.key}
+            data-index={virtualRow.index}
+            ref={virtualizer.measureElement}
+            className="decks-deck-row"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              // virtualRow.start includes the list's page offset; CSS uses list coordinates.
+              transform: `translateY(${virtualRow.start - scrollMargin}px)`,
+            }}
+          >
+            <div className="deck-section">
+              {showMatch && "matchPercentage" in d && (
+                <div className="decks-card-match-header">
+                  <span className="decks-card-match-value">{`${round(
+                    d.matchPercentage,
+                    1,
+                  )}% (${d.matchCount} matching ${pluralize(
+                    d.matchCount,
+                    "Card",
+                    "Cards",
+                  )})`}</span>
+                  <span className="decks-card-match-label">Card Match</span>
+                </div>
+              )}
+              <DeckComponent deck={d.deck} cards={cards} />
+            </div>
+            <div className="deck-stats-container">
+              <StatCard
+                label={pluralize(d.count, "Battle", "Battles")}
+                value={d.count}
+              />
+              <StatCard
+                label={pluralize(d.wins, "Win", "Wins")}
+                value={d.wins}
+              />
+              <StatCard label="Win Rate" value={`${round(d.winRate, 1)}%`} />
+              <StatCard
+                label="Usage Rate"
+                value={calculateAndFormatUsageRate(d.count, totalBattles)}
+              />
+              <StatCard
+                label={pluralize(d.modes.length, "Game Mode", "Game Modes")}
+                value={d.modes.length}
+              />
+              <StatCard
+                label="Last Seen"
+                value={datetimeToLocale(d.lastSeen)}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // TODO add same error handling for all pages if no data is found or the tag is invalid
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
+  const scrollingToTopRef = useRef(false);
+  const scrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const resetAtTop = () => {
+      if (window.scrollY <= 1) scrollingToTopRef.current = false;
+    };
+    const cancelScrollToTop = () => {
+      scrollingToTopRef.current = false;
+    };
+    window.addEventListener("scroll", resetAtTop);
+    window.addEventListener("wheel", cancelScrollToTop);
+    window.addEventListener("touchstart", cancelScrollToTop);
+    window.addEventListener("keydown", cancelScrollToTop);
+    return () => {
+      window.removeEventListener("scroll", resetAtTop);
+      window.removeEventListener("wheel", cancelScrollToTop);
+      window.removeEventListener("touchstart", cancelScrollToTop);
+      window.removeEventListener("keydown", cancelScrollToTop);
+      if (scrollResetTimeoutRef.current)
+        clearTimeout(scrollResetTimeoutRef.current);
+    };
+  }, []);
+
+  const handleScrollToTopStart = () => {
+    scrollingToTopRef.current = true;
+    if (scrollResetTimeoutRef.current)
+      clearTimeout(scrollResetTimeoutRef.current);
+    // Also restore normal scroll adjustments if the user interrupts the animation.
+    scrollResetTimeoutRef.current = setTimeout(() => {
+      scrollingToTopRef.current = false;
+    }, 3000);
+  };
 
   // Filter state management maintains two sets of state for each filter type:
   // 1. "selected" - what the user has chosen in the UI (not yet applied)
@@ -165,14 +342,10 @@ export default function PlayerDecks() {
       let valueB: number | string;
 
       if (selectedSortOption === "usageRate") {
-        // Special case for computed field - calculate usage rate percentage on-the-fly
-        // Usage rate = (deck battles / total battles in this filtered set) * 100
-        const totalBattlesForSort = decksToSort.reduce(
-          (sum, deck) => sum + deck.count,
-          0,
-        );
-        valueA = (a.count / totalBattlesForSort) * 100;
-        valueB = (b.count / totalBattlesForSort) * 100;
+        // Usage rate has the same ordering as battle count because every deck
+        // uses the same total number of battles as its denominator.
+        valueA = a.count;
+        valueB = b.count;
       } else {
         // Direct field access using bracket notation
         // Works for: count (battles), wins, winRate, lastSeen
@@ -265,7 +438,6 @@ export default function PlayerDecks() {
   }
   const totalDecks = filteredDecks.length;
 
-  // TODO for long time ranges this might be thousands of decks to display, add virtual window here or capped X approach
   return (
     <div className="decks-page">
       <div className="decks-content">
@@ -332,73 +504,19 @@ export default function PlayerDecks() {
                     value={`${round((totalWins / totalBattles) * 100, 1)}%`}
                   />
                 </div>
-                {filteredDecks.map((d) => (
-                  <div
-                    className="decks-deck-row"
-                    // Unique deck id of all cards in the deck
-                    key={`${d.deck?.map((c) => c.id).join(";")}`}
-                  >
-                    {/* TODO add a deck name, by using the top x elixir cards 
-                      or by using the win condition and the most expensive card */}
-                    <div className="deck-section">
-                      {/* Show match percentage only in match mode */}
-                      {!appliedFilters.includeCardFilterMode &&
-                        appliedFilters.cards.length > 0 &&
-                        "matchPercentage" in d && (
-                          <div className="decks-card-match-header">
-                            <span className="decks-card-match-value">{`${round(
-                              d.matchPercentage,
-                              1,
-                            )}% (${d.matchCount} matching ${pluralize(
-                              d.matchCount,
-                              "Card",
-                              "Cards",
-                            )})`}</span>
-                            <span className="decks-card-match-label">
-                              Card Match
-                            </span>
-                          </div>
-                        )}
-                      <DeckComponent deck={d.deck} cards={cards ?? []} />
-                    </div>
-                    <div className="deck-stats-container">
-                      <StatCard
-                        label={pluralize(d.count, "Battle", "Battles")}
-                        value={d.count}
-                      />
-                      <StatCard
-                        label={pluralize(d.wins, "Win", "Wins")}
-                        value={d.wins}
-                      />
-                      <StatCard
-                        label="Win Rate"
-                        value={`${round(d.winRate, 1)}%`}
-                      />
-                      <StatCard
-                        label="Usage Rate"
-                        value={calculateAndFormatUsageRate(
-                          d.count,
-                          totalBattles,
-                        )}
-                      />
-                      <StatCard
-                        label={pluralize(
-                          d.modes.length,
-                          "Game Mode",
-                          "Game Modes",
-                        )}
-                        value={d.modes.length}
-                      />
-                      <StatCard
-                        label="Last Seen"
-                        value={datetimeToLocale(d.lastSeen)}
-                      />
-                    </div>
-                  </div>
-                ))}
+                <VirtualDeckList
+                  decks={filteredDecks}
+                  cards={cards ?? []}
+                  totalBattles={totalBattles}
+                  scrollingToTopRef={scrollingToTopRef}
+                  showMatch={
+                    !appliedFilters.includeCardFilterMode &&
+                    appliedFilters.cards.length > 0
+                  }
+                />
               </div>
             )}
-            <ScrollToTopButton />
+            <ScrollToTopButton onScrollStart={handleScrollToTopStart} />
 
             {/* Show message when no decks are found and not still loading */}
             {(!filteredDecks || filteredDecks.length === 0) &&

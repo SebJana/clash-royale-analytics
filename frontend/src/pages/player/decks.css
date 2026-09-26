@@ -77,10 +77,14 @@
   max-width: 200px;
 }
 
+.decks-virtual-list {
+  position: relative;
+  width: 100%;
+}
+
 .decks-deck-row {
   display: flex;
   gap: var(--spacing-2xl);
-  margin-bottom: var(--spacing-2xl);
   align-items: center;
   flex-wrap: wrap;
   padding-bottom: var(--spacing-2xl);
