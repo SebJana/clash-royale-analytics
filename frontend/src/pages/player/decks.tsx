@@ -9,7 +9,10 @@ import { useGameModes } from "../../hooks/useGameModes";
 import { round } from "../../utils/number";
 import { pluralize } from "../../utils/plural";
 import { getCurrentFilterState } from "../../utils/filter";
-import { gameModesForQuery } from "../../utils/gameModes";
+import {
+  gameModesForQuery,
+  mapInternalNameToDisplayName,
+} from "../../utils/gameModes";
 import { datetimeToLocale } from "../../utils/datetime";
 import {
   useCallback,
@@ -50,6 +53,46 @@ function calculateAndFormatUsageRate(
   const usageRate = (battleCount / totalBattles) * 100; // In percent
   const roundedUsageRate = round(usageRate, 1);
   return `${roundedUsageRate}%`;
+}
+
+function GameModesStat({ modes }: Readonly<{ modes: string[] }>) {
+  const modeCounts = new Map<string, number>();
+  for (const mode of modes) {
+    const name = mapInternalNameToDisplayName(mode);
+    modeCounts.set(name, (modeCounts.get(name) ?? 0) + 1);
+  }
+
+  // Keep the tooltip short even when a deck was played in many different modes.
+  const visibleModes = [...modeCounts].sort(([a], [b]) => a.localeCompare(b));
+  const shownModes = visibleModes.slice(0, 8);
+  const remainingModes = visibleModes
+    .slice(8)
+    .reduce((count, [, variants]) => count + variants, 0);
+
+  return (
+    <StatCard
+      label={pluralize(modes.length, "Game Mode", "Game Modes")}
+      value={modes.length}
+      tooltip={
+        modes.length > 0 ? (
+          <div className="decks-game-modes-tooltip">
+            <strong>Game modes in this deck</strong>
+            <ul>
+              {shownModes.map(([name, variants]) => (
+                <li key={name}>
+                  {name}
+                  {variants > 1 && ` (${variants} variants)`}
+                </li>
+              ))}
+            </ul>
+            {remainingModes > 0 && <span>+{remainingModes} more modes</span>}
+          </div>
+        ) : (
+          ""
+        )
+      }
+    />
+  );
 }
 
 function VirtualDeckList({
@@ -188,10 +231,7 @@ function VirtualDeckList({
                 label="Usage Rate"
                 value={calculateAndFormatUsageRate(d.count, totalBattles)}
               />
-              <StatCard
-                label={pluralize(d.modes.length, "Game Mode", "Game Modes")}
-                value={d.modes.length}
-              />
+              <GameModesStat modes={d.modes} />
               <StatCard
                 label="Last Seen"
                 value={datetimeToLocale(d.lastSeen)}

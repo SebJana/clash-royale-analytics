@@ -3,6 +3,7 @@ import Tooltip from "@mui/material/Tooltip";
 import type { Card, CardMeta } from "../../types/cards";
 import {
   getCardName,
+  getCardVariantName,
   getCardElixirCost,
   getCardRarity,
   getCardIcon,
@@ -21,14 +22,14 @@ export const CardComponent = memo(function CardComponent({
   showTooltip?: boolean;
   matched?: boolean;
 }>) {
-  const name = getCardName(card.id, cards);
+  const evoLvl = card.evolutionLevel ?? 0; // If it's not an evolution, the evolutionLevel field is missing
+  const name = getCardVariantName(getCardName(card.id, cards), evoLvl);
   const elixir = getCardElixirCost(card.id, cards);
   const rarity = getCardRarity(card.id, cards);
   // Uppercase the first letter of the rarity
   const rarityLabel = rarity
     ? rarity.charAt(0).toUpperCase() + rarity.slice(1)
     : "";
-  const evoLvl = card.evolutionLevel ?? 0; // If it's not an evolution, the evolutionLevel field is missing
   const icon = getCardIcon(card.id, evoLvl, cards);
 
   const outlineImg = getCardOutline(rarity);

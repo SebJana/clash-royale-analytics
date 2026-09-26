@@ -114,6 +114,21 @@
   min-width: 180px;
 }
 
+.decks-game-modes-tooltip {
+  display: grid;
+  gap: var(--spacing-xs);
+  max-width: 280px;
+}
+
+.decks-game-modes-tooltip ul {
+  margin: 0;
+  padding-left: var(--spacing-lg);
+}
+
+.decks-game-modes-tooltip li + li {
+  margin-top: var(--spacing-xs);
+}
+
 .decks-loading-spinner {
   margin: var(--spacing-2xl) auto;
   display: block;

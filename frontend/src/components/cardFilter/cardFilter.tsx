@@ -3,6 +3,7 @@ import type { Card, CardMeta } from "../../types/cards";
 import { CardComponent } from "../card/card";
 import { ChevronUp } from "lucide-react";
 import { FilterSearch } from "../filterSearch/filterSearch";
+import { getCardVariantName } from "../../utils/getCardMetaFields";
 import "./cardFilter.css";
 
 /**
@@ -40,16 +41,8 @@ function createCard(
   cardName: string,
   cardEvolutionLevel: number,
 ): Card {
-  let variantName = cardName;
-
-  if (cardEvolutionLevel === 1) {
-    variantName = `Evolution ${cardName}`;
-  } else if (cardEvolutionLevel === 2) {
-    variantName = `Hero ${cardName}`;
-  }
-
   const card: Card = {
-    name: variantName,
+    name: getCardVariantName(cardName, cardEvolutionLevel),
     id: cardId,
   };
 
@@ -71,7 +64,7 @@ function createCardList(cards: CardMeta[]): Card[] {
   const cardList: Card[] = [];
 
   // NOTE: maxEvolutionLevel 3 creates both Evolution (level 1) and Hero (level 2).
-  // If more variant levels are added, update these loops and the names in createCard.
+  // If more variant levels are added, update these loops and getCardVariantName.
 
   // Add in multiple loops, so that order of cards stays how it was previously sorted
 
@@ -242,9 +235,8 @@ export function CardFilter({
             className={`card-filter-item ${isSelected(c) ? "is-selected" : ""}`}
             onClick={() => toggle(c)}
             aria-label={c.name}
-            title={c.name}
           >
-            <CardComponent card={c} cards={cards ?? []} showTooltip={false} />
+            <CardComponent card={c} cards={cards ?? []} />
           </button>
         ))}
         {filteredCardOptions.length === 0 && (
