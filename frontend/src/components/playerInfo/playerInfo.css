@@ -20,6 +20,10 @@
   min-width: 0;
 }
 
+.player-info-placeholder .player-info-component-basic-info {
+  padding-top: 0;
+}
+
 .player-info-component-name {
   font-size: var(--font-4xl);
   font-weight: var(--font-weight-bold);

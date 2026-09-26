@@ -81,19 +81,27 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
         str: The player tag when validation succeeds.
 
     Raises:
-        HTTPException 403 if the tag is syntactically invalid or the player is not being tracked.
+        HTTPException 403 with a specific code if the tag is invalid or untracked.
     """
 
     # Check the syntax is valid (takes load off of db and ensures tag is mongo query safe)
     if not cr_api.check_tag_syntax(player_tag):
         raise HTTPException(
-            status_code=403, detail=f"Player with tag {player_tag} doesn't exist"
+            status_code=403,
+            detail={
+                "code": "INVALID_PLAYER_TAG",
+                "message": f"Player with tag {player_tag} doesn't exist",
+            },
         )
 
     # Check if the player is in players collection and active
     if not await check_player_tracked(mongo_conn, player_tag):
         raise HTTPException(
-            status_code=403, detail=f"Player with tag {player_tag} isn't being tracked"
+            status_code=403,
+            detail={
+                "code": "PLAYER_NOT_TRACKED",
+                "message": f"Player with tag {player_tag} isn't being tracked",
+            },
         )
 
     return player_tag  # When its a valid and tracked player, return the tag

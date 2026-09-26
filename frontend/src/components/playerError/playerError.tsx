@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RotateCcw } from "lucide-react";
 import "./playerError.css";
+
+const MAX_RETRY_ATTEMPTS = 3;
 
 export type PlayerErrorSource = {
   label: string;
@@ -11,11 +13,24 @@ export type PlayerErrorSource = {
 export function PlayerError({
   sources,
   message,
+  title = "Couldn't load this page",
+  compact = false,
+  retryAttempts: controlledRetryAttempts,
+  onRetryAttempt,
 }: Readonly<{
   sources: PlayerErrorSource[];
   message?: string;
+  title?: string;
+  compact?: boolean;
+  retryAttempts?: number;
+  onRetryAttempt?: () => void;
 }>) {
   const [isRetrying, setIsRetrying] = useState(false);
+  const [localRetryAttempts, setLocalRetryAttempts] = useState(0);
+  // The profile keeps this count in the layout so a fresh ping cannot reset it.
+  const retryAttempts = controlledRetryAttempts ?? localRetryAttempts;
+  const retriesExhausted =
+    retryAttempts >= MAX_RETRY_ATTEMPTS && !isRetrying;
   const failedSources = sources.filter((source) => source.failed);
   const names = failedSources.map((source) => source.label);
   const sourceList =
@@ -24,29 +39,48 @@ export function PlayerError({
       : names[0];
 
   const retry = async () => {
+    if (isRetrying || retryAttempts >= MAX_RETRY_ATTEMPTS) return;
+    if (controlledRetryAttempts === undefined) {
+      setLocalRetryAttempts((attempts) => attempts + 1);
+    } else {
+      onRetryAttempt?.();
+    }
     setIsRetrying(true);
     // Retry every failed request; one successful request should not hide another failure.
-    await Promise.allSettled(failedSources.map((source) => source.retry()));
-    setIsRetrying(false);
+    try {
+      await Promise.allSettled(failedSources.map((source) => source.retry()));
+    } finally {
+      setIsRetrying(false);
+    }
   };
 
   return (
-    <section className="player-page-error" role="alert">
+    <section
+      className={`player-page-error${compact ? " is-compact" : ""}`}
+      role="alert"
+    >
       <AlertCircle className="player-page-error-icon" aria-hidden="true" />
-      <h2>Couldn't load this page</h2>
+      <h2>{title}</h2>
       <p>
-        {message ??
-          `Looks like the ${sourceList} went missing on the way here. Try again in a moment.`}
+        {retriesExhausted
+          ? `Still couldn't load the ${sourceList}. Please try again later.`
+          : retryAttempts > 0 && !isRetrying
+            ? `Trying again didn't work. The ${sourceList} still couldn't load.`
+          : (message ??
+            `Looks like the ${sourceList} went missing on the way here. Try again in a moment.`)}
       </p>
-      <div className="player-page-error-actions">
-        <button
-          type="button"
-          onClick={() => void retry()}
-          disabled={isRetrying}
-        >
-          {isRetrying ? "Trying again..." : "Try again"}
-        </button>
-      </div>
+      {!retriesExhausted && (
+        <div className="player-page-error-actions">
+          <button
+            type="button"
+            onClick={() => void retry()}
+            disabled={isRetrying}
+          >
+            <RotateCcw size={18} aria-hidden="true" />
+            {isRetrying ? "Trying again..." : "Try again"}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

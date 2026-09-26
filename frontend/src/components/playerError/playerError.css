@@ -8,6 +8,13 @@
   text-align: center;
 }
 
+.player-page-error.is-compact {
+  align-items: flex-start;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
+}
+
 .player-page-error-icon {
   width: 48px;
   height: 48px;
@@ -32,6 +39,11 @@
   justify-content: center;
   gap: var(--spacing-md);
   margin-top: var(--spacing-xl);
+}
+
+.player-page-error.is-compact .player-page-error-actions {
+  justify-content: flex-start;
+  margin-top: var(--spacing-md);
 }
 
 .player-page-error-actions button {

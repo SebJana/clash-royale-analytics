@@ -19,8 +19,54 @@ import { AuthModal } from "../components/auth/authModal";
 import Lottie from "lottie-react";
 import construction from "../assets/animations/construction.json";
 import CircularProgress from "@mui/material/CircularProgress";
+import axios from "axios";
 import { StatCard } from "../components/statCard/statCard";
 import "./home.css";
+
+function getErrorMessage(error: unknown): string {
+  if (!axios.isAxiosError<{
+    detail?: string | { code?: string; message?: string };
+  }>(error)) {
+    return error instanceof Error
+      ? error.message
+      : "Something went wrong. Please try again.";
+  }
+
+  if (!error.response) return "Could not reach the server. Please try again.";
+
+  const { status, data } = error.response;
+  const detail = data?.detail;
+  const code = typeof detail === "object" ? detail?.code : undefined;
+
+  // Check the backend code first; a 502 can also come from Clash Royale.
+  if (code === "INVALID_PLAYER_TAG")
+    return "Invalid player tag. Enter a tag like #YYRJQY28.";
+  if (code === "PLAYER_NOT_FOUND")
+    return "Player not found. Check the tag and try again.";
+  if (code === "PLAYER_NOT_TRACKED") return "That player isn't being tracked.";
+  if (code === "CR_API_AUTH_FAILED")
+    return (
+      "Clash Royale rejected the API connection, so this player can't be tracked right now. " +
+      "Please try again later."
+    );
+  if (code === "CR_API_MAINTENANCE")
+    return (
+      "Clash Royale is currently undergoing maintenance, so this player can't be tracked right now. " +
+      "Please try again later."
+    );
+  if (code === "CR_API_UNAVAILABLE" || code === "CR_API_INVALID_RESPONSE")
+    return "Could not check the player with Clash Royale. Please try again later.";
+  if (status === 401 || status === 403)
+    return "Authorization failed. Please verify again.";
+  if (status === 429) return "Too many requests. Please try again shortly.";
+  if (status >= 500)
+    return "The server could not complete the request. Please try again later.";
+
+  return (
+    (typeof detail === "string" ? detail : detail?.message) ??
+    "Something went wrong. Please try again."
+  );
+}
 
 function HomePage() {
   const {
@@ -113,17 +159,7 @@ function HomePage() {
       // Clear the input field
       setAddedPlayerTag("");
     } catch (error) {
-      // Extract error message using structural typing
-      type ErrorLike = {
-        response?: { data?: { detail?: string } };
-        message?: string;
-      };
-
-      const err = error as ErrorLike;
-      // See if there is any error text or status message on what happened upon error
-      const errorDetail =
-        err.response?.data?.detail || err.message || "An error occurred";
-      setTrackingError(errorDetail);
+      setTrackingError(getErrorMessage(error));
     } finally {
       setTrackingPlayer(false);
     }
@@ -154,16 +190,7 @@ function HomePage() {
       // Clear the input field
       setUntrackedPlayerTag("");
     } catch (error) {
-      // Extract error message using structural typing
-      type ErrorLike = {
-        response?: { data?: { detail?: string } };
-        message?: string;
-      };
-
-      const err = error as ErrorLike;
-      const errorDetail =
-        err.response?.data?.detail || err.message || "An error occurred";
-      setUntrackingError(errorDetail);
+      setUntrackingError(getErrorMessage(error));
     } finally {
       setUntrackingPlayer(false);
     }
