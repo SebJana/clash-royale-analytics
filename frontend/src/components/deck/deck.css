@@ -9,6 +9,14 @@
   min-width: 0;
 }
 
+.deck-component-deck-row .card-component-card.is-matched .card-component-wrap {
+  border-radius: var(--radius-md);
+  background: rgba(52, 152, 219, 0.15);
+  box-shadow:
+    0 0 0 2px var(--color-primary),
+    0 0 12px rgba(52, 152, 219, 0.5);
+}
+
 .deck-component-copy-button {
   cursor: pointer;
   background: var(--bg-overlay-medium);

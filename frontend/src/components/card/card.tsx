@@ -14,10 +14,12 @@ export const CardComponent = memo(function CardComponent({
   card,
   cards,
   showTooltip = true,
+  matched = false,
 }: Readonly<{
   card: Card;
   cards: CardMeta[];
   showTooltip?: boolean;
+  matched?: boolean;
 }>) {
   const name = getCardName(card.id, cards);
   const elixir = getCardElixirCost(card.id, cards);
@@ -51,7 +53,7 @@ export const CardComponent = memo(function CardComponent({
   );
 
   return (
-    <div className="card-component-card">
+    <div className={`card-component-card${matched ? " is-matched" : ""}`}>
       {showTooltip ? (
         <Tooltip
           arrow
@@ -61,6 +63,7 @@ export const CardComponent = memo(function CardComponent({
               <strong>{name}</strong>
               <span>{elixir} Elixir</span>
               <span>{rarityLabel}</span>
+              {matched && <span>Matches card filter</span>}
             </div>
           }
         >

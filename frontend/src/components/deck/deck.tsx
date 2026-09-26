@@ -88,22 +88,34 @@ export const DeckComponent = memo(function DeckComponent({
   deck,
   cards,
   elixirLeaked,
+  matchedCards,
 }: Readonly<{
   deck: Card[];
   cards: CardMeta[];
   elixirLeaked?: number; // Optional parameter, so that it can be used in battle display but also for deck statistics
+  matchedCards?: Card[];
 }>) {
   const cardsPerRow = 4;
   const rows: React.ReactElement[] = [];
+  const matchedCardKeys = new Set(
+    matchedCards?.map((card) => `${card.id}:${card.evolutionLevel ?? 0}`),
+  );
   // TODO sort cards here: regular evolutions (evoLevel = 1), the heroes (evoLevel = 2, so ascending evoLevel), champions and then regular cards
   for (let i = 0; i < deck.length; i += cardsPerRow) {
     const group = deck.slice(i, i + cardsPerRow); // put the cards into one row of display
     rows.push(
       <div key={`row-${i}`} className="deck-component-deck-row">
         {group.map((card) => (
-          <CardComponent key={card.id} card={card} cards={cards} />
+          <CardComponent
+            key={`${card.id}:${card.evolutionLevel ?? 0}`}
+            card={card}
+            cards={cards}
+            matched={matchedCardKeys.has(
+              `${card.id}:${card.evolutionLevel ?? 0}`,
+            )}
+          />
         ))}
-      </div>
+      </div>,
     );
   }
 

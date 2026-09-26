@@ -57,12 +57,14 @@ function VirtualDeckList({
   cards,
   totalBattles,
   showMatch,
+  matchedCards,
   scrollingToTopRef,
 }: Readonly<{
   decks: (Deck | DeckWithMatchScore)[];
   cards: CardMeta[];
   totalBattles: number;
   showMatch: boolean;
+  matchedCards: Card[];
   scrollingToTopRef: RefObject<boolean>;
 }>) {
   const listRef = useRef<HTMLDivElement>(null);
@@ -166,7 +168,11 @@ function VirtualDeckList({
                   <span className="decks-card-match-label">Card Match</span>
                 </div>
               )}
-              <DeckComponent deck={d.deck} cards={cards} />
+              <DeckComponent
+                deck={d.deck}
+                cards={cards}
+                matchedCards={showMatch ? matchedCards : undefined}
+              />
             </div>
             <div className="deck-stats-container">
               <StatCard
@@ -524,6 +530,7 @@ export default function PlayerDecks() {
                   decks={filteredDecks}
                   cards={cards ?? []}
                   totalBattles={totalBattles}
+                  matchedCards={appliedFilters.cards}
                   scrollingToTopRef={scrollingToTopRef}
                   showMatch={
                     !appliedFilters.includeCardFilterMode &&
