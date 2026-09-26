@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronUp } from "lucide-react";
 import type { Player } from "../../types/player";
 import { round } from "../../utils/number";
+import { formatDateForInput } from "../../utils/datetime";
 import { StatCard } from "../statCard/statCard";
 import "./playerInfo.css";
 
@@ -50,7 +51,7 @@ function getAccountCreationDate(accountAgeDays: number): string {
   const today = new Date(); // current date & time
   const result = new Date(today); // copy
   result.setDate(result.getDate() - accountAgeDays);
-  return result.toISOString().split("T")[0]; // keep only YYYY-MM-DD
+  return formatDateForInput(result);
 }
 
 /**
