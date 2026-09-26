@@ -14,6 +14,7 @@ import { FilterContainer } from "../../components/filterContainer/filterContaine
 import type { FilterState } from "../../components/filterContainer/filterContainer";
 import { SortByContainer } from "../../components/sortByContainer/sortByContainer";
 import { CardComponent } from "../../components/card/card";
+import { PlayerError } from "../../components/playerError/playerError";
 import type { CardStats } from "../../types/cardStats";
 import "./cards.css";
 
@@ -60,14 +61,14 @@ export default function PlayerCards() {
     data: cards,
     isLoading: cardsLoading,
     isError: isCardsError,
-    error: cardsError,
+    refetch: refetchCards,
   } = useCards();
 
   const {
     data: gameModes,
     isLoading: gameModesLoading,
     isError: isGameModesError,
-    error: gameModesError,
+    refetch: refetchGameModes,
   } = useGameModes();
 
   // Game mode initialization
@@ -151,7 +152,7 @@ export default function PlayerCards() {
     data: cardStats,
     isLoading: cardStatsLoading,
     isError: isCardStatsError,
-    error: cardStatsError,
+    refetch: refetchCardStats,
   } = useCardStats(
     playerTag,
     appliedFilters.startDate,
@@ -182,13 +183,29 @@ export default function PlayerCards() {
     ? sortCards(cardStats.card_statistics.cards)
     : [];
 
+  if (isCardStatsError || isCardsError || isGameModesError) {
+    return (
+      <PlayerError
+        sources={[
+          {
+            label: "card statistics",
+            failed: isCardStatsError,
+            retry: refetchCardStats,
+          },
+          { label: "cards", failed: isCardsError, retry: refetchCards },
+          {
+            label: "game modes",
+            failed: isGameModesError,
+            retry: refetchGameModes,
+          },
+        ]}
+      />
+    );
+  }
+
   return (
     <div className="cards-page">
       <div className="cards-content">
-        {isCardStatsError && <div>Error: {cardStatsError?.message}</div>}
-        {isCardsError && <div>Error: {cardsError?.message}</div>}
-        {isGameModesError && <div>Error: {gameModesError?.message}</div>}
-
         {/* Loading State - Shows during initial load, cards loading, card stats loading, or game mode loading */}
         {/* The loading spinner prevents users from seeing incomplete data during the initialization process */}
         {(isInitialLoad ||
@@ -201,7 +218,7 @@ export default function PlayerCards() {
           </div>
         )}
         {/* Loaded State - Show decks when all data is available and no errors occurred */}
-        {!isCardStatsError && !isGameModesError && !isInitialLoad && (
+        {!isInitialLoad && (
           <>
             {/* FilterContainer component */}
             <FilterContainer

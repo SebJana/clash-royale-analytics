@@ -2,6 +2,7 @@ import { Outlet, NavLink, useParams, useLocation } from "react-router-dom";
 import { usePlayerProfile } from "../../hooks/usePlayerProfile";
 import { House, Menu, X, ChevronLeft } from "lucide-react";
 import { PlayerInfo } from "../../components/playerInfo/playerInfo";
+import { PlayerErrorBoundary } from "../../components/playerError/playerErrorBoundary";
 import { useEffect, useState } from "react";
 import Lottie from "lottie-react";
 import emptyBox from "../../assets/animations/emptyBox.json";
@@ -126,7 +127,9 @@ export default function PlayerLayout() {
         {player && <PlayerInfo player={player} />}
       </header>
       <main className="player-content">
-        <Outlet /> {/* displays active subpage */}
+        <PlayerErrorBoundary key={pathname}>
+          <Outlet /> {/* displays active subpage */}
+        </PlayerErrorBoundary>
       </main>
     </div>
   );

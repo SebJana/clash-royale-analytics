@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useDeckStats } from "../../hooks/useDeckStats";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { DeckComponent } from "../../components/deck/deck";
+import { PlayerError } from "../../components/playerError/playerError";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
@@ -306,14 +307,14 @@ export default function PlayerDecks() {
     data: cards,
     isLoading: cardsLoading,
     isError: isCardsError,
-    error: cardsError,
+    refetch: refetchCards,
   } = useCards();
 
   const {
     data: gameModes,
     isLoading: gameModesLoading,
     isError: isGameModesError,
-    error: gameModesError,
+    refetch: refetchGameModes,
   } = useGameModes();
 
   // Game mode initialization
@@ -365,7 +366,7 @@ export default function PlayerDecks() {
     data: deckStats,
     isLoading: decksLoading,
     isError: isDecksError,
-    error: decksError,
+    refetch: refetchDecks,
   } = useDeckStats(
     playerTag,
     appliedFilters.startDate,
@@ -500,13 +501,25 @@ export default function PlayerDecks() {
   }
   const totalDecks = filteredDecks.length;
 
+  if (isDecksError || isCardsError || isGameModesError) {
+    return (
+      <PlayerError
+        sources={[
+          { label: "decks", failed: isDecksError, retry: refetchDecks },
+          { label: "cards", failed: isCardsError, retry: refetchCards },
+          {
+            label: "game modes",
+            failed: isGameModesError,
+            retry: refetchGameModes,
+          },
+        ]}
+      />
+    );
+  }
+
   return (
     <div className="decks-page">
       <div className="decks-content">
-        {isDecksError && <div>Error: {decksError?.message}</div>}
-        {isCardsError && <div>Error: {cardsError?.message}</div>}
-        {isGameModesError && <div>Error: {gameModesError?.message}</div>}
-
         {/* Loading State - Shows during initial load, cards loading, decks loading, or game mode loading */}
         {/* The loading spinner prevents users from seeing incomplete data during the initialization process */}
         {(isInitialLoad ||
@@ -519,7 +532,7 @@ export default function PlayerDecks() {
           </div>
         )}
         {/* Loaded State - Show decks when all data is available and no errors occurred */}
-        {!isDecksError && !isGameModesError && !isInitialLoad && (
+        {!isInitialLoad && (
           <>
             {/* FilterContainer component */}
             <FilterContainer

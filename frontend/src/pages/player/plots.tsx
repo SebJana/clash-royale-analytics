@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import type { DateLevel } from "../../types/chart";
 import { LineChart } from "../../components/lineChart/lineChart";
+import { PlayerError } from "../../components/playerError/playerError";
 import { buildPlotConfig, PLOT_DEFINITIONS } from "../../utils/plotConfig";
 import type { PlotDefinition } from "../../utils/plotConfig";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -150,7 +151,7 @@ export default function PlayerPlots() {
     data: gameModes,
     isLoading: gameModesLoading,
     isError: isGameModesError,
-    error: gameModesError,
+    refetch: refetchGameModes,
   } = useGameModes();
 
   // Game mode initialization
@@ -180,7 +181,7 @@ export default function PlayerPlots() {
     data: stats,
     isLoading: statsLoading,
     isError: isStatsError,
-    error: statsError,
+    refetch: refetchStats,
   } = useDailyStats(
     playerTag,
     appliedFilters.startDate,
@@ -202,12 +203,24 @@ export default function PlayerPlots() {
     resetDependency: `${playerTag}-${appliedFilters.startDate}-${appliedFilters.endDate}-${modesKey}`,
   });
 
+  if (isStatsError || isGameModesError) {
+    return (
+      <PlayerError
+        sources={[
+          { label: "statistics", failed: isStatsError, retry: refetchStats },
+          {
+            label: "game modes",
+            failed: isGameModesError,
+            retry: refetchGameModes,
+          },
+        ]}
+      />
+    );
+  }
+
   return (
     <div className="plots-page">
       <div className="plots-content">
-        {isStatsError && <div>Error: {statsError?.message}</div>}
-        {isGameModesError && <div>Error: {gameModesError?.message}</div>}
-
         {/* Loading State - Shows during initial load, cards loading, card stats loading, or game mode loading */}
         {/* The loading spinner prevents users from seeing incomplete data during the initialization process */}
         {(isInitialLoad || statsLoading || gameModesLoading) && (
@@ -217,7 +230,7 @@ export default function PlayerPlots() {
           </div>
         )}
         {/* Loaded State - Show decks when all data is available and no errors occurred */}
-        {!isGameModesError && !isInitialLoad && (
+        {!isInitialLoad && (
           <>
             {/* FilterContainer component */}
             <FilterContainer

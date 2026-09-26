@@ -4,6 +4,7 @@ import { useCards } from "../../hooks/useCards";
 import { usePlayerBattlesInfinite } from "../../hooks/useLastBattles";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import { BattleComponent } from "../../components/battle/battle";
+import { PlayerError } from "../../components/playerError/playerError";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import {
   localeToUTC,
@@ -58,7 +59,7 @@ export default function PlayerBattles() {
     data: cards,
     isLoading: cardsLoading,
     isError: isCardsError,
-    error: cardsError,
+    refetch: refetchCards,
   } = useCards();
 
   // Fetch battles with infinite pagination
@@ -66,7 +67,7 @@ export default function PlayerBattles() {
     data: battles,
     isLoading: battlesLoading,
     isError: isBattlesError,
-    error: battlesError,
+    refetch: refetchBattles,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -74,12 +75,12 @@ export default function PlayerBattles() {
     playerTag,
     battlesPageSize,
     true,
-    appliedBeforeDate
+    appliedBeforeDate,
   );
   // Flatten paginated battle data into a single array for easier rendering
   const battlesList = useMemo(
     () => battles?.pages.flatMap((p) => p.last_battles.battles) ?? [],
-    [battles]
+    [battles],
   );
 
   // Use loading state logic
@@ -119,7 +120,7 @@ export default function PlayerBattles() {
       {
         rootMargin: "500px", // Start loading before the element comes into view
         threshold: 0.1, // Trigger when 10% of the element is visible
-      }
+      },
     );
 
     observer.observe(loadMoreElement);
@@ -231,8 +232,16 @@ export default function PlayerBattles() {
     setBeforeDate(getTodayDateTime());
   };
 
-  // Handle cards error early - battles can't be displayed without card data
-  if (isCardsError) return <div>Error: {cardsError.message}</div>;
+  if (isCardsError || isBattlesError) {
+    return (
+      <PlayerError
+        sources={[
+          { label: "cards", failed: isCardsError, retry: refetchCards },
+          { label: "battles", failed: isBattlesError, retry: refetchBattles },
+        ]}
+      />
+    );
+  }
 
   return (
     <div className="battles-page">
@@ -267,8 +276,6 @@ export default function PlayerBattles() {
       </div>
 
       <div className="battles-content">
-        {isBattlesError && <div>Error: {battlesError.message}</div>}
-
         {/* Loading State - Shows during initial load, cards loading, or battles loading */}
         {/* By showing a loading spinner, the user can access the site instantly and doesn't have
             to wait on the previous site till all battles loaded and rendered */}
@@ -280,7 +287,7 @@ export default function PlayerBattles() {
         )}
 
         {/* Loaded State - Show battles when all data is available and no errors occurred */}
-        {!isBattlesError && !isInitialLoad && (
+        {!isInitialLoad && (
           <>
             {/* Show battles if there is any data to display */}
             {battlesList.length > 0 && (
