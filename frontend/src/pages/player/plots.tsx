@@ -1,104 +1,138 @@
 import { useParams } from "react-router-dom";
-import type { DailyStats, Days } from "../../types/dailyStats";
+import type { DailyStats } from "../../types/dailyStats";
 import { useDailyStats } from "../../hooks/useDailyStats";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
+import Tooltip from "@mui/material/Tooltip";
 import { useGameModes } from "../../hooks/useGameModes";
 import { getCurrentFilterState } from "../../utils/filter";
 import { gameModesForQuery } from "../../utils/gameModes";
 import { useEffect, useState } from "react";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
-import type { ChartConfig } from "../../types/chart";
+import type { DateLevel } from "../../types/chart";
 import { LineChart } from "../../components/lineChart/lineChart";
+import { buildPlotConfig, PLOT_DEFINITIONS } from "../../utils/plotConfig";
+import type { PlotDefinition } from "../../utils/plotConfig";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
 import "./plots.css";
 
-/**
- * Extracts an array of values for a specific field from daily statistics data.
- *
- * This generic function takes daily statistics and extracts all values for a given field
- * across all days, returning them as a typed array. It's particularly useful for creating
- * chart data where you need all values of a specific metric (like battles, winRate, etc.)
- * from multiple days in a single array.
- *
- * @template T - The key type that extends the keys of the Days interface
- * @param stats - The daily statistics data containing an array of daily records, or undefined if not loaded
- * @param key - The specific field name to extract from each daily record (e.g., 'battles', 'winRate', 'date')
- * @returns An array containing all values of the specified field from each day's data.
- *          The return type matches the type of the field (e.g., number[] for 'battles', string[] for 'date')
- *          Returns an empty array if stats is undefined or null.
- *
- * @example
- * // Extract all battle counts across days
- * const battleCounts = getDataArrayForKey(stats, 'battles'); // Returns number[]
- *
- * @example
- * // Extract all dates across days
- * const dates = getDataArrayForKey(stats, 'date'); // Returns string[]
- */
-function getDataArrayForKey<T extends keyof Days>(
-  stats: DailyStats | undefined,
-  key: T,
-): Days[T][] {
-  // Early return with empty array if stats is null/undefined to avoid runtime errors
-  if (!stats) return [];
+type DateSpacing = "calendar" | "recorded";
 
-  // Extract the daily array from the nested statistics structure
-  const daily = stats.daily_statistics.daily;
+const DATE_LEVELS: DateLevel[] = ["year", "month", "day"];
 
-  // Initialize typed array to store extracted values - TypeScript infers the correct element type (string or number)
-  const data: Days[T][] = [];
+function PlotPanel({
+  definition,
+  stats,
+  startDate,
+  endDate,
+}: Readonly<{
+  definition: PlotDefinition;
+  stats: DailyStats;
+  startDate: string;
+  endDate: string;
+}>) {
+  const [dateLevel, setDateLevel] = useState<DateLevel>("day");
+  const [dateSpacing, setDateSpacing] = useState<DateSpacing>("recorded");
+  const levelIndex = DATE_LEVELS.indexOf(dateLevel);
+  const config = buildPlotConfig(definition, stats, dateLevel);
+  const previousLevel = DATE_LEVELS[levelIndex - 1];
+  const nextLevel = DATE_LEVELS[levelIndex + 1];
 
-  // Iterate through each day's data to extract the specified field value
-  for (const day of daily) {
-    // Extract the value for the given key and add to results array
-    data.push(day[key]);
-  }
-
-  // Return the collected values as a typed array ready for chart consumption
-  return data;
-}
-
-/**
- * Calculates the average leaked elixir per battle for each day in the statistics data.
- *
- * @param stats - The daily statistics data containing an array of daily records, or undefined if not loaded
- * @returns An array of numbers representing the average leaked elixir per battle for each given day.
- *          Each element corresponds to one day's average leaked elixir efficiency.
- *          Returns an empty array if stats is undefined or null.
- *          If a day has 0 battles, returns the total leaked elixir value (not divided by zero).
-
- */
-function getLeakedElixirPerMatch(stats: DailyStats | undefined): number[] {
-  if (!stats) return [];
-
-  const averageLeaked: number[] = [];
-
-  const daily = stats.daily_statistics.daily;
-
-  for (const day of daily) {
-    const battles = day.battles;
-    const leakedElixir = day.elixirLeaked;
-
-    let averageLeakedElixir = leakedElixir;
-
-    // Calculate average only if battles were played to avoid division by zero
-    // Should not happen, that there is an entry without a played battle, but fallback value is leakedElixir
-    if (battles > 0) {
-      averageLeakedElixir = leakedElixir / battles;
-    }
-
-    // Add the calculated average to the results array
-    averageLeaked.push(averageLeakedElixir);
-  }
-
-  return averageLeaked;
+  return (
+    <section
+      className="stat-chart"
+      aria-labelledby={`plot-${definition.id}-title`}
+    >
+      <div className="plot-controls">
+        <div
+          className="plots-drill-controls"
+          role="group"
+          aria-label={`${config.title} date hierarchy`}
+        >
+          <Tooltip
+            arrow
+            title={
+              previousLevel ? `Drill up to ${previousLevel}` : "Already at year"
+            }
+          >
+            <span className="plots-drill-button-wrap">
+              <button
+                type="button"
+                disabled={!previousLevel}
+                onClick={() => setDateLevel(previousLevel)}
+                aria-label="Drill up"
+              >
+                <ArrowUp size={18} />
+              </button>
+            </span>
+          </Tooltip>
+          <span className="plots-drill-level" aria-live="polite">
+            {dateLevel.charAt(0).toUpperCase() + dateLevel.slice(1)}
+          </span>
+          <Tooltip
+            arrow
+            title={nextLevel ? `Drill down to ${nextLevel}` : "Already at day"}
+          >
+            <span className="plots-drill-button-wrap">
+              <button
+                type="button"
+                disabled={!nextLevel}
+                onClick={() => setDateLevel(nextLevel)}
+                aria-label="Drill down"
+              >
+                <ArrowDown size={18} />
+              </button>
+            </span>
+          </Tooltip>
+        </div>
+        <div
+          className={`plots-date-spacing-toggle${dateSpacing === "calendar" ? " is-calendar" : ""}`}
+        >
+          <span>Recorded</span>
+          <Tooltip
+            arrow
+            title={
+              dateSpacing === "calendar"
+                ? "Calendar spacing; dots mark missing periods"
+                : "Even spacing for recorded periods"
+            }
+          >
+            <label
+              className="plots-date-spacing-switch"
+              aria-label="Use calendar spacing"
+            >
+              <input
+                type="checkbox"
+                checked={dateSpacing === "calendar"}
+                onChange={(event) =>
+                  setDateSpacing(event.target.checked ? "calendar" : "recorded")
+                }
+              />
+              <span className="plots-date-spacing-slider" />
+            </label>
+          </Tooltip>
+          <span>Calendar</span>
+        </div>
+      </div>
+      <h2 className="plot-title" id={`plot-${definition.id}-title`}>
+        {config.title}
+      </h2>
+      <LineChart
+        className="plot-canvas"
+        config={config}
+        dateSpacing={dateSpacing}
+        dateLevel={dateLevel}
+        startDate={startDate}
+        endDate={endDate}
+      />
+    </section>
+  );
 }
 
 export default function PlayerPlots() {
   const { playerTag = "" } = useParams();
-
   // Filter state management maintains two sets of state for each filter type:
   // 1. "selected" - what the user has chosen in the UI (not yet applied)
   // 2. "applied" - what is actually used for the API query (in case of cards for the frontend filter)
@@ -168,72 +202,6 @@ export default function PlayerPlots() {
     resetDependency: `${playerTag}-${appliedFilters.startDate}-${appliedFilters.endDate}-${modesKey}`,
   });
 
-  const winRateChart: ChartConfig = {
-    datasets: [
-      {
-        data: getDataArrayForKey(stats, "winRate"),
-        label: "Win Rate",
-        color: "#00C9FF",
-      },
-    ],
-    labels: getDataArrayForKey(stats, "date"),
-    title: "🏆 Win Rate Performance",
-    yAxisTitle: "Win Rate (%)",
-    xAxisTitle: "Date",
-    labelColor: "#e0e0e0",
-  };
-
-  const battlesChart: ChartConfig = {
-    datasets: [
-      {
-        data: getDataArrayForKey(stats, "battles"),
-        label: "Battles",
-        color: "#FF6B6B",
-      },
-    ],
-    labels: getDataArrayForKey(stats, "date"),
-    title: "⚔️ Battle Activity",
-    yAxisTitle: "Number of Battles",
-    xAxisTitle: "Date",
-    labelColor: "#e0e0e0",
-  };
-
-  const leakedElixirChart: ChartConfig = {
-    datasets: [
-      {
-        data: getLeakedElixirPerMatch(stats),
-        label: "Leaked Elixir",
-        color: "#C547DB",
-      },
-    ],
-    labels: getDataArrayForKey(stats, "date"),
-    title: "🩸 Average Leaked Elixir per Battle",
-    yAxisTitle: "Leaked Elixir",
-    xAxisTitle: "Date",
-    labelColor: "#e0e0e0",
-  };
-
-  const crownsChart: ChartConfig = {
-    datasets: [
-      {
-        data: getDataArrayForKey(stats, "crownsFor"),
-        label: "Crowns For",
-        color: "#00C9FF",
-      },
-      {
-        data: getDataArrayForKey(stats, "crownsAgainst"),
-        label: "Crowns Against",
-        color: "#FF6B6B",
-      },
-    ],
-    labels: getDataArrayForKey(stats, "date"),
-    title: "👑 Crowns For vs. Crowns Against",
-    yAxisTitle: "Crowns",
-    xAxisTitle: "Date",
-    labelColor: "#e0e0e0",
-    showLegend: true,
-  };
-
   return (
     <div className="plots-page">
       <div className="plots-content">
@@ -261,18 +229,21 @@ export default function PlayerPlots() {
               appliedFilters={appliedFilters}
               initialFilters={getCurrentFilterState()}
             />
-
             {/* Show stats if there is any data to display */}
             {stats && stats.daily_statistics.daily.length > 0 && (
               <div className="plots-charts">
-                <LineChart className="stat-chart" config={winRateChart} />
-                <LineChart className="stat-chart" config={battlesChart} />
-                <LineChart className="stat-chart" config={crownsChart} />
-                <LineChart className="stat-chart" config={leakedElixirChart} />
+                {PLOT_DEFINITIONS.map((definition) => (
+                  <PlotPanel
+                    key={definition.id}
+                    definition={definition}
+                    stats={stats}
+                    startDate={appliedFilters.startDate}
+                    endDate={appliedFilters.endDate}
+                  />
+                ))}
               </div>
             )}
             <ScrollToTopButton />
-
             {/* Show message when no stats are found and not still loading */}
             {(!stats || stats.daily_statistics.daily.length === 0) &&
               !statsLoading &&
