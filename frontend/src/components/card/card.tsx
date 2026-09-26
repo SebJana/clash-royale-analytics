@@ -58,6 +58,8 @@ export const CardComponent = memo(function CardComponent({
       {showTooltip ? (
         <Tooltip
           arrow
+          // Let the tooltip close as soon as the pointer leaves the card.
+          disableInteractive
           placement="auto"
           title={
             <div className="card-component-tooltip">

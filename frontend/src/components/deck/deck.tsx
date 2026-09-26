@@ -4,6 +4,7 @@ import { getCardElixirCost } from "../../utils/getCardMetaFields";
 import type { Card, CardMeta } from "../../types/cards";
 import { round } from "../../utils/number";
 import { Copy } from "lucide-react";
+import rareOutlineImg from "../../assets/cards/rareOutline.png";
 import "./deck.css";
 
 /**
@@ -18,7 +19,7 @@ function calcAverageElixirCost(deck: Card[], cards: CardMeta[]): number {
   let elixirSum = 0;
   const numberOfCards = deck.length;
 
-  if (numberOfCards < 0) {
+  if (numberOfCards <= 0) {
     return 0;
   }
 
@@ -125,27 +126,51 @@ export const DeckComponent = memo(function DeckComponent({
   const fourCardCycle = calculateFourCardCycle(deck, cards);
   const roundedFourCardCycle = round(fourCardCycle, 2);
 
-  const copyLink = generateCopyLink(deck);
-
   // Works for both mobile and desktop because the Clash Royale Website handles
   // showing a qr code (desktop) and a copy link (mobile)
   const handleCopy = () => {
-    window.open(copyLink, "_blank");
+    window.open(generateCopyLink(deck), "_blank");
   };
 
   return (
     <>
       {/* TODO (potentially) add max deck row width/height*/}
-      <div>{rows}</div>
+      <div>
+        {deck.length === 0 ? (
+          <div className="deck-component-empty-state">
+            {/* Keep the usual two rows of four, even when a mode has no cards. */}
+            {Array.from({ length: 2 }, (_, rowIndex) => (
+              <div
+                key={rowIndex}
+                className="deck-component-deck-row deck-component-empty-row"
+                aria-hidden="true"
+              >
+                {Array.from({ length: cardsPerRow }, (_, index) => (
+                  <div key={index} className="deck-component-empty-card">
+                    <img src={rareOutlineImg} alt="" />
+                  </div>
+                ))}
+              </div>
+            ))}
+            <span>No cards in this deck</span>
+          </div>
+        ) : (
+          rows
+        )}
+      </div>
       {/* TODO add elixir droplet icon to value*/}
       <div className="deck-component-footer">
         <div className="deck-component-stats">
           <div className="deck-component-stat-item">
-            <p className="deck-component-stat-value">{roundedAvgElixir}</p>
+            <p className="deck-component-stat-value">
+              {deck.length === 0 ? "—" : roundedAvgElixir}
+            </p>
             <p className="deck-component-stat-label">Avg Elixir</p>
           </div>
           <div className="deck-component-stat-item">
-            <p className="deck-component-stat-value">{roundedFourCardCycle}</p>
+            <p className="deck-component-stat-value">
+              {deck.length === 0 ? "—" : roundedFourCardCycle}
+            </p>
             <p className="deck-component-stat-label">4-Card Cycle</p>
           </div>
           {/* Only display leaked elixir if it was passed into the component*/}
@@ -156,7 +181,9 @@ export const DeckComponent = memo(function DeckComponent({
             </div>
           )}
         </div>
-        <Copy className="deck-component-copy-button" onClick={handleCopy} />
+        {deck.length > 0 && (
+          <Copy className="deck-component-copy-button" onClick={handleCopy} />
+        )}
       </div>
     </>
   );
