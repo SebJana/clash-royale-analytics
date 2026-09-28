@@ -105,6 +105,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return true;
   }, [authState.isAuthenticated, authState.expiresAt, logout]);
 
+  // Keep the visible auth state in sync when a token expires while the page is open.
+  useEffect(() => {
+    if (!authState.isAuthenticated || !authState.expiresAt) return;
+    const expiresAt = authState.expiresAt;
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleExpiry = () => {
+      const remaining = expiresAt - Date.now();
+      if (remaining <= 0) {
+        logout();
+        return;
+      }
+      timer = setTimeout(scheduleExpiry, Math.min(remaining, 2_147_483_647));
+    };
+    scheduleExpiry();
+    return () => clearTimeout(timer);
+  }, [authState.isAuthenticated, authState.expiresAt, logout]);
+
   // Memoized context value to prevent unnecessary re-renders
   const contextValue: AuthContextType = useMemo(
     () => ({

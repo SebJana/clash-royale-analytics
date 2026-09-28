@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { LockKeyhole, LockKeyholeOpen, CircleCheck } from "lucide-react";
 import { useNavigate } from "react-router";
 import {
   fetchAllTrackedPlayers,
@@ -99,8 +100,15 @@ function HomePage() {
     null
   );
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAuthSuccess, setShowAuthSuccess] = useState(false);
   const navigate = useNavigate();
-  const { checkAuthStatus } = useAuth();
+  const { isAuthenticated, checkAuthStatus } = useAuth();
+
+  useEffect(() => {
+    if (!showAuthSuccess) return;
+    const timer = window.setTimeout(() => setShowAuthSuccess(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [showAuthSuccess]);
 
   if (playersLoading || playerCountLoading || battleCountLoading)
     return <CircularProgress className="home-loading-spinner" />;
@@ -198,10 +206,9 @@ function HomePage() {
 
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
-    // Retry the untrack operation after successful authentication
-    if (untrackedPlayerTag) {
-      handleUntrackPlayerClick();
-    }
+    setShowAuthSuccess(true);
+    setUntrackingError(null);
+    setUntrackingSuccess(null);
   };
 
   return (
@@ -283,31 +290,71 @@ function HomePage() {
               <div className="home-success-message">{trackingSuccess}</div>
             )}
           </div>
-          <div className="untrack-section">
-            {/* TODO add unlocked/locked lock icon here, to indicate wether a player is authenticated or not*/}
-            <h2 className="section-header">Remove Tracked Player</h2>
+          <div
+            className={`untrack-section${showAuthSuccess && isAuthenticated ? " untrack-section-unlocked" : ""}`}
+          >
+            <h2 className="section-header">
+              Remove Tracked Player
+              <span
+                className={`untrack-auth-status${isAuthenticated ? " is-unlocked" : ""}`}
+                role="img"
+                aria-label={isAuthenticated ? "Verified" : "Verification required"}
+                title={isAuthenticated ? "Verified" : "Verification required"}
+              >
+                <span className="untrack-auth-icon" aria-hidden="true">
+                  {isAuthenticated ? (
+                    <LockKeyholeOpen size={24} />
+                  ) : (
+                    <LockKeyhole size={24} />
+                  )}
+                </span>
+              </span>
+            </h2>
             <p className="section-description">
-              Enter a player tag to stop tracking their activity. Previously
-              stored data won't be deleted by this, you can always add the
-              player back.
+              {isAuthenticated
+                ? "Enter a player tag to stop tracking their activity."
+                : "Verify to stop tracking a player's activity."}{" "}
+              Previously stored data won't be deleted by this, you can always
+              add the player back.
             </p>
-            <input
-              type="text"
-              placeholder="Enter player tag... (e.g. #YYRJQY28)"
-              value={untrackedPlayerTag}
-              onChange={(e) => {
-                const tag = e.target.value;
-                setUntrackedPlayerTag(tag);
-                if (validatePlayerTagSyntax(tag)) setUntrackingError(null);
-              }}
-            />
-            <button
-              className="remove-button"
-              onClick={handleUntrackPlayerClick}
-              disabled={!untrackedPlayerTag || untrackingPlayer}
-            >
-              {untrackingPlayer ? "Removing Player..." : "Remove Player"}
-            </button>
+            {isAuthenticated ? (
+              <>
+                <input
+                  type="text"
+                  aria-label="Player tag to remove"
+                  placeholder="Enter player tag... (e.g. #YYRJQY28)"
+                  value={untrackedPlayerTag}
+                  onChange={(e) => {
+                    const tag = e.target.value;
+                    setUntrackedPlayerTag(tag);
+                    if (validatePlayerTagSyntax(tag)) setUntrackingError(null);
+                  }}
+                />
+                <button
+                  className="remove-button"
+                  onClick={handleUntrackPlayerClick}
+                  disabled={!untrackedPlayerTag || untrackingPlayer}
+                >
+                  {untrackingPlayer ? "Removing Player..." : "Remove Player"}
+                </button>
+              </>
+            ) : (
+              <button
+                className="verify-remove-button"
+                onClick={() => setShowAuthModal(true)}
+              >
+                Verify
+              </button>
+            )}
+
+            <div className="untrack-auth-feedback" role="status" aria-atomic="true">
+              {showAuthSuccess && isAuthenticated && (
+                <div className="home-success-message untrack-auth-success">
+                  <CircleCheck size={20} aria-hidden="true" />
+                  <span>Verification complete! Enter a player tag to remove.</span>
+                </div>
+              )}
+            </div>
 
             {untrackingError && (
               <div className="home-error-message">{untrackingError}</div>

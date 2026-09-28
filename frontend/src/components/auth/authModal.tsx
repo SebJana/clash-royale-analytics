@@ -28,7 +28,7 @@ interface AuthModalProps {
   readonly onSuccess: () => void;
 }
 
-type AuthStep = "captcha" | "wordle" | "halli_galli" | "security" | "complete";
+type AuthStep = "captcha" | "wordle" | "halli_galli" | "security";
 // TODO let the backend communicate that upon wordle session start and the frontend
 // dynamically reacts to it
 const MAX_WORDLE_GUESSES_ALLOWED = 6; // Standard Wordle guess limit
@@ -222,7 +222,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
 
       const { auth_token } = await getAuthToken(security_token);
       login(auth_token);
-      setCurrentStep("complete");
+      resetAuthFlow();
       onSuccess();
       onClose();
     } catch (err) {
