@@ -19,10 +19,10 @@ import json
 import uuid
 
 from core.settings import settings
+from helpers.halli_galli_rendering.models import HalliGalliCard
 from helpers.halli_galli_card import (
     AVAILABLE_FRUITS,
     FRUIT_POSITIONS,
-    HalliGalliCard,
     create_card,
 )
 from redis_service import RedisConn

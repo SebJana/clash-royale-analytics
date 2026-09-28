@@ -7,10 +7,10 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from helpers.encrypt_image import encrypt_image
 from helpers.halli_galli_card_pool import get_card_template, get_or_create_card
+from helpers.halli_galli_rendering.models import FruitImagePosition
 from helpers.halli_galli_card import (
     AVAILABLE_FRUITS,
     FRUIT_POSITIONS,
-    FruitImagePosition,
     pick_random_card,
 )
 
@@ -157,11 +157,21 @@ class HalliGalliGame(BaseModel):
     # Keep the last committed score and pile change so status can reconstruct
     # a round result when its action response never reaches the browser.
     last_round_index: int | None = None
-    last_round_result: Literal["player_won", "player_lost", "no_halli_galli"] | None = None
-    last_round_reason: Literal[
-        "correct_buzz", "late_buzz", "wrong_card", "wrong_fruit",
-        "false_buzz", "missed_halli_galli", "no_halli_galli"
-    ] | None = None
+    last_round_result: Literal["player_won", "player_lost", "no_halli_galli"] | None = (
+        None
+    )
+    last_round_reason: (
+        Literal[
+            "correct_buzz",
+            "late_buzz",
+            "wrong_card",
+            "wrong_fruit",
+            "false_buzz",
+            "missed_halli_galli",
+            "no_halli_galli",
+        ]
+        | None
+    ) = None
     last_round_clear_cards: bool | None = None
     # A late buzz's delay belongs to the committed result. Keep it for status
     # recovery, and leave it empty for every other action.
@@ -347,8 +357,9 @@ async def prepare_round_card(
         round_card.fruit,
         round_card.amount,
     )
-    # The private template ID can repeat across games. The public image ID is
-    # new for this round and does not reveal which raw variation was selected.
+    # NOTE: A fresh public ID for each round prevents the client from mapping
+    # a previously revealed template ID to its fruit and amount on reuse.
+    # The private template ID can repeat across games but stays server-side.
     image_id = uuid.uuid4().hex
     update_round_template(
         game, round_index, image_id, template_id, card.fruit_positions
@@ -456,8 +467,13 @@ def get_halli_galli_winning_cards(game: HalliGalliGame) -> dict[str, set[int]]:
 
 RoundResult = Literal["player_won", "player_lost", "no_halli_galli"]
 RoundReason = Literal[
-    "correct_buzz", "late_buzz", "wrong_card", "wrong_fruit",
-    "false_buzz", "missed_halli_galli", "no_halli_galli"
+    "correct_buzz",
+    "late_buzz",
+    "wrong_card",
+    "wrong_fruit",
+    "false_buzz",
+    "missed_halli_galli",
+    "no_halli_galli",
 ]
 
 
@@ -677,14 +693,9 @@ def _clicked_winning_card(
     if selected_index is None:
         return False
 
-    return (
-        game.rounds[selected_index].image_id == clicked_card_id
-        and (
-            not game.rules.require_target_fruit
-            or _hit_target_fruit(
-                game.rounds[selected_index], game.rules, click_x, click_y
-            )
-        )
+    return game.rounds[selected_index].image_id == clicked_card_id and (
+        not game.rules.require_target_fruit
+        or _hit_target_fruit(game.rounds[selected_index], game.rules, click_x, click_y)
     )
 
 
@@ -748,15 +759,10 @@ def eval_round(
 
     winning_cards = get_halli_galli_winning_cards(game)
     has_halli_galli = bool(winning_cards)
-    clicked_winning_card = (
-        clicked_card_id is not None
-        and _clicked_winning_card(
-            game, winning_cards, clicked_card_id, click_x, click_y
-        )
+    clicked_winning_card = clicked_card_id is not None and _clicked_winning_card(
+        game, winning_cards, clicked_card_id, click_x, click_y
     )
-    player_won = (
-        clicked_winning_card and now < deadline
-    )
+    player_won = clicked_winning_card and now < deadline
     result = _score_round(
         game, has_halli_galli, player_won, clicked_card_id is not None
     )
@@ -766,7 +772,9 @@ def eval_round(
     # Report an incorrect click as such even if it arrived after the deadline.
     # Only a click on the required card and fruit can receive a late-buzz reason.
     if clicked_card_id is None:
-        reason: RoundReason = "missed_halli_galli" if has_halli_galli else "no_halli_galli"
+        reason: RoundReason = (
+            "missed_halli_galli" if has_halli_galli else "no_halli_galli"
+        )
     elif not has_halli_galli:
         reason = "false_buzz"
     elif clicked_winning_card and now >= deadline:
@@ -849,6 +857,12 @@ def reveal_card(game: HalliGalliGame) -> str:
         raise ValueError("The current card is not ready.")
     # Pick jitter only once. Buzzes and next-card requests use this same
     # deadline, so an early next-card response cannot reveal a winning count.
+
+    # NOTE: After a round settles, the next reveal can be delayed until the
+    # game session expires; actions preserve its original TTL. This gives
+    # humans and slower solvers time to analyze the old pile. Fast solvers can
+    # already track it during play, so this does not materially weaken the
+    # challenge. A shorter server-side wait limit could enforce a steady pace.
     if current.revelation_timestamp is None:
         revealed_at = time.monotonic()
         jitter_range = _round_jitter_range_ms(game)
@@ -859,8 +873,7 @@ def reveal_card(game: HalliGalliGame) -> str:
         current.revelation_timestamp = revealed_at
         current.buzz_deadline_timestamp = (
             revealed_at
-            + max(0.0, game.rules.round_window_ms + jitter)
-            / MILLISECONDS_PER_SECOND
+            + max(0.0, game.rules.round_window_ms + jitter) / MILLISECONDS_PER_SECOND
             + _network_delay_allowance_seconds(game)
         )
     return current.encryption_key

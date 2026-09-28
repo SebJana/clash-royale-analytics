@@ -56,7 +56,6 @@ from routers.auth_routes.common import round_token_scheme
 
 router = APIRouter()
 
-
 # A preload and a game action can change the same saved state. Retry a few
 # times if another request commits first.
 GAME_STATE_UPDATE_ATTEMPTS = 3

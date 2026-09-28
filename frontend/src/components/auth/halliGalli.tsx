@@ -558,6 +558,10 @@ export function HalliGalli({
         cards. Every visible card counts, including all{" "}
         <strong>{game.rules.visible_card_count}</strong> once they are shown.
       </p>
+      <p>
+        Count only the <strong>actual fruit emojis</strong>. Ignore colored
+        blobs, noise, and all other distractions.
+      </p>
       <p className="halli-click-rule">
         Click the <strong>{game.rules.winning_card_age}</strong> card of the{" "}
         <strong>winning fruit</strong>.{" "}

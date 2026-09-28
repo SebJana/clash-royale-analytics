@@ -24,6 +24,7 @@ class Settings:
     MOST_SKILLFUL_CARD: str = os.getenv("MOST_SKILLFUL_CARD", "")
     MOST_MOUSEY_CARD: str = os.getenv("MOST_MOUSEY_CARD", "")
 
+    # TODO add setting where neither .lower() nor any fuzzy matching are used to have a "secure" option
     # How close does the given security question answer need to be to the actual one from .env?
     SECURITY_FUZZY_THRESHOLD: int = 95  # Keep in high 90s to let cards with typos pass
 
@@ -44,6 +45,9 @@ class Settings:
 
     # Maximum number of reusable rendered PNGs for each fruit and amount pair.
     # For example, banana with four fruits has its own pool of this size.
+    # NOTE This is a security relevant setting, if variations are not arbitrarily big
+    # an "attacker" could start fingerprinting the already known images and compare
+    # the incoming (from the same pool) to those
     HALLI_GALLI_CARD_VARIATIONS_PER_COMBINATION = 25
 
     # Rotate raw card variations after they are created, so that an automated attack
@@ -60,7 +64,7 @@ class Settings:
     # network delay.
     # Every round receives a deadline, including those without a winning count.
     # An early next-card request is therefore handled the same way in both cases.
-    HALLI_GALLI_ROUND_WINDOW_MS = 1500
+    HALLI_GALLI_ROUND_WINDOW_MS = 1750
     # Sample uniformly within plus or minus this percentage of the base time.
     # At 2000 ms and 12.5%, the sampled window is 1750 to 2250 ms.
     HALLI_GALLI_ROUND_JITTER_PERCENT = 12.5
