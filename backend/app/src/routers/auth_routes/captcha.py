@@ -56,7 +56,10 @@ async def get_captcha_image(auth_state_conn: AuthStateConn, captcha_id: str):
     if not text:
         raise HTTPException(
             status_code=404,
-            detail="No captcha image generated, no valid captcha id given or expired.",
+            detail={
+                "code": "CAPTCHA_EXPIRED",
+                "message": "CAPTCHA took too long. Restart the CAPTCHA.",
+            },
         )
 
     # ImageCaptcha renders synchronously; run it in a worker thread so other
@@ -81,7 +84,10 @@ async def get_captcha_token(auth_state_conn: AuthStateConn, req: CaptchaAnswerRe
     if not text:
         raise HTTPException(
             status_code=404,
-            detail="No captcha generated, no valid captcha id given or expired.",
+            detail={
+                "code": "CAPTCHA_EXPIRED",
+                "message": "CAPTCHA took too long. Restart the CAPTCHA.",
+            },
         )
 
     # NOTE: compare with lowercase answer and text, otherwise the captcha is very hard to solve
@@ -96,7 +102,11 @@ async def get_captcha_token(auth_state_conn: AuthStateConn, req: CaptchaAnswerRe
         }
 
     raise HTTPException(
-        status_code=401, detail="No captcha token generated, incorrect answer given."
+        status_code=401,
+        detail={
+            "code": "CAPTCHA_INCORRECT",
+            "message": "The CAPTCHA text doesn't match. Check the image and try again.",
+        },
     )
 
 

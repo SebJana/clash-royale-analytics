@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
+import { AuthChallengeError, getAuthErrorFeedback, type AuthErrorFeedback } from "../../utils/authErrors";
 import {
   buzzHalliGalliRound,
   getHalliGalliCard,
@@ -113,7 +114,7 @@ export function HalliGalli({
   const [winToken, setWinToken] = useState<string | null>(null);
   const [pauseAfterRound, setPauseAfterRound] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<AuthErrorFeedback | null>(null);
   const pauseAfterRoundRef = useRef(false);
   const buzzRef = useRef<(card: VisibleCard, x: number, y: number) => void>(
     () => {},
@@ -176,25 +177,11 @@ export function HalliGalli({
     function fail(err: unknown) {
       if (!active) return;
       clearTimer();
-      if (
-        (axios.isAxiosError(err) && err.response?.status === 401) ||
-        (err instanceof Error && err.message.includes("invalid_wordle_token"))
-      ) {
-        callbacksRef.current.onWordleExpired();
-        return;
-      }
       setPhase("error");
-      if (axios.isAxiosError(err) && err.response?.status === 429) {
-        setError("Too many requests. Wait a minute, then try again.");
-      } else if (axios.isAxiosError(err) && err.response?.status === 404) {
-        setError("This game expired. Start a new Halli Galli game.");
-      } else {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Halli Galli could not continue.",
-        );
-      }
+      setError(getAuthErrorFeedback(
+        tokenExpired(wordleToken) ? new AuthChallengeError("WORDLE_TOKEN_EXPIRED") : err,
+        "halli_galli",
+      ));
     }
     /** Wait for the next-card cadence or result feedback to finish. */
     function waitUntil(when: number): Promise<void> {
@@ -238,7 +225,7 @@ export function HalliGalli({
       // after decryption, when the card can actually be shown.
       const card = ciphertext.get(index);
       if (!card || !matchingCard(card, response)) {
-        throw new Error("The preloaded card did not match its reveal version.");
+        throw new AuthChallengeError("HALLI_CARD_LOAD_FAILED");
       }
       const url = await decryptHalliGalliCard(card, response.encryption_key);
       if (!active) {
@@ -364,7 +351,7 @@ export function HalliGalli({
             if (!active) return;
             setWinToken(result.halli_galli_token);
             setPhase("won");
-          } else throw new Error("The win token could not be recovered.");
+          } else throw new AuthChallengeError("HALLI_WIN_UNAVAILABLE");
           return;
         }
         if (result.game_status === "player_lost") {
@@ -374,7 +361,7 @@ export function HalliGalli({
           return;
         }
         const next = result.next_card;
-        if (!next) throw new Error("The next card is missing.");
+        if (!next) throw new AuthChallengeError("HALLI_GAME_INCOMPLETE");
         // Status recovery names the far end too, so both paths refill once.
         const future = result.preloaded_card ? [result.preloaded_card] : [];
         if (scored) {
@@ -435,12 +422,12 @@ export function HalliGalli({
     async function start() {
       try {
         if (tokenExpired(wordleToken)) {
-          callbacksRef.current.onWordleExpired();
+          fail(new AuthChallengeError("WORDLE_TOKEN_EXPIRED"));
           return;
         }
         setPhase("loading");
         setLoadingStage("calibrating");
-        setError("");
+        setError(null);
         setPile([]);
         setFeedback(null);
         setLateByMs(null);
@@ -470,7 +457,7 @@ export function HalliGalli({
         const first = gameData.initial_cards.find(
           (card) => card.round_index === gameData.current_round,
         );
-        if (!first) throw new Error("The first card is missing.");
+        if (!first) throw new AuthChallengeError("HALLI_GAME_INCOMPLETE");
         // Hold the first reveal until the player has read this game's rules.
         // The server's reaction clock starts only when reveal is requested.
         let started = false;
@@ -622,7 +609,7 @@ export function HalliGalli({
           </div>
         </div>
       )}
-      {game && phase !== "loading" && phase !== "error" && (
+      {game && phase !== "loading" && (
         <>
           <div className="halli-rules">{ruleText}</div>
           <details className="halli-mobile-rules">
@@ -865,15 +852,23 @@ export function HalliGalli({
         </>
       )}
       {phase === "error" && (
-        <div className="halli-finale bad" role="alert">
-          <p>{error}</p>
+        <div className={`halli-finale bad${game ? " is-error-overlay" : ""}`} role="alert">
+          <p>{error?.message}</p>
           <Button
             variant="contained"
             className="auth-outcome-button is-retry"
-            onClick={() => setAttempt((value) => value + 1)}
+            onClick={() => {
+              if (error?.recovery === "restart") {
+                callbacksRef.current.onWordleExpired();
+              } else if (tokenExpired(wordleToken)) {
+                setError(getAuthErrorFeedback(new AuthChallengeError("WORDLE_TOKEN_EXPIRED"), "halli_galli"));
+              } else {
+                setAttempt((value) => value + 1);
+              }
+            }}
           >
             <RotateCcw size={18} aria-hidden="true" />
-            <span>Try Again</span>
+            <span>{error?.recovery === "restart" ? "Restart Verification" : "Try Again"}</span>
           </Button>
         </div>
       )}

@@ -20,9 +20,17 @@
 }
 
 .wordle-grid {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+}
+
+.wordle-grid .wordle-error-overlay {
+  top: auto;
+  bottom: calc(100% + var(--spacing-sm));
+  max-width: min(440px, calc(100vw - 64px));
+  width: max-content;
 }
 
 .wordle-row {

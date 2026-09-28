@@ -11,4 +11,7 @@ const api = axios.create({
   },
 });
 
+// TODO: Handle player data route rate limits (HTTP 429): read Retry-After,
+// show a clear cooldown message in the affected view, preserve existing data,
+// and prevent automatic retries/refetches until the cooldown has passed.
 export default api;

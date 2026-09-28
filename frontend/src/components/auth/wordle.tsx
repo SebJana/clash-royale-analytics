@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { PartyPopper, RotateCcw } from "lucide-react";
 import { isValidGuess } from "../../utils/wordle";
+import { getAuthErrorFeedback } from "../../utils/authErrors";
 import "./wordle.css";
 
 // Props for Wordle game component
@@ -10,7 +11,7 @@ interface WordleGameProps {
     correct: boolean;
     feedback?: { evaluation: Record<number, string>; solution: string };
   }>; // Callback to validate guess and get feedback
-  readonly onFailure: () => void; // Callback when all guesses are exhausted
+  readonly onFailure: () => Promise<void>; // Callback to request a new challenge
   readonly onSuccess?: () => void; // Callback when the wordle is solved
 }
 
@@ -45,6 +46,8 @@ export function WordleGame({
   const [letterStates, setLetterStates] = useState<Record<string, string>>({});
   const [shakeCurrentRow, setShakeCurrentRow] = useState(false); // Invalid guess animation
   const [showGameEndPopup, setShowGameEndPopup] = useState(false);
+  const [error, setError] = useState("");
+  const [isRestarting, setIsRestarting] = useState(false);
 
   // Animation state management for flip reveal
   const [animatingRowIndex, setAnimatingRowIndex] = useState<number | null>(
@@ -117,22 +120,30 @@ export function WordleGame({
   // Validates guess, submits to API, and triggers animations
   const handleSubmit = useCallback(async () => {
     if (
-      currentGuess.length !== WORDLE_WORD_LENGTH ||
       isSubmitting ||
       isAnimationRunning
     )
       return;
 
+    setError("");
+    if (currentGuess.length !== WORDLE_WORD_LENGTH) {
+      return;
+    }
+
     // Block invalid guesses with shake animation
+    setIsSubmitting(true);
     try {
       const isValid = await isValidGuess(currentGuess);
       if (!isValid) {
+        setIsSubmitting(false);
         setShakeCurrentRow(true);
         setTimeout(() => setShakeCurrentRow(false), 500);
         return;
       }
     } catch (error) {
       console.error("Error validating guess:", error);
+      setError("Couldn't check that word. Please try again.");
+      setIsSubmitting(false);
       return;
     }
 
@@ -226,12 +237,13 @@ export function WordleGame({
         setTimeout(() => {
           setShowGameEndPopup(true);
         }, animationDuration);
-        onFailure();
       }
 
       setCurrentGuess("");
     } catch (error) {
       console.error("Error submitting guess:", error);
+      const feedback = getAuthErrorFeedback(error, "wordle_guess");
+      setError(feedback.recovery ? "" : feedback.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -243,7 +255,6 @@ export function WordleGame({
     guesses,
     evaluations,
     guessesAllowed,
-    onFailure,
     letterStates,
     animateLetterReveal,
   ]);
@@ -254,7 +265,7 @@ export function WordleGame({
       if (gameStatus !== "playing" || isAnimationRunning) return;
 
       if (key === "ENTER") {
-        if (currentGuess.length === WORDLE_WORD_LENGTH && !isSubmitting) {
+        if (!isSubmitting) {
           handleSubmit();
         }
       } else if (key === "BACKSPACE") {
@@ -280,7 +291,7 @@ export function WordleGame({
       if (gameStatus === "playing" && !isAnimationRunning) {
         if (event.key === "Enter") {
           // Submit guess when Enter is pressed
-          if (currentGuess.length === WORDLE_WORD_LENGTH && !isSubmitting) {
+          if (!isSubmitting) {
             handleSubmit();
           }
         } else if (event.key === "Backspace") {
@@ -310,8 +321,8 @@ export function WordleGame({
       <h3 className="auth-stage-heading">
         Solve the Wordle to prove your reasoning skills
       </h3>
-
       <div className="wordle-grid">
+        {error && <div className="auth-error-overlay wordle-error-overlay" role="alert">{error}</div>}
         {/* Render game grid with rows for each guess attempt */}
         {Array.from({ length: guessesAllowed }, (_, i) => (
           <div
@@ -450,20 +461,19 @@ export function WordleGame({
                 </p>
                 <button
                   className="popup-button auth-outcome-button is-retry"
-                  onClick={() => {
-                    setShowGameEndPopup(false);
-                    // Reset game state for retry
-                    setGuesses([]);
-                    setEvaluations([]);
-                    setCurrentGuess("");
-                    setGameStatus("playing");
-                    setLetterStates({});
-                    // Call onFailure to restart challenge
-                    onFailure();
+                  disabled={isRestarting}
+                  onClick={async () => {
+                    setIsRestarting(true);
+                    try {
+                      // A successful new ID remounts the game; failed retries keep this result.
+                      await onFailure();
+                    } finally {
+                      setIsRestarting(false);
+                    }
                   }}
                 >
                   <RotateCcw size={18} aria-hidden="true" />
-                  <span>Try Again</span>
+                  <span>{isRestarting ? "Loading..." : "Try Again"}</span>
                 </button>
               </>
             )}

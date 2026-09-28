@@ -27,7 +27,13 @@ async def get_wordle_id(
     if not credentials or not validate_access_token(
         credentials.credentials, AvailableTokenTypes.CAPTCHA.value
     ):
-        raise HTTPException(status_code=401, detail="Invalid or missing captcha token")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "CAPTCHA_TOKEN_EXPIRED",
+                "message": "CAPTCHA took too long. Restart verification.",
+            },
+        )
 
     wordle = pick_random_wordle_solution()
     wordle_id = str(uuid.uuid4())
@@ -58,7 +64,10 @@ async def get_wordle_token(
     ):
         raise HTTPException(
             status_code=401,
-            detail="No authorization token generated, invalid captcha token given",
+            detail={
+                "code": "CAPTCHA_TOKEN_EXPIRED",
+                "message": "CAPTCHA took too long. Restart verification.",
+            },
         )
 
     # Extract the wordle session to the given wordle_id
@@ -70,7 +79,10 @@ async def get_wordle_token(
     if not wordle_session:
         raise HTTPException(
             status_code=404,
-            detail="No valid wordle id given or the wordle challenge expired.",
+            detail={
+                "code": "WORDLE_EXPIRED",
+                "message": "Wordle took too long. Restart Wordle.",
+            },
         )
 
     # The session JSON is corrupted, abort session to not give up token on empty solution or similar problems
@@ -89,7 +101,10 @@ async def get_wordle_token(
     if guesses >= settings.MAX_WORDLE_GUESSES:
         raise HTTPException(
             status_code=429,
-            detail=f"Maximum amount of guesses reached, the word was {solution}, try again with a new wordle challenge.",
+            detail={
+                "code": "WORDLE_GUESSES_EXHAUSTED",
+                "message": "You've used all your guesses. Start a new Wordle.",
+            },
         )
 
     # TODO potentially implement hard mode? ;)
@@ -97,7 +112,10 @@ async def get_wordle_token(
     if not is_valid_guess(guess):
         raise HTTPException(
             status_code=422,
-            detail=f"{guess} is not a valid guess, try again with a different word",
+            detail={
+                "code": "WORDLE_INVALID_GUESS",
+                "message": "That word isn't in the word list. Try another five-letter word.",
+            },
         )
 
     # Check the guess and if it is the solution

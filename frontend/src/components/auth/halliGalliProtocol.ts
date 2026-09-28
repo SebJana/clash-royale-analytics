@@ -1,5 +1,6 @@
 import type { HalliGalliRevealResponse } from "../../types/auth";
 import { gcm } from "@noble/ciphers/aes.js";
+import { AuthChallengeError } from "../../utils/authErrors";
 
 export type EncryptedCard = {
   image: Blob;
@@ -26,10 +27,10 @@ export function calibrateHalliGalli(
     const socket = new WebSocket(url);
     let finished = false;
     const timeout = window.setTimeout(
-      () => fail("Connection test timed out."),
+      () => fail("CALIBRATION_TIMEOUT"),
       20000,
     );
-    const abort = () => fail("Connection test cancelled.");
+    const abort = () => fail("CALIBRATION_CANCELLED");
     signal.addEventListener("abort", abort, { once: true });
 
     // One completion path owns socket and listener cleanup. Close/error events
@@ -40,10 +41,10 @@ export function calibrateHalliGalli(
       socket.close();
       finished = true;
     }
-    function fail(message: string) {
+    function fail(code: string) {
       if (finished) return;
       finish();
-      reject(new Error(message));
+      reject(new AuthChallengeError(code));
     }
     socket.onopen = () =>
       socket.send(
@@ -71,15 +72,19 @@ export function calibrateHalliGalli(
           finish();
           resolve(message.calibration_id);
         } else if (message.type === "calibration_failed") {
-          fail(`Connection test failed: ${message.reason ?? "unknown error"}.`);
+          const reason = message.reason;
+          fail(reason === "invalid_wordle_token" ? "WORDLE_TOKEN_EXPIRED"
+            : reason === "connection latency is too unstable" ? "CALIBRATION_UNSTABLE"
+            : reason === "not enough valid probe replies" || reason === "authentication_timeout_or_invalid"
+              ? "CALIBRATION_TIMEOUT" : "CALIBRATION_INVALID");
         }
       } catch {
-        fail("Connection test returned an invalid message.");
+        fail("CALIBRATION_INVALID");
       }
     };
-    socket.onerror = () => fail("Connection test could not connect.");
+    socket.onerror = () => fail("CALIBRATION_CONNECTION");
     socket.onclose = () => {
-      if (!finished) fail("Connection test closed early.");
+      if (!finished) fail("CALIBRATION_CONNECTION");
     };
     if (signal.aborted) abort();
   });
@@ -113,7 +118,7 @@ export async function decryptHalliGalliCard(
   keyBase64: string,
 ): Promise<string> {
   const bytes = new Uint8Array(await card.image.arrayBuffer());
-  if (bytes.length < 29) throw new Error("The encrypted card is incomplete.");
+  if (bytes.length < 29) throw new AuthChallengeError("HALLI_CARD_LOAD_FAILED");
   const keyBytes = Uint8Array.from(atob(keyBase64), (character) =>
     character.charCodeAt(0),
   );

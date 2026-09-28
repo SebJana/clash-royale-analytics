@@ -33,7 +33,10 @@ async def get_security_token(
     ):
         raise HTTPException(
             status_code=401,
-            detail="No access granted to answer security questions",
+            detail={
+                "code": "HALLI_GALLI_TOKEN_EXPIRED",
+                "message": "Halli Galli took too long. Restart verification.",
+            },
         )
 
     # Calculate similarity ratios for all three security questions using fuzzy matching
@@ -52,7 +55,11 @@ async def get_security_token(
         }
 
     raise HTTPException(
-        status_code=401, detail="No security token generated, incorrect answers given."
+        status_code=401,
+        detail={
+            "code": "SECURITY_ANSWERS_INCORRECT",
+            "message": "One or more answers are incorrect. Check all three answers and try again.",
+        },
     )
 
 

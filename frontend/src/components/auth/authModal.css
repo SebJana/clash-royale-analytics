@@ -5,17 +5,30 @@
   color: var(--text-primary);
 }
 
-/* Hold the Halli Galli dialog in place while its card grid fills up. */
+/* Let Halli Galli fit its content; smaller screens scroll the outer dialog. */
+.auth-modal.halli-galli-modal .MuiDialog-container.MuiDialog-scrollBody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+}
+
+.auth-modal.halli-galli-modal .MuiDialog-container.MuiDialog-scrollBody::after {
+  display: none;
+}
+
 .auth-modal.halli-galli-modal .MuiDialog-paper {
+  flex-shrink: 0;
   width: min(1100px, calc(100vw - 32px));
   max-width: 1100px;
-  height: min(900px, calc(100dvh - 32px));
-  max-height: calc(100dvh - 32px);
+  height: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .auth-modal.halli-galli-modal .MuiDialogContent-root {
   min-height: 0;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .auth-modal.wordle-modal .MuiDialog-paper {
@@ -148,6 +161,41 @@
   gap: var(--spacing-lg);
   align-items: center;
   max-width: 400px;
+  width: 100%;
+}
+
+.captcha-image-slot {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 10 / 3;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-overlay-light);
+}
+
+.captcha-image-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+}
+
+.captcha-image-slot .captcha-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border: none;
+}
+
+.captcha-image.is-loading {
+  visibility: hidden;
 }
 
 .captcha-image {
@@ -299,6 +347,50 @@
 
 .auth-loading-spinner {
   color: var(--color-accent);
+}
+
+.auth-error-overlay {
+  position: absolute;
+  top: var(--spacing-sm);
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: max-content;
+  max-width: calc(100% - 2 * var(--spacing-sm));
+  box-sizing: border-box;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  background: rgba(36, 36, 36, 0.92);
+  color: var(--color-error);
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.auth-error-overlay .MuiButton-root {
+  pointer-events: auto;
+}
+
+.auth-feedback-anchor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+}
+
+.auth-feedback-anchor .auth-error-overlay {
+  top: auto;
+  bottom: 0;
+  left: 0;
+  width: fit-content;
+  max-width: 100%;
+  transform: none;
 }
 
 .error-message {

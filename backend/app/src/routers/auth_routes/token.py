@@ -21,7 +21,10 @@ async def get_remove_player_token(
     ):
         raise HTTPException(
             status_code=401,
-            detail="No authorization token generated, invalid token given",
+            detail={
+                "code": "SECURITY_TOKEN_EXPIRED",
+                "message": "Security questions took too long. Restart verification.",
+            },
         )
 
     return {

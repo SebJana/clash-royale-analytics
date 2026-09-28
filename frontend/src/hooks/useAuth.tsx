@@ -4,7 +4,10 @@ import { jwtDecode } from "jwt-decode";
 import type { AuthState } from "../types/auth";
 import { AuthContext } from "../contexts/AuthContext";
 import type { AuthContextType } from "../contexts/AuthContext";
-import { setRemovePlayerToken, clearRemovePlayerToken } from "../services/api/auth";
+import {
+  setRemovePlayerToken,
+  clearRemovePlayerToken,
+} from "../services/api/auth";
 
 // Props interface for AuthProvider component - accepts child components to wrap with auth context
 interface AuthProviderProps {
@@ -12,6 +15,12 @@ interface AuthProviderProps {
 }
 
 // localStorage key for persisting auth state
+// TODO: Store the final player-removal token in a backend-set HttpOnly,
+// Secure (HTTPS in production), SameSite=Strict cookie instead of localStorage.
+// Read authorization via a backend status endpoint after refresh, validate the
+// cookie on removal requests, and add CSRF protection (e.g. trusted Origin checks).
+// potentially handle all the other tokens the same way, so user could pick up
+// auth challenge where ever they left off (if that is wanted and useful?)
 const REMOVE_PLAYER_TOKEN_STORAGE_KEY = "clash_royale_remove_player_token";
 
 /**
@@ -80,7 +89,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setAuthState(newAuthState);
     setRemovePlayerToken(token);
-    localStorage.setItem(REMOVE_PLAYER_TOKEN_STORAGE_KEY, JSON.stringify(newAuthState));
+    localStorage.setItem(
+      REMOVE_PLAYER_TOKEN_STORAGE_KEY,
+      JSON.stringify(newAuthState),
+    );
   }, []);
 
   // Logout user and clear all auth data
@@ -130,7 +142,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       logout,
       checkAuthStatus,
     }),
-    [authState, login, logout, checkAuthStatus]
+    [authState, login, logout, checkAuthStatus],
   );
 
   // Wrap children with AuthContext.Provider to make auth state available to all child components

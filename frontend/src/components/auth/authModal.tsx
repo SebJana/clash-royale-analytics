@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { RotateCcw } from "lucide-react";
 import {
   Dialog,
   DialogTitle,
@@ -11,6 +12,7 @@ import {
 import { WordleGame } from "./wordle";
 import { HalliGalli } from "./halliGalli";
 import { useAuth } from "../../hooks/useAuthHook";
+import { getAuthErrorFeedback, type AuthErrorFeedback } from "../../utils/authErrors";
 import {
   getCaptchaId,
   getCaptchaImage,
@@ -37,12 +39,13 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   const isNarrowScreen = useMediaQuery("(max-width:600px)");
   const [currentStep, setCurrentStep] = useState<AuthStep>("captcha");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AuthErrorFeedback | null>(null);
   const { login } = useAuth();
 
   // Captcha state
   const [captchaId, setCaptchaId] = useState("");
   const [captchaImageUrl, setCaptchaImageUrl] = useState("");
+  const [captchaImageLoaded, setCaptchaImageLoaded] = useState(false);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
 
@@ -50,6 +53,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   const [wordleId, setWordleId] = useState("");
   const [wordleToken, setWordleToken] = useState("");
   const [halliGalliToken, setHalliGalliToken] = useState("");
+  const [securityToken, setSecurityToken] = useState("");
 
   // Security questions state
   const [securityAnswers, setSecurityAnswers] = useState({
@@ -68,6 +72,11 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   const initializeCaptcha = async () => {
     setLoading(true);
     setError(null);
+    setCaptchaId("");
+    setCaptchaImageUrl("");
+    setCaptchaImageLoaded(false);
+    setCaptchaAnswer("");
+    setCaptchaToken("");
     try {
       const { captcha_id } = await getCaptchaId();
       setCaptchaId(captcha_id);
@@ -76,7 +85,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
       const imageUrl = URL.createObjectURL(imageBlob);
       setCaptchaImageUrl(imageUrl);
     } catch (err) {
-      setError("Failed to load captcha");
+      setError(getAuthErrorFeedback(err, "captcha_load"));
       console.error("Captcha initialization error:", err);
     } finally {
       setLoading(false);
@@ -84,7 +93,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   };
 
   const handleCaptchaSubmit = async () => {
-    if (!captchaAnswer.trim()) return;
+    if (loading || !captchaAnswer.trim()) return;
 
     setLoading(true);
     setError(null);
@@ -96,10 +105,8 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
       setCaptchaToken(captcha_token);
       await initializeWordle(captcha_token);
     } catch (err) {
-      setError("Incorrect captcha answer. Please try again.");
+      setError(getAuthErrorFeedback(err, "captcha"));
       console.error("Captcha verification error:", err);
-      await initializeCaptcha(); // Reset captcha
-      setCaptchaAnswer("");
     } finally {
       setLoading(false);
     }
@@ -107,12 +114,13 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
 
   const initializeWordle = async (token = captchaToken) => {
     setLoading(true);
+    setError(null);
     try {
       const { wordle_id } = await getWordleId(token);
       setWordleId(wordle_id);
       setCurrentStep("wordle");
     } catch (err) {
-      setError("Failed to load wordle challenge");
+      setError(getAuthErrorFeedback(err, "wordle_load"));
       console.error("Wordle initialization error:", err);
     } finally {
       setLoading(false);
@@ -120,6 +128,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   };
 
   const handleWordleGuess = async (guess: string) => {
+    setError(null);
     try {
       const result = await submitWordleGuess(captchaToken, {
         wordle_id: wordleId,
@@ -151,20 +160,25 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
       };
     } catch (err) {
       console.error("Wordle guess error:", err);
-      setError("Something went wrong, couldn't submit guess.");
+      const feedback = getAuthErrorFeedback(err, "wordle_guess");
+      if (feedback.recovery) setError(feedback);
       throw err;
     }
   };
 
   const handleWordleFailure = async () => {
     // Reset the Wordle challenge to allow retry --> request new id
+    setLoading(true);
+    setError(null);
     try {
       const { wordle_id } = await getWordleId(captchaToken);
       setWordleId(wordle_id);
       setError(null); // Clear any previous errors
     } catch (err) {
-      setError("Failed to load new wordle challenge. Please refresh the page.");
+      setError(getAuthErrorFeedback(err, "wordle_load"));
       console.error("Wordle retry initialization error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -179,24 +193,27 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   }, []);
 
   const handleWordleExpired = useCallback(() => {
-    // A rejected Wordle token cannot start another game. End this attempt so
-    // the player can open authentication again from the normal entry point.
+    // Restart only after the player has seen the expiry message and chosen to continue.
     setCurrentStep("captcha");
     setCaptchaId("");
     setCaptchaImageUrl("");
+    setCaptchaImageLoaded(false);
     setCaptchaAnswer("");
     setCaptchaToken("");
     setWordleId("");
     setWordleToken("");
     setHalliGalliToken("");
-    onClose();
-  }, [onClose]);
+    setSecurityToken("");
+    setSecurityAnswers({ most_annoying_card: "", most_skillful_card: "", most_mousey_card: "" });
+    setError(null);
+  }, []);
 
   const handleSecuritySubmit = async () => {
+    if (loading) return;
     const { most_annoying_card, most_skillful_card, most_mousey_card } =
       securityAnswers;
     if (!halliGalliToken) {
-      setError("Complete Halli Galli before answering security questions.");
+      setError({ message: "Complete Halli Galli before answering security questions.", recovery: "restart" });
       return;
     }
     if (
@@ -204,29 +221,30 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
       !most_skillful_card.trim() ||
       !most_mousey_card.trim()
     ) {
-      setError("Please answer all security questions");
+      setError({ message: "Please answer all three security questions." });
       return;
     }
 
     setLoading(true);
     setError(null);
+    let verifiedSecurityToken = securityToken;
     try {
-      const { security_token } = await verifySecurityQuestions(
-        halliGalliToken,
-        {
-          most_annoying_card,
-          most_skillful_card,
-          most_mousey_card,
-        },
-      );
+      if (!verifiedSecurityToken) {
+        const { security_token } = await verifySecurityQuestions(
+          halliGalliToken,
+          { most_annoying_card, most_skillful_card, most_mousey_card },
+        );
+        verifiedSecurityToken = security_token;
+        setSecurityToken(security_token);
+      }
 
-      const { remove_player_token } = await getRemovePlayerToken(security_token);
+      const { remove_player_token } = await getRemovePlayerToken(verifiedSecurityToken);
       login(remove_player_token);
       resetAuthFlow();
       onSuccess();
       onClose();
     } catch (err) {
-      setError("Incorrect security answers. Please try again.");
+      setError(getAuthErrorFeedback(err, verifiedSecurityToken ? "finish" : "security"));
       console.error("Security questions error:", err);
     } finally {
       setLoading(false);
@@ -238,11 +256,13 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     setCurrentStep("captcha");
     setCaptchaId("");
     setCaptchaImageUrl("");
+    setCaptchaImageLoaded(false);
     setCaptchaAnswer("");
     setCaptchaToken("");
     setWordleId("");
     setWordleToken("");
     setHalliGalliToken("");
+    setSecurityToken("");
     setSecurityAnswers({
       most_annoying_card: "",
       most_skillful_card: "",
@@ -256,24 +276,71 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     onClose();
   };
 
+  const handleRestart = () => {
+    resetAuthFlow();
+    // Changing steps triggers initialization; an already-active CAPTCHA needs it explicitly.
+    if (currentStep === "captcha") void initializeCaptcha();
+  };
+
   const renderCaptchaStep = () => (
     <div className="auth-step">
       <h3 className="auth-stage-heading">Prove that you are not a robot</h3>
-      {captchaImageUrl && (
+      {captchaToken ? (
+        <Button
+          onClick={() => initializeWordle()}
+          disabled={loading}
+          variant="contained"
+          startIcon={<RotateCcw size={18} aria-hidden="true" />}
+        >
+          Retry Wordle
+        </Button>
+      ) : (
         <div className="captcha-container">
-          <img src={captchaImageUrl} alt="Captcha" className="captcha-image" />
+          <div
+            className="captcha-image-slot"
+            aria-busy={!captchaImageLoaded && (loading || Boolean(captchaImageUrl))}
+          >
+            {!captchaImageLoaded && (
+              <div className="captcha-image-placeholder" role="status">
+                {loading || captchaImageUrl ? (
+                  <CircularProgress
+                    className="auth-loading-spinner"
+                    size={24}
+                    aria-label="Loading CAPTCHA image"
+                  />
+                ) : (
+                  <span>CAPTCHA image</span>
+                )}
+              </div>
+            )}
+            {captchaImageUrl && (
+              <img
+                key={captchaImageUrl}
+                src={captchaImageUrl}
+                alt="Captcha"
+                className={`captcha-image${captchaImageLoaded ? "" : " is-loading"}`}
+                onLoad={() => setCaptchaImageLoaded(true)}
+                onError={() => {
+                  setCaptchaImageUrl("");
+                  setCaptchaImageLoaded(false);
+                  setError({ message: "Couldn't load the CAPTCHA image. Restart the CAPTCHA." });
+                }}
+              />
+            )}
+          </div>
           <input
             type="text"
+            aria-label="CAPTCHA answer"
             value={captchaAnswer}
             onChange={(e) => setCaptchaAnswer(e.target.value)}
             placeholder="Enter the text you see"
-            disabled={loading}
+            disabled={loading || !captchaImageLoaded}
             onKeyDown={(e) => e.key === "Enter" && handleCaptchaSubmit()}
           />
           <div className="captcha-buttons">
             <Button
               onClick={handleCaptchaSubmit}
-              disabled={loading || !captchaAnswer.trim()}
+              disabled={loading || !captchaImageLoaded || !captchaAnswer.trim()}
               variant="contained"
               color="primary"
             >
@@ -283,8 +350,9 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
               onClick={initializeCaptcha}
               disabled={loading}
               variant="outlined"
+              startIcon={<RotateCcw size={18} aria-hidden="true" />}
             >
-              Refresh Captcha
+              Restart CAPTCHA
             </Button>
           </div>
         </div>
@@ -296,6 +364,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     <div className="auth-step">
       {wordleId && (
         <WordleGame
+          key={wordleId}
           guessesAllowed={MAX_WORDLE_GUESSES_ALLOWED}
           onGuess={handleWordleGuess}
           onFailure={handleWordleFailure}
@@ -336,7 +405,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
               }))
             }
             placeholder="e.g., Mega Knight"
-            disabled={loading}
+            disabled={loading || Boolean(securityToken)}
             autoComplete="off"
             spellCheck="false"
             data-form-type="other"
@@ -357,7 +426,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
               }))
             }
             placeholder="e.g., X-Bow"
-            disabled={loading}
+            disabled={loading || Boolean(securityToken)}
             autoComplete="off"
             spellCheck="false"
             data-form-type="other"
@@ -378,7 +447,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
               }))
             }
             placeholder="e.g., Heal Spirit"
-            disabled={loading}
+            disabled={loading || Boolean(securityToken)}
             autoComplete="off"
             spellCheck="false"
             data-form-type="other"
@@ -389,8 +458,9 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
           disabled={loading}
           variant="contained"
           className="security-submit"
+          startIcon={securityToken || error ? <RotateCcw size={18} aria-hidden="true" /> : undefined}
         >
-          Complete Authentication
+          {securityToken ? "Finish Verification" : "Complete Authentication"}
         </Button>
       </div>
     </div>
@@ -414,7 +484,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   return (
     <Dialog
       open={open}
-      scroll={isNarrowScreen ? "body" : "paper"}
+      scroll={isNarrowScreen || currentStep === "halli_galli" ? "body" : "paper"}
       disableEscapeKeyDown
       maxWidth={currentStep === "halli_galli" ? "lg" : "md"}
       fullWidth
@@ -422,7 +492,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     >
       <DialogTitle>Authentication</DialogTitle>
       <DialogContent>
-        {loading && (
+        {loading && !(currentStep === "captcha" && !captchaImageLoaded) && (
           <div className="loading-overlay">
             <CircularProgress
               className="auth-loading-spinner"
@@ -431,10 +501,26 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
             />
           </div>
         )}
-        {error && <div className="error-message">{error}</div>}
         {getStepContent()}
       </DialogContent>
       <DialogActions>
+        <div className="auth-feedback-anchor">
+        {error && (
+          <div className="auth-error-overlay" role="alert">
+            <span>{error.message}</span>
+            {error.recovery && (
+              <Button
+                onClick={error.recovery === "wordle" ? handleWordleFailure : handleRestart}
+                disabled={loading}
+                variant="contained"
+                startIcon={<RotateCcw size={18} aria-hidden="true" />}
+              >
+                {error.recovery === "wordle" ? "Restart Wordle" : "Restart Verification"}
+              </Button>
+            )}
+          </div>
+        )}
+        </div>
         <Button onClick={handleClose} color="error" variant="outlined">
           Cancel
         </Button>
