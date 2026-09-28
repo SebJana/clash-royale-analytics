@@ -24,6 +24,8 @@ from mongo import (
     get_daily_stats,
 )
 
+# TODO: Add consistent rate limits to all player data routes (profile, battles,
+# decks, cards, and daily stats), with HTTP 429 and Retry-After for frontend handling.
 router = APIRouter(
     prefix="/players",
     tags=["Player Details"],

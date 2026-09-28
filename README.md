@@ -28,6 +28,9 @@ REDIS_PASSWORD=YOUR_SECURE_REDIS_PASSWORD
 # JWT Secret for Admin Authentication
 JWT_SECRET=YOUR_SECURE_JWT_SECRET_KEY
 
+# Browser origins allowed to open the Halli Galli calibration WebSocket
+HALLI_GALLI_WS_ALLOWED_ORIGINS=http://localhost,http://127.0.0.1
+
 # Security Question Answers for Admin Access
 MOST_ANNOYING_CARD="Card1"
 MOST_SKILLFUL_CARD="Card2"
@@ -65,6 +68,18 @@ APP_API_KEY = ey41eas...
 
 - `JWT_SECRET`: Secret key used for signing JWT tokens for admin authentication. Should be a long, random string for security.
 
+#### Halli Galli connection and card loading
+
+For another device on your home network, run `docker compose up -d --build` and open `http://HOST_LAN_IP`, replacing `HOST_LAN_IP` with the Docker host's private LAN address. `http://HOST_LAN_IP:8000` also works. No certificate or device installation is needed. For frontend development, run `npm start` in `frontend` and open `http://HOST_LAN_IP:5173`; Vite forwards `/api` and its WebSocket connection to the Docker frontend.
+
+After Wordle, the browser opens `/api/auth/halli-galli/calibration` on the same host, using `ws://` for HTTP or `wss://` for HTTPS. A browser WebSocket cannot set the normal Bearer header, so its **first message** contains the Wordle token. The server verifies it, sends numbered probes with random nonces, and measures the matching replies. The returned calibration ID is short lived and can start one game. Game start sends that ID in `X-Halli-Galli-Calibration` and the Wordle token in `Authorization: Bearer`; the server checks that both belong to the same Wordle attempt. Nginx and Vite forward the WebSocket upgrade to the API.
+
+The calibration WebSocket checks the browser's `Origin` before accepting it. `HALLI_GALLI_WS_ALLOWED_ORIGINS` is a comma-separated list of exact origins, including scheme and port; the repository's `.env` lists localhost. An HTTP origin with a private or loopback IP (`10/8`, `172.16/12`, `192.168/16`, `127/8`, or local IPv6) is also accepted automatically **only when it exactly matches the forwarded Host, including the port**. Other HTTP names, public IPs, and all HTTPS origins must be listed explicitly. This allows changing home LAN IPs without opening calibration to unrelated websites.
+
+The game response names the initial cards and how many cards can remain visible. The browser preloads each prepared round once because another card POST would replace its encryption key and image version. Reveal returns the key, image ID, and version; the browser checks the saved ID and version before decrypting. Each encrypted image contains a 12-byte AES-GCM nonce followed by ciphertext and its authentication tag. Decryption uses the browser's `crypto.subtle` on HTTPS or localhost. When that API is unavailable on LAN HTTP, `@noble/ciphers` performs the same authenticated AES-GCM decryption in JavaScript. The PNG is shown through a temporary blob URL and that URL is revoked when the card leaves the pile. The next prepared card is preloaded while play continues.
+
+LAN HTTP supports the game but does **not** protect Wordle tokens, reveal keys, or game traffic in transit. Use it on a home network you trust, without router port forwarding. For an HTTPS host or tunnel, point it at the Docker frontend on port `80`, add its exact browser origin to `HALLI_GALLI_WS_ALLOWED_ORIGINS` in `.env`, and recreate the API container. The host or tunnel must forward WebSocket upgrades. HTTPS protects transport and lets the browser use native Web Crypto; the card encryption alone does not replace HTTPS.
+
 #### Security Questions
 
 - `MOST_ANNOYING_CARD`: Answer to the first security question for admin access (Most annoying card in Clash Royale?)
@@ -90,6 +105,12 @@ Start all services by running:
 ```bash
 docker compose up -d
 ```
+
+The API is available through nginx at `http://localhost/api` or
+`http://localhost:8000/api`. Swagger UI is at `http://localhost:8000/docs`.
+The optional `8000:80` mapping is marked in `docker-compose.yml`. Removing it
+closes port 8000, but Swagger stays available at `/docs` on port 80 until the
+documentation location in `frontend/nginx.conf` is removed or protected.
 
 ### 2. Local Development Setup
 
@@ -121,7 +142,7 @@ Start all required docker services for the backend (api, mongo, redis)
 
    The frontend will be available at `http://localhost:5173`
 
-**Note**: The Vite development server is configured to proxy `/api` requests to `http://localhost:8000`, so all services (backend, mongo and redis) need to be running for local development.
+**Note**: The Vite development server proxies `/api` through the Docker frontend at `http://localhost:80`, so the frontend container and backend services need to be running for local development.
 
 ### 3. Restoring Data
 
@@ -140,3 +161,9 @@ cd db
 cd db
 .\restore.ps1 .\backups\clash_royale_YYYY-MM-DD_HH-MM-SS
 ```
+
+# TODO
+
+2. Add celebratory animation upon successfully completing the full authentication flow for removal permissions + check and adjust how many tries one gets for the security questions (the token that unlocks security questions try should be locked after 3 attempts?, via a counter field or something the like in the token itself or as a session on the server tied to that token?)
+
+3. Add another step into the auth flow, has to be time consuming and challenging game before the questions step + server-side verifiable game that tests accuracy/reaction time/skill? 🗿

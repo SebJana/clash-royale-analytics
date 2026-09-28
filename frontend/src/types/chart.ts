@@ -4,6 +4,8 @@ export type ChartDataset = {
   color: string;
 };
 
+export type DateLevel = "day" | "month" | "year";
+
 export type ChartConfig = {
   datasets: ChartDataset[];
   labels: string[];

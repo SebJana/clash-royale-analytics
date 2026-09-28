@@ -1,21 +1,15 @@
 .wordle-game {
+  --wordle-cell-size: clamp(
+    38px,
+    min(calc((100vw - 70px) / 5), calc((100dvh - 390px) / 6)),
+    70px
+  );
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-sm);
   max-width: 600px;
   width: 100%;
-}
-
-.wordle-game h3 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: var(--font-xl);
-  font-weight: var(--font-weight-bold);
-  text-align: center;
-  max-width: 100%;
-  overflow-wrap: break-word;
-  hyphens: none;
 }
 
 .wordle-game p {
@@ -26,9 +20,17 @@
 }
 
 .wordle-grid {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+}
+
+.wordle-grid .wordle-error-overlay {
+  top: auto;
+  bottom: calc(100% + var(--spacing-sm));
+  max-width: min(440px, calc(100vw - 64px));
+  width: max-content;
 }
 
 .wordle-row {
@@ -37,8 +39,8 @@
 }
 
 .wordle-cell {
-  width: 70px;
-  height: 70px;
+  width: var(--wordle-cell-size);
+  height: var(--wordle-cell-size);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,12 +162,8 @@
 /* Responsive design */
 @media (max-width: 768px) {
   .wordle-cell {
-    width: calc((100vw - 140px) / 5);
-    height: calc((100vw - 140px) / 5);
-    max-width: 70px;
-    max-height: 70px;
-    min-width: 55px;
-    min-height: 55px;
+    min-width: 0;
+    min-height: 0;
     font-size: var(--font-2xl);
   }
 
@@ -186,21 +184,14 @@
     width: 100%;
     min-width: auto;
   }
-
-  .wordle-game h3 {
-    font-size: var(--font-lg);
-    line-height: 1.2;
-  }
 }
 
 @media (max-width: 480px) {
+  .wordle-grid {
+    max-width: 100%;
+  }
+
   .wordle-cell {
-    width: calc((100vw - 120px) / 5);
-    height: calc((100vw - 120px) / 5);
-    max-width: 65px;
-    max-height: 65px;
-    min-width: 45px;
-    min-height: 45px;
     font-size: var(--font-xl);
     border-width: 2px;
   }
@@ -217,12 +208,6 @@
     gap: var(--spacing-sm);
     max-width: 100%;
     overflow-x: hidden;
-  }
-
-  .wordle-game h3 {
-    font-size: var(--font-md);
-    line-height: 1.2;
-    margin-bottom: var(--spacing-xs);
   }
 
   .wordle-game p {
@@ -257,7 +242,7 @@
   flex-direction: column;
   gap: var(--spacing-xs);
   align-items: center;
-  margin-top: var(--spacing-lg);
+  margin-top: var(--spacing-xs);
 }
 
 .keyboard-row {
@@ -328,8 +313,23 @@
 
 /* Responsive keyboard styles */
 @media (max-width: 768px) {
+  .wordle-keyboard,
+  .keyboard-row {
+    width: 100%;
+  }
+
+  .keyboard-key {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .keyboard-key.wide {
+    flex: 1.5 1 0;
+    min-width: 0;
+  }
+
   .wordle-keyboard {
-    margin-top: var(--spacing-md);
+    margin-top: var(--spacing-xs);
     gap: 5px;
   }
 
@@ -338,26 +338,22 @@
   }
 
   .keyboard-key {
-    min-width: 40px;
     height: 50px;
     font-size: var(--font-sm);
   }
 
   .keyboard-key.wide {
-    min-width: 65px;
     font-size: var(--font-xs);
   }
 }
 
 @media (max-width: 480px) {
   .keyboard-key {
-    min-width: 35px;
     height: 45px;
     font-size: var(--font-xs);
   }
 
   .keyboard-key.wide {
-    min-width: 55px;
     font-size: 10px;
   }
 
@@ -370,13 +366,19 @@
   }
 }
 
+@media (max-height: 700px) {
+  .keyboard-key {
+    height: clamp(34px, calc((100dvh - 450px) / 3), 45px);
+  }
+}
+
 /* Game end popup styles */
 .game-end-popup {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: 100dvh;
   background-color: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
@@ -395,6 +397,9 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   max-width: 300px;
   width: 90%;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  box-sizing: border-box;
   animation: popupSlideIn 0.4s ease-out;
 }
 
@@ -402,6 +407,12 @@
   margin: 0 0 var(--spacing-md) 0;
   font-size: var(--font-2xl);
   font-weight: var(--font-weight-bold);
+}
+.wordle-solved-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
 }
 
 .popup-content p {
@@ -420,28 +431,6 @@
   transition: all var(--transition-fast);
   min-width: 120px;
   outline: none;
-}
-
-.continue-button {
-  background-color: var(--color-success);
-  color: var(--text-primary);
-}
-
-.continue-button:hover {
-  background-color: var(--color-success);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
-}
-
-.retry-button {
-  background-color: var(--color-error);
-  color: var(--text-primary);
-}
-
-.retry-button:hover {
-  background-color: var(--color-error);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(244, 67, 54, 0.3);
 }
 
 @keyframes popupSlideIn {

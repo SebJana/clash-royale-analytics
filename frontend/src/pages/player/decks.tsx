@@ -1,21 +1,34 @@
 import { useCards } from "../../hooks/useCards";
 import { useParams } from "react-router-dom";
 import { useDeckStats } from "../../hooks/useDeckStats";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { DeckComponent } from "../../components/deck/deck";
+import { PlayerError } from "../../components/playerError/playerError";
 import { usePageLoadingState } from "../../hooks/usePageLoadingState";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useGameModes } from "../../hooks/useGameModes";
 import { round } from "../../utils/number";
 import { pluralize } from "../../utils/plural";
 import { getCurrentFilterState } from "../../utils/filter";
+import {
+  gameModesForQuery,
+  mapInternalNameToDisplayName,
+} from "../../utils/gameModes";
 import { datetimeToLocale } from "../../utils/datetime";
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import type { RefObject } from "react";
 import { StatCard } from "../../components/statCard/statCard";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
 import { SortByContainer } from "../../components/sortByContainer/sortByContainer";
-import type { Card } from "../../types/cards";
+import type { Card, CardMeta } from "../../types/cards";
 import type { Deck } from "../../types/deckStats";
 import "./decks.css";
 
@@ -36,16 +49,240 @@ type DeckSortFields = {
 
 function calculateAndFormatUsageRate(
   battleCount: number,
-  totalBattles: number
+  totalBattles: number,
 ) {
   const usageRate = (battleCount / totalBattles) * 100; // In percent
   const roundedUsageRate = round(usageRate, 1);
   return `${roundedUsageRate}%`;
 }
 
+function GameModesStat({ modes }: Readonly<{ modes: string[] }>) {
+  const modeCounts = new Map<string, number>();
+  for (const mode of modes) {
+    const name = mapInternalNameToDisplayName(mode);
+    modeCounts.set(name, (modeCounts.get(name) ?? 0) + 1);
+  }
+
+  // Keep the tooltip short even when a deck was played in many different modes.
+  const visibleModes = [...modeCounts].sort(([a], [b]) => a.localeCompare(b));
+  const shownModes = visibleModes.slice(0, 8);
+  const remainingModes = visibleModes
+    .slice(8)
+    .reduce((count, [, variants]) => count + variants, 0);
+
+  return (
+    <StatCard
+      label={pluralize(modes.length, "Game Mode", "Game Modes")}
+      value={modes.length}
+      tooltip={
+        modes.length > 0 ? (
+          <div className="decks-game-modes-tooltip">
+            <strong>Game modes in this deck</strong>
+            <ul>
+              {shownModes.map(([name, variants]) => (
+                <li key={name}>
+                  {name}
+                  {variants > 1 && ` (${variants} variants)`}
+                </li>
+              ))}
+            </ul>
+            {remainingModes > 0 && <span>+{remainingModes} more modes</span>}
+          </div>
+        ) : (
+          ""
+        )
+      }
+    />
+  );
+}
+
+function VirtualDeckList({
+  decks,
+  cards,
+  totalBattles,
+  showMatch,
+  matchedCards,
+  scrollingToTopRef,
+}: Readonly<{
+  decks: (Deck | DeckWithMatchScore)[];
+  cards: CardMeta[];
+  totalBattles: number;
+  showMatch: boolean;
+  matchedCards: Card[];
+  scrollingToTopRef: RefObject<boolean>;
+}>) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+
+  // Only render deck rows near the visible part of the page.
+  // Row heights are measured after rendering because they vary with screen width.
+  const virtualizer = useWindowVirtualizer({
+    count: decks.length, // Total number of decks the user can scroll through
+    estimateSize: () => 420, // Initial row height in pixels, before its actual height is measured
+    overscan: 3, // Render three extra rows above and below the visible area
+    scrollMargin, // Distance from the top of the page to the start of the deck list
+  });
+
+  // Filtering can reuse a mounted row for a different deck. Measure it again
+  // immediately so a stale row height does not shift decks into each other.
+  // Scrolling a row out and back in does the same measurement on remount.
+  const measureRow = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (element && !decks[Number(element.dataset.index)]) return;
+      virtualizer.measureElement(element);
+    },
+    [decks, virtualizer],
+  );
+
+  useLayoutEffect(() => {
+    // Measuring rows above the viewport can interrupt the Back to Top animation.
+    virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (
+      item,
+      _delta,
+      instance,
+    ) =>
+      !scrollingToTopRef.current && item.start < (instance.scrollOffset ?? 0);
+    return () => {
+      virtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined;
+    };
+  }, [virtualizer, scrollingToTopRef]);
+
+  useLayoutEffect(() => {
+    const updateScrollMargin = () => {
+      if (listRef.current) {
+        setScrollMargin(
+          listRef.current.getBoundingClientRect().top + window.scrollY,
+        );
+      }
+    };
+    updateScrollMargin();
+    // Expanding the filters moves the list without resizing the window.
+    const resizeObserver = new ResizeObserver(updateScrollMargin);
+    const content = listRef.current?.closest(".decks-content");
+    if (content) {
+      resizeObserver.observe(content);
+      content
+        .querySelectorAll(
+          ".filter-component-container, .sort-by-container, .decks-general-stats",
+        )
+        .forEach((element) => resizeObserver.observe(element));
+    }
+    window.addEventListener("resize", updateScrollMargin);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateScrollMargin);
+    };
+  }, []);
+
+  return (
+    // Keep the full scroll height even though only nearby rows are rendered.
+    <div
+      ref={listRef}
+      className="decks-virtual-list"
+      style={{ height: virtualizer.getTotalSize() }}
+    >
+      {virtualizer.getVirtualItems().map((virtualRow) => {
+        const d = decks[virtualRow.index];
+        return (
+          <div
+            key={virtualRow.key}
+            data-index={virtualRow.index}
+            ref={measureRow}
+            className="decks-deck-row"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              // virtualRow.start includes the list's page offset; CSS uses list coordinates.
+              transform: `translateY(${virtualRow.start - scrollMargin}px)`,
+            }}
+          >
+            <div className="deck-section">
+              {showMatch && "matchPercentage" in d && (
+                <div className="decks-card-match-header">
+                  <span className="decks-card-match-value">{`${round(
+                    d.matchPercentage,
+                    1,
+                  )}% (${d.matchCount} matching ${pluralize(
+                    d.matchCount,
+                    "Card",
+                    "Cards",
+                  )})`}</span>
+                  <span className="decks-card-match-label">Card Match</span>
+                </div>
+              )}
+              <DeckComponent
+                deck={d.deck}
+                cards={cards}
+                matchedCards={showMatch ? matchedCards : undefined}
+              />
+            </div>
+            <div className="deck-stats-container">
+              <StatCard
+                label={pluralize(d.count, "Battle", "Battles")}
+                value={d.count}
+              />
+              <StatCard
+                label={pluralize(d.wins, "Win", "Wins")}
+                value={d.wins}
+              />
+              <StatCard label="Win Rate" value={`${round(d.winRate, 1)}%`} />
+              <StatCard
+                label="Usage Rate"
+                value={calculateAndFormatUsageRate(d.count, totalBattles)}
+              />
+              <GameModesStat modes={d.modes} />
+              <StatCard
+                label="Last Seen"
+                value={datetimeToLocale(d.lastSeen)}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // TODO add same error handling for all pages if no data is found or the tag is invalid
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
+  const scrollingToTopRef = useRef(false);
+  const scrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const resetAtTop = () => {
+      if (window.scrollY <= 1) scrollingToTopRef.current = false;
+    };
+    const cancelScrollToTop = () => {
+      scrollingToTopRef.current = false;
+    };
+    window.addEventListener("scroll", resetAtTop);
+    window.addEventListener("wheel", cancelScrollToTop);
+    window.addEventListener("touchstart", cancelScrollToTop);
+    window.addEventListener("keydown", cancelScrollToTop);
+    return () => {
+      window.removeEventListener("scroll", resetAtTop);
+      window.removeEventListener("wheel", cancelScrollToTop);
+      window.removeEventListener("touchstart", cancelScrollToTop);
+      window.removeEventListener("keydown", cancelScrollToTop);
+      if (scrollResetTimeoutRef.current)
+        clearTimeout(scrollResetTimeoutRef.current);
+    };
+  }, []);
+
+  const handleScrollToTopStart = () => {
+    scrollingToTopRef.current = true;
+    if (scrollResetTimeoutRef.current)
+      clearTimeout(scrollResetTimeoutRef.current);
+    // Also restore normal scroll adjustments if the user interrupts the animation.
+    scrollResetTimeoutRef.current = setTimeout(() => {
+      scrollingToTopRef.current = false;
+    }, 3000);
+  };
 
   // Filter state management maintains two sets of state for each filter type:
   // 1. "selected" - what the user has chosen in the UI (not yet applied)
@@ -54,7 +291,7 @@ export default function PlayerDecks() {
 
   // State to store applied filters from FilterContainer
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(
-    getCurrentFilterState()
+    getCurrentFilterState(),
   );
 
   // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
@@ -70,14 +307,14 @@ export default function PlayerDecks() {
     data: cards,
     isLoading: cardsLoading,
     isError: isCardsError,
-    error: cardsError,
+    refetch: refetchCards,
   } = useCards();
 
   const {
     data: gameModes,
     isLoading: gameModesLoading,
     isError: isGameModesError,
-    error: gameModesError,
+    refetch: refetchGameModes,
   } = useGameModes();
 
   // Game mode initialization
@@ -122,16 +359,19 @@ export default function PlayerDecks() {
   // Fetch deck statistics only when game modes are properly initialized
   // Uses applied filter values (not selected ones) to ensure query stability
   // Passes null for game modes to disable the query until gameModesInitialized is true
+  const queryGameModes = gameModesInitialized
+    ? gameModesForQuery(appliedFilters.gameModes, gameModes)
+    : null;
   const {
     data: deckStats,
     isLoading: decksLoading,
     isError: isDecksError,
-    error: decksError,
+    refetch: refetchDecks,
   } = useDeckStats(
     playerTag,
     appliedFilters.startDate,
     appliedFilters.endDate,
-    gameModesInitialized ? appliedFilters.gameModes : null // Use applied filters for the query
+    queryGameModes,
   );
 
   // Helper function to check if a deck contains a specific card
@@ -139,7 +379,7 @@ export default function PlayerDecks() {
     return deck.deck?.some(
       (deckCard) =>
         deckCard.id === appliedCard.id &&
-        (deckCard.evolutionLevel ?? 0) === (appliedCard.evolutionLevel ?? 0)
+        (deckCard.evolutionLevel ?? 0) === (appliedCard.evolutionLevel ?? 0),
     );
   };
 
@@ -152,7 +392,7 @@ export default function PlayerDecks() {
   // Helper function to calculate amount of matched cards for a deck
   const calculateMatchCount = (deck: Deck) => {
     const matchingCards = appliedFilters.cards.filter((appliedCard) =>
-      deckContainsCard(deck, appliedCard)
+      deckContainsCard(deck, appliedCard),
     );
     return matchingCards.length;
   };
@@ -165,14 +405,10 @@ export default function PlayerDecks() {
       let valueB: number | string;
 
       if (selectedSortOption === "usageRate") {
-        // Special case for computed field - calculate usage rate percentage on-the-fly
-        // Usage rate = (deck battles / total battles in this filtered set) * 100
-        const totalBattlesForSort = decksToSort.reduce(
-          (sum, deck) => sum + deck.count,
-          0
-        );
-        valueA = (a.count / totalBattlesForSort) * 100;
-        valueB = (b.count / totalBattlesForSort) * 100;
+        // Usage rate has the same ordering as battle count because every deck
+        // uses the same total number of battles as its denominator.
+        valueA = a.count;
+        valueB = b.count;
       } else {
         // Direct field access using bracket notation
         // Works for: count (battles), wins, winRate, lastSeen
@@ -215,7 +451,7 @@ export default function PlayerDecks() {
       // Include mode: deck must contain ALL selected cards (strict filtering)
       const filteredDecks = allDecks.filter((deck) => {
         return appliedFilters.cards.every((appliedCard) =>
-          deckContainsCard(deck, appliedCard)
+          deckContainsCard(deck, appliedCard),
         );
       });
 
@@ -241,8 +477,8 @@ export default function PlayerDecks() {
     // Either return the Deck (include mode) or the Deck and its score (match mode)
   })() as (Deck | DeckWithMatchScore)[];
 
-  // Create cache key from applied filters for loading state dependency
-  const modesKey = appliedFilters.gameModes.join("|");
+  // Use the modes actually sent to the API for the loading state dependency.
+  const modesKey = queryGameModes?.join("|") ?? "";
 
   // Loading state management
   // Determines when to show loading spinner vs content
@@ -265,13 +501,25 @@ export default function PlayerDecks() {
   }
   const totalDecks = filteredDecks.length;
 
+  if (isDecksError || isCardsError || isGameModesError) {
+    return (
+      <PlayerError
+        sources={[
+          { label: "decks", failed: isDecksError, retry: refetchDecks },
+          { label: "cards", failed: isCardsError, retry: refetchCards },
+          {
+            label: "game modes",
+            failed: isGameModesError,
+            retry: refetchGameModes,
+          },
+        ]}
+      />
+    );
+  }
+
   return (
     <div className="decks-page">
       <div className="decks-content">
-        {isDecksError && <div>Error: {decksError?.message}</div>}
-        {isCardsError && <div>Error: {cardsError?.message}</div>}
-        {isGameModesError && <div>Error: {gameModesError?.message}</div>}
-
         {/* Loading State - Shows during initial load, cards loading, decks loading, or game mode loading */}
         {/* The loading spinner prevents users from seeing incomplete data during the initialization process */}
         {(isInitialLoad ||
@@ -284,7 +532,7 @@ export default function PlayerDecks() {
           </div>
         )}
         {/* Loaded State - Show decks when all data is available and no errors occurred */}
-        {!isDecksError && !isGameModesError && !isInitialLoad && (
+        {!isInitialLoad && (
           <>
             {/* FilterContainer component */}
             <FilterContainer
@@ -331,73 +579,20 @@ export default function PlayerDecks() {
                     value={`${round((totalWins / totalBattles) * 100, 1)}%`}
                   />
                 </div>
-                {filteredDecks.map((d) => (
-                  <div
-                    className="decks-deck-row"
-                    // Unique deck id of all cards in the deck
-                    key={`${d.deck?.map((c) => c.id).join(";")}`}
-                  >
-                    {/* TODO add a deck name, by using the top x elixir cards 
-                      or by using the win condition and the most expensive card */}
-                    <div className="deck-section">
-                      {/* Show match percentage only in match mode */}
-                      {!appliedFilters.includeCardFilterMode &&
-                        appliedFilters.cards.length > 0 &&
-                        "matchPercentage" in d && (
-                          <div className="decks-card-match-header">
-                            <span className="decks-card-match-value">{`${round(
-                              d.matchPercentage,
-                              1
-                            )}% (${d.matchCount} matching ${pluralize(
-                              d.matchCount,
-                              "Card",
-                              "Cards"
-                            )})`}</span>
-                            <span className="decks-card-match-label">
-                              Card Match
-                            </span>
-                          </div>
-                        )}
-                      <DeckComponent deck={d.deck} cards={cards ?? []} />
-                    </div>
-                    <div className="deck-stats-container">
-                      <StatCard
-                        label={pluralize(d.count, "Battle", "Battles")}
-                        value={d.count}
-                      />
-                      <StatCard
-                        label={pluralize(d.wins, "Win", "Wins")}
-                        value={d.wins}
-                      />
-                      <StatCard
-                        label="Win Rate"
-                        value={`${round(d.winRate, 1)}%`}
-                      />
-                      <StatCard
-                        label="Usage Rate"
-                        value={calculateAndFormatUsageRate(
-                          d.count,
-                          totalBattles
-                        )}
-                      />
-                      <StatCard
-                        label={pluralize(
-                          d.modes.length,
-                          "Game Mode",
-                          "Game Modes"
-                        )}
-                        value={d.modes.length}
-                      />
-                      <StatCard
-                        label="Last Seen"
-                        value={datetimeToLocale(d.lastSeen)}
-                      />
-                    </div>
-                  </div>
-                ))}
+                <VirtualDeckList
+                  decks={filteredDecks}
+                  cards={cards ?? []}
+                  totalBattles={totalBattles}
+                  matchedCards={appliedFilters.cards}
+                  scrollingToTopRef={scrollingToTopRef}
+                  showMatch={
+                    !appliedFilters.includeCardFilterMode &&
+                    appliedFilters.cards.length > 0
+                  }
+                />
               </div>
             )}
-            <ScrollToTopButton />
+            <ScrollToTopButton onScrollStart={handleScrollToTopStart} />
 
             {/* Show message when no decks are found and not still loading */}
             {(!filteredDecks || filteredDecks.length === 0) &&

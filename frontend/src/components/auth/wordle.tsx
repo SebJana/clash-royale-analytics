@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import { PartyPopper, RotateCcw } from "lucide-react";
 import { isValidGuess } from "../../utils/wordle";
+import { getAuthErrorFeedback } from "../../utils/authErrors";
 import "./wordle.css";
 
 // Props for Wordle game component
@@ -9,7 +11,7 @@ interface WordleGameProps {
     correct: boolean;
     feedback?: { evaluation: Record<number, string>; solution: string };
   }>; // Callback to validate guess and get feedback
-  readonly onFailure: () => void; // Callback when all guesses are exhausted
+  readonly onFailure: () => Promise<void>; // Callback to request a new challenge
   readonly onSuccess?: () => void; // Callback when the wordle is solved
 }
 
@@ -37,17 +39,19 @@ export function WordleGame({
   const [evaluations, setEvaluations] = useState<string[][]>([]);
   const [currentGuess, setCurrentGuess] = useState("");
   const [gameStatus, setGameStatus] = useState<"playing" | "won" | "lost">(
-    "playing"
+    "playing",
   );
   const [solution, setSolution] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [letterStates, setLetterStates] = useState<Record<string, string>>({});
   const [shakeCurrentRow, setShakeCurrentRow] = useState(false); // Invalid guess animation
   const [showGameEndPopup, setShowGameEndPopup] = useState(false);
+  const [error, setError] = useState("");
+  const [isRestarting, setIsRestarting] = useState(false);
 
   // Animation state management for flip reveal
   const [animatingRowIndex, setAnimatingRowIndex] = useState<number | null>(
-    null
+    null,
   );
   const [animatingLetterIndex, setAnimatingLetterIndex] = useState(-1);
   const [completedLetterIndex, setCompletedLetterIndex] = useState(-1); // Controls when colors show
@@ -72,26 +76,35 @@ export function WordleGame({
       // Calculation: (letter_index * delay) + (80% of flip_duration)
       // This reveals color while card is rotating back to face, creating smooth reveal
       // Example: Letter 2 shows color at 800ms + 640ms = 1440ms
-      setTimeout(() => {
-        setCompletedLetterIndex(i);
-      }, i * FLIP_DELAY_LETTER_MS + FLIP_DURATION_MS * 0.8);
+      setTimeout(
+        () => {
+          setCompletedLetterIndex(i);
+        },
+        i * FLIP_DELAY_LETTER_MS + FLIP_DURATION_MS * 0.8,
+      );
     }
 
     // Clean up after all animations finish
     // Calculation: (5 letters * 400ms delay) + 5000ms buffer = 7000ms total
     // Buffer ensures all flip animations (800ms each) complete before cleanup
-    setTimeout(() => {
-      setAnimatingRowIndex(null);
-      setAnimatingLetterIndex(-1);
-      setCompletedLetterIndex(-1);
-      setIsAnimationRunning(false);
-    }, WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 5000);
+    setTimeout(
+      () => {
+        setAnimatingRowIndex(null);
+        setAnimatingLetterIndex(-1);
+        setCompletedLetterIndex(-1);
+        setIsAnimationRunning(false);
+      },
+      WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 5000,
+    );
 
     // Safety unlock - Shorter timeout to prevent stuck input if main cleanup fails
     // Uses 1000ms buffer instead of 5000ms as emergency fallback
-    setTimeout(() => {
-      setIsAnimationRunning(false);
-    }, WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 1000);
+    setTimeout(
+      () => {
+        setIsAnimationRunning(false);
+      },
+      WORDLE_WORD_LENGTH * FLIP_DELAY_LETTER_MS + 1000,
+    );
   }, []);
 
   // Emergency timeout to prevent permanent input lock
@@ -107,22 +120,30 @@ export function WordleGame({
   // Validates guess, submits to API, and triggers animations
   const handleSubmit = useCallback(async () => {
     if (
-      currentGuess.length !== WORDLE_WORD_LENGTH ||
       isSubmitting ||
       isAnimationRunning
     )
       return;
 
+    setError("");
+    if (currentGuess.length !== WORDLE_WORD_LENGTH) {
+      return;
+    }
+
     // Block invalid guesses with shake animation
+    setIsSubmitting(true);
     try {
       const isValid = await isValidGuess(currentGuess);
       if (!isValid) {
+        setIsSubmitting(false);
         setShakeCurrentRow(true);
         setTimeout(() => setShakeCurrentRow(false), 500);
         return;
       }
     } catch (error) {
       console.error("Error validating guess:", error);
+      setError("Couldn't check that word. Please try again.");
+      setIsSubmitting(false);
       return;
     }
 
@@ -143,7 +164,7 @@ export function WordleGame({
           const backendValue = result.feedback.evaluation[i];
           let cssClass = "";
 
-          // Map backend terminology to CSS class names that match our styles
+          // Map backend terminology to the matching CSS class names
           // "in word" becomes "present" to align with Wordle conventions
           switch (backendValue) {
             case "correct":
@@ -216,12 +237,13 @@ export function WordleGame({
         setTimeout(() => {
           setShowGameEndPopup(true);
         }, animationDuration);
-        onFailure();
       }
 
       setCurrentGuess("");
     } catch (error) {
       console.error("Error submitting guess:", error);
+      const feedback = getAuthErrorFeedback(error, "wordle_guess");
+      setError(feedback.recovery ? "" : feedback.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -233,7 +255,6 @@ export function WordleGame({
     guesses,
     evaluations,
     guessesAllowed,
-    onFailure,
     letterStates,
     animateLetterReveal,
   ]);
@@ -244,7 +265,7 @@ export function WordleGame({
       if (gameStatus !== "playing" || isAnimationRunning) return;
 
       if (key === "ENTER") {
-        if (currentGuess.length === WORDLE_WORD_LENGTH && !isSubmitting) {
+        if (!isSubmitting) {
           handleSubmit();
         }
       } else if (key === "BACKSPACE") {
@@ -261,7 +282,7 @@ export function WordleGame({
       currentGuess.length,
       isSubmitting,
       isAnimationRunning,
-    ]
+    ],
   );
 
   // Handle actual keyboard input for typing letters, backspace, and enter
@@ -270,7 +291,7 @@ export function WordleGame({
       if (gameStatus === "playing" && !isAnimationRunning) {
         if (event.key === "Enter") {
           // Submit guess when Enter is pressed
-          if (currentGuess.length === WORDLE_WORD_LENGTH && !isSubmitting) {
+          if (!isSubmitting) {
             handleSubmit();
           }
         } else if (event.key === "Backspace") {
@@ -297,11 +318,11 @@ export function WordleGame({
 
   return (
     <div className="wordle-game">
-      <h3>
-        Solve the Wordle to prove you're worthy of managing player tracking
+      <h3 className="auth-stage-heading">
+        Solve the Wordle to prove your reasoning skills
       </h3>
-
       <div className="wordle-grid">
+        {error && <div className="auth-error-overlay wordle-error-overlay" role="alert">{error}</div>}
         {/* Render game grid with rows for each guess attempt */}
         {Array.from({ length: guessesAllowed }, (_, i) => (
           <div
@@ -325,7 +346,7 @@ export function WordleGame({
               // Complex state machine that determines when each letter should animate and show colors
 
               // shouldStartFlip: Has this letter's animation been triggered?
-              // True when: we're animating this row AND the animation has reached or passed this letter
+              // True when this row is animating and the animation has reached this letter
               // Example: Row 2, Letter 3 starts flipping when animatingLetterIndex >= 3
               const shouldStartFlip =
                 animatingRowIndex === i && animatingLetterIndex >= j;
@@ -397,8 +418,10 @@ export function WordleGame({
           <div className="popup-content">
             {gameStatus === "won" ? (
               <>
-                <h2>🎉 Solved! 🎉</h2>
-                <p>Congratulations! You've proven your worth!</p>
+                <h2 className="wordle-solved-title">
+                  <PartyPopper size={26} aria-hidden="true" /> Solved!
+                </h2>
+                <p>You've proven your puzzle-solving skills.</p>
                 <p>
                   <a
                     href={`https://dictionary.cambridge.org/dictionary/english/${solution}`}
@@ -410,7 +433,7 @@ export function WordleGame({
                   </a>
                 </p>
                 <button
-                  className="popup-button continue-button"
+                  className="popup-button auth-outcome-button is-success"
                   onClick={() => {
                     setShowGameEndPopup(false);
                     onSuccess?.();
@@ -437,20 +460,20 @@ export function WordleGame({
                   </a>
                 </p>
                 <button
-                  className="popup-button retry-button"
-                  onClick={() => {
-                    setShowGameEndPopup(false);
-                    // Reset game state for retry
-                    setGuesses([]);
-                    setEvaluations([]);
-                    setCurrentGuess("");
-                    setGameStatus("playing");
-                    setLetterStates({});
-                    // Call onFailure to restart challenge
-                    onFailure();
+                  className="popup-button auth-outcome-button is-retry"
+                  disabled={isRestarting}
+                  onClick={async () => {
+                    setIsRestarting(true);
+                    try {
+                      // A successful new ID remounts the game; failed retries keep this result.
+                      await onFailure();
+                    } finally {
+                      setIsRestarting(false);
+                    }
                   }}
                 >
-                  Try Again
+                  <RotateCcw size={18} aria-hidden="true" />
+                  <span>{isRestarting ? "Loading..." : "Try Again"}</span>
                 </button>
               </>
             )}

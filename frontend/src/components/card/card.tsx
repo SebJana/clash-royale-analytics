@@ -3,6 +3,7 @@ import Tooltip from "@mui/material/Tooltip";
 import type { Card, CardMeta } from "../../types/cards";
 import {
   getCardName,
+  getCardVariantName,
   getCardElixirCost,
   getCardRarity,
   getCardIcon,
@@ -14,19 +15,21 @@ export const CardComponent = memo(function CardComponent({
   card,
   cards,
   showTooltip = true,
+  matched = false,
 }: Readonly<{
   card: Card;
   cards: CardMeta[];
   showTooltip?: boolean;
+  matched?: boolean;
 }>) {
-  const name = getCardName(card.id, cards);
+  const evoLvl = card.evolutionLevel ?? 0; // If it's not an evolution, the evolutionLevel field is missing
+  const name = getCardVariantName(getCardName(card.id, cards), evoLvl);
   const elixir = getCardElixirCost(card.id, cards);
   const rarity = getCardRarity(card.id, cards);
   // Uppercase the first letter of the rarity
   const rarityLabel = rarity
     ? rarity.charAt(0).toUpperCase() + rarity.slice(1)
     : "";
-  const evoLvl = card.evolutionLevel ?? 0; // If it's not an evolution, the evolutionLevel field is missing
   const icon = getCardIcon(card.id, evoLvl, cards);
 
   const outlineImg = getCardOutline(rarity);
@@ -37,6 +40,8 @@ export const CardComponent = memo(function CardComponent({
         src={outlineImg}
         alt={`outline`}
         loading="lazy"
+        width={285}
+        height={420}
         className="card-component-outline"
       />
       <img
@@ -49,16 +54,19 @@ export const CardComponent = memo(function CardComponent({
   );
 
   return (
-    <div className="card-component-card">
+    <div className={`card-component-card${matched ? " is-matched" : ""}`}>
       {showTooltip ? (
         <Tooltip
           arrow
+          // Let the tooltip close as soon as the pointer leaves the card.
+          disableInteractive
           placement="auto"
           title={
             <div className="card-component-tooltip">
               <strong>{name}</strong>
               <span>{elixir} Elixir</span>
               <span>{rarityLabel}</span>
+              {matched && <span>Matches card filter</span>}
             </div>
           }
         >

@@ -63,7 +63,7 @@ export function usePageLoadingState({
   // Track if the current loading cycle has completed (regardless of whether data was returned)
   const [hasCompletedLoad, setHasCompletedLoad] = useState(false);
 
-  // Track if we've had any loading activity at all
+  // Track whether any loading activity has occurred
   const [hasHadLoadingActivity, setHasHadLoadingActivity] = useState(false);
 
   // Track component mount to ensure loading spinner shows immediately
@@ -85,11 +85,11 @@ export function usePageLoadingState({
   // Track loading state changes to detect when a load cycle completes
   useEffect(() => {
     if (isLoading) {
-      // Mark that we've had loading activity and reset completion state
+      // Mark loading activity and reset the completion state
       setHasHadLoadingActivity(true);
       setHasCompletedLoad(false);
     } else if (hasHadLoadingActivity) {
-      // Only mark as completed if we actually had loading activity before
+      // Mark completion only after a loading cycle has started
       // Use a small delay to ensure all loading states have settled
       const timer = setTimeout(() => {
         setHasCompletedLoad(true);
@@ -113,7 +113,7 @@ export function usePageLoadingState({
     //    - There was data before, OR
     //    - There's an error, OR
     //    - A loading cycle completed (this covers empty results), OR
-    //    - We never had any loading activity (immediate cache hits)
+    //    - No loading activity occurred (immediate cache hits)
     // 3. At least minDisplayTime has passed to ensure spinner is visible
     const shouldClearLoading =
       !isLoading &&

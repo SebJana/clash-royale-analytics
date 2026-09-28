@@ -134,7 +134,7 @@ async def process_player(
                 # Try to fetch the last battles for each player
                 battle_logs = await cr_api.get_player_battle_logs(player_tag=player_tag)
 
-            # Check if we got any battle logs
+            # Check whether any battle logs were returned
             if not battle_logs:
                 print(f"[WARNING] No battle logs returned for player {player_tag}")
                 return

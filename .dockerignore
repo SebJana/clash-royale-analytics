@@ -1,0 +1,11 @@
+# Local credentials must never enter a Docker build context.
+.env
+
+# Rebuild these inside the image or keep them on the host.
+.git/
+.venv/
+frontend/node_modules/
+frontend/dist/
+db/data/
+db/backups/
+**/__pycache__/

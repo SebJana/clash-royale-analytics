@@ -1,0 +1,29 @@
+.filter-search {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 0 0.65rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.filter-search:focus-within {
+  border-color: var(--color-primary);
+}
+
+.filter-search svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.filter-search input {
+  width: 100%;
+  min-height: 2.4rem;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { LockKeyhole, LockKeyholeOpen, CircleCheck } from "lucide-react";
 import { useNavigate } from "react-router";
 import {
   fetchAllTrackedPlayers,
@@ -19,8 +20,54 @@ import { AuthModal } from "../components/auth/authModal";
 import Lottie from "lottie-react";
 import construction from "../assets/animations/construction.json";
 import CircularProgress from "@mui/material/CircularProgress";
+import axios from "axios";
 import { StatCard } from "../components/statCard/statCard";
 import "./home.css";
+
+function getErrorMessage(error: unknown): string {
+  if (!axios.isAxiosError<{
+    detail?: string | { code?: string; message?: string };
+  }>(error)) {
+    return error instanceof Error
+      ? error.message
+      : "Something went wrong. Please try again.";
+  }
+
+  if (!error.response) return "Could not reach the server. Please try again.";
+
+  const { status, data } = error.response;
+  const detail = data?.detail;
+  const code = typeof detail === "object" ? detail?.code : undefined;
+
+  // Check the backend code first; a 502 can also come from Clash Royale.
+  if (code === "INVALID_PLAYER_TAG")
+    return "Invalid player tag. Enter a tag like #YYRJQY28.";
+  if (code === "PLAYER_NOT_FOUND")
+    return "Player not found. Check the tag and try again.";
+  if (code === "PLAYER_NOT_TRACKED") return "That player isn't being tracked.";
+  if (code === "CR_API_AUTH_FAILED")
+    return (
+      "Clash Royale rejected the API connection, so this player can't be tracked right now. " +
+      "Please try again later."
+    );
+  if (code === "CR_API_MAINTENANCE")
+    return (
+      "Clash Royale is currently undergoing maintenance, so this player can't be tracked right now. " +
+      "Please try again later."
+    );
+  if (code === "CR_API_UNAVAILABLE" || code === "CR_API_INVALID_RESPONSE")
+    return "Could not check the player with Clash Royale. Please try again later.";
+  if (status === 401 || status === 403)
+    return "Authorization failed. Please verify again.";
+  if (status === 429) return "Too many requests. Please try again shortly.";
+  if (status >= 500)
+    return "The server could not complete the request. Please try again later.";
+
+  return (
+    (typeof detail === "string" ? detail : detail?.message) ??
+    "Something went wrong. Please try again."
+  );
+}
 
 function HomePage() {
   const {
@@ -53,8 +100,15 @@ function HomePage() {
     null
   );
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAuthSuccess, setShowAuthSuccess] = useState(false);
   const navigate = useNavigate();
-  const { checkAuthStatus } = useAuth();
+  const { isAuthenticated, checkAuthStatus } = useAuth();
+
+  useEffect(() => {
+    if (!showAuthSuccess) return;
+    const timer = window.setTimeout(() => setShowAuthSuccess(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [showAuthSuccess]);
 
   if (playersLoading || playerCountLoading || battleCountLoading)
     return <CircularProgress className="home-loading-spinner" />;
@@ -113,17 +167,7 @@ function HomePage() {
       // Clear the input field
       setAddedPlayerTag("");
     } catch (error) {
-      // Extract error message using structural typing
-      type ErrorLike = {
-        response?: { data?: { detail?: string } };
-        message?: string;
-      };
-
-      const err = error as ErrorLike;
-      // See if there is any error text or status message on what happened upon error
-      const errorDetail =
-        err.response?.data?.detail || err.message || "An error occurred";
-      setTrackingError(errorDetail);
+      setTrackingError(getErrorMessage(error));
     } finally {
       setTrackingPlayer(false);
     }
@@ -131,6 +175,12 @@ function HomePage() {
 
   const handleUntrackPlayerClick = async () => {
     if (!untrackedPlayerTag) return;
+    if (!validatePlayerTagSyntax(untrackedPlayerTag)) {
+      setUntrackingError("Invalid player tag. Enter a tag like #YYRJQY28.");
+      setUntrackingSuccess(null);
+      return;
+    }
+    setUntrackingError(null);
 
     // Check if user is authenticated
     if (!checkAuthStatus()) {
@@ -139,7 +189,6 @@ function HomePage() {
     }
 
     setUntrackingPlayer(true);
-    setUntrackingError(null);
     setUntrackingSuccess(null);
 
     try {
@@ -149,16 +198,7 @@ function HomePage() {
       // Clear the input field
       setUntrackedPlayerTag("");
     } catch (error) {
-      // Extract error message using structural typing
-      type ErrorLike = {
-        response?: { data?: { detail?: string } };
-        message?: string;
-      };
-
-      const err = error as ErrorLike;
-      const errorDetail =
-        err.response?.data?.detail || err.message || "An error occurred";
-      setUntrackingError(errorDetail);
+      setUntrackingError(getErrorMessage(error));
     } finally {
       setUntrackingPlayer(false);
     }
@@ -166,10 +206,9 @@ function HomePage() {
 
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
-    // Retry the untrack operation after successful authentication
-    if (untrackedPlayerTag) {
-      handleUntrackPlayerClick();
-    }
+    setShowAuthSuccess(true);
+    setUntrackingError(null);
+    setUntrackingSuccess(null);
   };
 
   return (
@@ -251,27 +290,71 @@ function HomePage() {
               <div className="home-success-message">{trackingSuccess}</div>
             )}
           </div>
-          <div className="untrack-section">
-            {/* TODO add unlocked/locked lock icon here, to indicate wether a player is authenticated or not*/}
-            <h2 className="section-header">Remove Tracked Player</h2>
+          <div
+            className={`untrack-section${showAuthSuccess && isAuthenticated ? " untrack-section-unlocked" : ""}`}
+          >
+            <h2 className="section-header">
+              Remove Tracked Player
+              <span
+                className={`untrack-auth-status${isAuthenticated ? " is-unlocked" : ""}`}
+                role="img"
+                aria-label={isAuthenticated ? "Verified" : "Verification required"}
+                title={isAuthenticated ? "Verified" : "Verification required"}
+              >
+                <span className="untrack-auth-icon" aria-hidden="true">
+                  {isAuthenticated ? (
+                    <LockKeyholeOpen size={24} />
+                  ) : (
+                    <LockKeyhole size={24} />
+                  )}
+                </span>
+              </span>
+            </h2>
             <p className="section-description">
-              Enter a player tag to stop tracking their activity. Previously
-              stored data won't be deleted by this, you can always add the
-              player back.
+              {isAuthenticated
+                ? "Enter a player tag to stop tracking their activity."
+                : "Verify to stop tracking a player's activity."}{" "}
+              Previously stored data won't be deleted by this, you can always
+              add the player back.
             </p>
-            <input
-              type="text"
-              placeholder="Enter player tag... (e.g. #YYRJQY28)"
-              value={untrackedPlayerTag}
-              onChange={(e) => setUntrackedPlayerTag(e.target.value)}
-            />
-            <button
-              className="remove-button"
-              onClick={handleUntrackPlayerClick}
-              disabled={!untrackedPlayerTag || untrackingPlayer}
-            >
-              {untrackingPlayer ? "Removing Player..." : "Remove Player"}
-            </button>
+            {isAuthenticated ? (
+              <>
+                <input
+                  type="text"
+                  aria-label="Player tag to remove"
+                  placeholder="Enter player tag... (e.g. #YYRJQY28)"
+                  value={untrackedPlayerTag}
+                  onChange={(e) => {
+                    const tag = e.target.value;
+                    setUntrackedPlayerTag(tag);
+                    if (validatePlayerTagSyntax(tag)) setUntrackingError(null);
+                  }}
+                />
+                <button
+                  className="remove-button"
+                  onClick={handleUntrackPlayerClick}
+                  disabled={!untrackedPlayerTag || untrackingPlayer}
+                >
+                  {untrackingPlayer ? "Removing Player..." : "Remove Player"}
+                </button>
+              </>
+            ) : (
+              <button
+                className="verify-remove-button"
+                onClick={() => setShowAuthModal(true)}
+              >
+                Verify
+              </button>
+            )}
+
+            <div className="untrack-auth-feedback" role="status" aria-atomic="true">
+              {showAuthSuccess && isAuthenticated && (
+                <div className="home-success-message untrack-auth-success">
+                  <CircleCheck size={20} aria-hidden="true" />
+                  <span>Verification complete! Enter a player tag to remove.</span>
+                </div>
+              )}
+            </div>
 
             {untrackingError && (
               <div className="home-error-message">{untrackingError}</div>

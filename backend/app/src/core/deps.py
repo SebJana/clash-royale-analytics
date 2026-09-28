@@ -32,6 +32,24 @@ def get_auth_state_redis(request: Request) -> RedisConn:
     return r
 
 
+def get_card_image_redis(request: Request) -> RedisConn:
+    """Return the binary client for the existing Redis cache server.
+
+    The pool size and future preload count come from settings and game rules;
+    this connection only reads and writes the associated image bytes.
+
+    Args:
+        request (Request): Request whose app owns the Redis connection.
+
+    Returns:
+        RedisConn: Connection that returns raw image bytes.
+    """
+    r = getattr(request.app.state, "card_image_redis", None)
+    if r is None:
+        raise HTTPException(status_code=500, detail="Card image Redis not initialized")
+    return r
+
+
 # Dependency that returns the Cr API client
 def get_cr_api(request: Request) -> ClashRoyaleAPI:
     api = getattr(request.app.state, "cr_api", None)
@@ -46,6 +64,7 @@ CrApi = Annotated[ClashRoyaleAPI, Depends(get_cr_api)]
 DbConn = Annotated[MongoConn, Depends(get_mongo)]
 RedConn = Annotated[CacheRedisConn, Depends(get_redis)]
 AuthStateConn = Annotated[RedisConn, Depends(get_auth_state_redis)]
+CardImageConn = Annotated[RedisConn, Depends(get_card_image_redis)]
 
 
 # Dependency that ensures the given player tag is active in the players collection
@@ -62,19 +81,27 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
         str: The player tag when validation succeeds.
 
     Raises:
-        HTTPException 403 if the tag is syntactically invalid or the player is not being tracked.
+        HTTPException 403 with a specific code if the tag is invalid or untracked.
     """
 
     # Check the syntax is valid (takes load off of db and ensures tag is mongo query safe)
     if not cr_api.check_tag_syntax(player_tag):
         raise HTTPException(
-            status_code=403, detail=f"Player with tag {player_tag} doesn't exist"
+            status_code=403,
+            detail={
+                "code": "INVALID_PLAYER_TAG",
+                "message": f"Player with tag {player_tag} doesn't exist",
+            },
         )
 
     # Check if the player is in players collection and active
     if not await check_player_tracked(mongo_conn, player_tag):
         raise HTTPException(
-            status_code=403, detail=f"Player with tag {player_tag} isn't being tracked"
+            status_code=403,
+            detail={
+                "code": "PLAYER_NOT_TRACKED",
+                "message": f"Player with tag {player_tag} isn't being tracked",
+            },
         )
 
     return player_tag  # When its a valid and tracked player, return the tag
@@ -86,13 +113,13 @@ auth_scheme = HTTPBearer()
 
 
 # Dependency that ensures authorization token is received and validated
-def require_auth(credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)):
+def require_remove_player_token(credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)):
     """
     Validates a Bearer token provided via the Authorization header.
     """
     token = credentials.credentials
 
-    if not validate_access_token(token, AvailableTokenTypes.AUTH.value):
+    if not validate_access_token(token, AvailableTokenTypes.REMOVE_PLAYER_TOKEN.value):
         raise HTTPException(
             status_code=403,
             detail="No authorization, invalid or expired auth token.",

@@ -17,6 +17,36 @@ class ClashRoyaleMaintenanceError(Exception):
         self.code = code
 
 
+class ClashRoyalePlayerCheckError(Exception):
+    """Give the add route a specific failure without exposing raw httpx errors."""
+
+    default_detail = "Clash Royale API request failed"
+
+    def __init__(self):
+        self.detail = self.default_detail
+        super().__init__(self.detail)
+
+
+class ClashRoyaleInvalidTagError(ClashRoyalePlayerCheckError):
+    default_detail = "Invalid player tag"
+
+
+class ClashRoyalePlayerNotFoundError(ClashRoyalePlayerCheckError):
+    default_detail = "Player not found"
+
+
+class ClashRoyaleAuthError(ClashRoyalePlayerCheckError):
+    default_detail = "Clash Royale rejected the API token or IP address"
+
+
+class ClashRoyaleConnectionError(ClashRoyalePlayerCheckError):
+    default_detail = "Clash Royale API could not be reached"
+
+
+class ClashRoyaleInvalidResponseError(ClashRoyalePlayerCheckError):
+    default_detail = "Clash Royale API returned no player name"
+
+
 class ClashRoyaleAPI:
     """
     Async Clash Royale API client (single API key, no rotation).
@@ -40,10 +70,9 @@ class ClashRoyaleAPI:
 
     # --- helpers -------------------------------------------------------------
     @staticmethod
-    def check_tag_syntax(player_tag: str):
+    def check_tag_syntax(player_tag: str) -> bool:
         """
-        Checks wether the player tag starts with a '#' and has the correct length
-        and matches the Supercell alphabet.
+        Check for one leading '#', 4-12 tag characters, and the Supercell alphabet.
 
         Args:
             player_tag (str): The player tag starting with '#' (e.g., "#YYRJQY28")
@@ -52,19 +81,16 @@ class ClashRoyaleAPI:
             bool: True if valid, False otherwise
         """
 
-        ALPHABET = set("0289PYLQGRJCUV")  # Supercell-Tag-Alphabet
-
         # Strip the tag
         tag = player_tag.strip()
 
-        # Missing the starting code symbol
-        if not tag.startswith("#"):
+        if not tag.startswith("#") or tag.count("#") != 1:
             return False
 
         core = tag[1:]  # Part without the leading '#'
 
-        # TODO check actual max or min length
-        # Invalid length
+        # NOTE Match the frontend's current 4-12 limit. Update both validators if Clash
+        # Royale starts (or already is) issuing shorter or longer tags.
         if len(core) < 4 or len(core) > 12:
             return False
 
@@ -97,16 +123,13 @@ class ClashRoyaleAPI:
         Checks if the Clash Royale API is in maintenance mode.
 
         Args:
-            response (Any): The API response (usually a list of dicts)
+            response (Any): Parsed API response.
 
         Raises:
             ClashRoyaleMaintenanceError: If the API is in maintenance mode.
         """
-        if (
-            isinstance(response, list)
-            and len(response) > 0
-            and response[0].get("reason") == "inMaintenance"
-        ):
+        reason = response[0] if isinstance(response, list) and response else response
+        if isinstance(reason, dict) and reason.get("reason") == "inMaintenance":
             raise ClashRoyaleMaintenanceError(
                 "Clash Royale API is in maintenance mode. Try again later."
             )
@@ -141,12 +164,17 @@ class ClashRoyaleAPI:
             endpoint,
             headers={"Authorization": f"Bearer {self._api_key}"},
         )
+        # An error response can still contain the maintenance reason.
+        if resp.is_error:
+            try:
+                self._check_maintenance(resp.json())
+            except ValueError:
+                pass
         resp.raise_for_status()  # will raise httpx.HTTPStatusError on 4xx/5xx
 
-        # Check for maintenance
-        self._check_maintenance(resp)
-
-        return resp.json()
+        payload = resp.json()
+        self._check_maintenance(payload)
+        return payload
 
     async def check_connection(self):
         await self.get_cards()
@@ -160,18 +188,38 @@ class ClashRoyaleAPI:
             player_tag (str): The player tag starting with '#' (e.g., "#YYRJQY28")
 
         Returns:
-            str: The players name if the tag syntax is valid AND the API confirms the player exists; else an empty string.
+            str: The player's name when the API confirms the player exists.
+
+        Raises:
+            ClashRoyalePlayerCheckError: If the tag or API response is invalid,
+                or the Clash Royale API rejects or cannot complete the request.
+            ClashRoyaleMaintenanceError: If Clash Royale is in maintenance.
         """
 
+        player_tag = player_tag.strip()
         if not self.check_tag_syntax(player_tag):
-            return ""
+            raise ClashRoyaleInvalidTagError()
 
-        # If no error on request --> player with that tag exists
         try:
             player_info = await self.get_player_info(player_tag)
-            return player_info.get("name")
-        except Exception:
-            return ""
+        except httpx.HTTPStatusError as e:
+            # Only 404 proves the player is missing. Auth and API failures need
+            # their own errors so the add route does not call them "not found".
+            status = e.response.status_code
+            if status == 404:
+                raise ClashRoyalePlayerNotFoundError() from e
+            if status in (401, 403):
+                raise ClashRoyaleAuthError() from e
+            raise ClashRoyalePlayerCheckError() from e
+        except httpx.RequestError as e:
+            raise ClashRoyaleConnectionError() from e
+
+        # A successful request without a name does not prove the tag is missing.
+        # This should not happen if the CR API is working as expected.
+        if not isinstance(player_info, dict) or not player_info.get("name"):
+            raise ClashRoyaleInvalidResponseError()
+
+        return player_info["name"]
 
     async def get_player_battle_logs(self, player_tag: str):
         """

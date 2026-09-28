@@ -7,18 +7,20 @@ import { useGameModes } from "../../hooks/useGameModes";
 import { round } from "../../utils/number";
 import { pluralize } from "../../utils/plural";
 import { getCurrentFilterState } from "../../utils/filter";
+import { gameModesForQuery } from "../../utils/gameModes";
 import { useEffect, useState } from "react";
 import { ScrollToTopButton } from "../../components/scrollToTop/scrollToTop";
 import { FilterContainer } from "../../components/filterContainer/filterContainer";
 import type { FilterState } from "../../components/filterContainer/filterContainer";
 import { SortByContainer } from "../../components/sortByContainer/sortByContainer";
 import { CardComponent } from "../../components/card/card";
+import { PlayerError } from "../../components/playerError/playerError";
 import type { CardStats } from "../../types/cardStats";
 import "./cards.css";
 
 function calculateAndFormatUsageRate(
   battleCount: number,
-  totalBattles: number
+  totalBattles: number,
 ) {
   const usageRate = (battleCount / totalBattles) * 100; // In percent
   const roundedUsageRate = round(usageRate, 1);
@@ -43,7 +45,7 @@ export default function PlayerCards() {
 
   // State to store applied filters from FilterContainer
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(
-    getCurrentFilterState()
+    getCurrentFilterState(),
   );
 
   // Prevents double API calls during initialization, because filter and query need to be built on API Game Modes Data
@@ -59,14 +61,14 @@ export default function PlayerCards() {
     data: cards,
     isLoading: cardsLoading,
     isError: isCardsError,
-    error: cardsError,
+    refetch: refetchCards,
   } = useCards();
 
   const {
     data: gameModes,
     isLoading: gameModesLoading,
     isError: isGameModesError,
-    error: gameModesError,
+    refetch: refetchGameModes,
   } = useGameModes();
 
   // Game mode initialization
@@ -109,7 +111,7 @@ export default function PlayerCards() {
   // Helper function to sort cards based on selected sort option
   // Creates a new sorted array without mutating the original card statistics
   const sortCards = (
-    cardsToSort: CardStats["card_statistics"]["cards"]
+    cardsToSort: CardStats["card_statistics"]["cards"],
   ): CardStats["card_statistics"]["cards"] => {
     return [...cardsToSort].sort((a, b) => {
       let valueA: number | string;
@@ -143,20 +145,23 @@ export default function PlayerCards() {
   // Fetch card statistics only when game modes are properly initialized
   // Uses applied filter values (not selected ones) to ensure query stability
   // Passes null for game modes to disable the query until gameModesInitialized is true
+  const queryGameModes = gameModesInitialized
+    ? gameModesForQuery(appliedFilters.gameModes, gameModes)
+    : null;
   const {
     data: cardStats,
     isLoading: cardStatsLoading,
     isError: isCardStatsError,
-    error: cardStatsError,
+    refetch: refetchCardStats,
   } = useCardStats(
     playerTag,
     appliedFilters.startDate,
     appliedFilters.endDate,
-    gameModesInitialized ? appliedFilters.gameModes : null // Use applied filters for the query
+    queryGameModes,
   );
 
-  // Create cache key from applied filters for loading state dependency
-  const modesKey = appliedFilters.gameModes.join("|");
+  // Use the modes actually sent to the API for the loading state dependency.
+  const modesKey = queryGameModes?.join("|") ?? "";
 
   // Loading state management
   // Determines when to show loading spinner vs content
@@ -178,13 +183,29 @@ export default function PlayerCards() {
     ? sortCards(cardStats.card_statistics.cards)
     : [];
 
+  if (isCardStatsError || isCardsError || isGameModesError) {
+    return (
+      <PlayerError
+        sources={[
+          {
+            label: "card statistics",
+            failed: isCardStatsError,
+            retry: refetchCardStats,
+          },
+          { label: "cards", failed: isCardsError, retry: refetchCards },
+          {
+            label: "game modes",
+            failed: isGameModesError,
+            retry: refetchGameModes,
+          },
+        ]}
+      />
+    );
+  }
+
   return (
     <div className="cards-page">
       <div className="cards-content">
-        {isCardStatsError && <div>Error: {cardStatsError?.message}</div>}
-        {isCardsError && <div>Error: {cardsError?.message}</div>}
-        {isGameModesError && <div>Error: {gameModesError?.message}</div>}
-
         {/* Loading State - Shows during initial load, cards loading, card stats loading, or game mode loading */}
         {/* The loading spinner prevents users from seeing incomplete data during the initialization process */}
         {(isInitialLoad ||
@@ -197,7 +218,7 @@ export default function PlayerCards() {
           </div>
         )}
         {/* Loaded State - Show decks when all data is available and no errors occurred */}
-        {!isCardStatsError && !isGameModesError && !isInitialLoad && (
+        {!isInitialLoad && (
           <>
             {/* FilterContainer component */}
             <FilterContainer

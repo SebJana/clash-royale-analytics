@@ -4,9 +4,17 @@ from core.deps import (
     DbConn,
     CrApi,
     require_tracked_player,
-    require_auth,
+    require_remove_player_token,
 )
-from clash_royale_api import ClashRoyaleMaintenanceError
+from clash_royale_api import (
+    ClashRoyaleMaintenanceError,
+    ClashRoyalePlayerCheckError,
+    ClashRoyaleInvalidTagError,
+    ClashRoyalePlayerNotFoundError,
+    ClashRoyaleAuthError,
+    ClashRoyaleConnectionError,
+    ClashRoyaleInvalidResponseError,
+)
 from mongo import (
     get_tracked_players,
     insert_tracked_player,
@@ -41,15 +49,47 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
 
 @router.post("/{player_tag}", dependencies=[Depends(RateLimiter(times=3, seconds=60))])
 async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi):
+    # Use the same trimmed tag for the Clash Royale check and the stored player.
+    player_tag = player_tag.strip()
     try:
         player = await cr_api.check_existing_player(player_tag)
-        # API returns empty response when player doesn't exist
-        if not player:
-            raise HTTPException(
-                status_code=404, detail=f"Player with tag {player_tag} does not exist"
-            )
+    # Keep missing players and Clash Royale failures separate for the frontend.
     except ClashRoyaleMaintenanceError as e:
-        raise HTTPException(status_code=e.code, detail=e.detail)
+        raise HTTPException(
+            status_code=e.code,
+            detail={"code": "CR_API_MAINTENANCE", "message": e.detail},
+        ) from e
+    except ClashRoyaleInvalidTagError as e:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "INVALID_PLAYER_TAG", "message": e.detail},
+        ) from e
+    except ClashRoyalePlayerNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "PLAYER_NOT_FOUND", "message": e.detail},
+        ) from e
+    except ClashRoyaleAuthError as e:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "CR_API_AUTH_FAILED", "message": e.detail},
+        ) from e
+    except ClashRoyaleConnectionError as e:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "CR_API_UNAVAILABLE", "message": e.detail},
+        ) from e
+    except ClashRoyaleInvalidResponseError as e:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "CR_API_INVALID_RESPONSE", "message": e.detail},
+        ) from e
+    except ClashRoyalePlayerCheckError as e:
+        # Other Clash Royale failures still need to stay separate from backend errors.
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "CR_API_UNAVAILABLE", "message": e.detail},
+        ) from e
 
     try:
         status_insert = await insert_tracked_player(mongo_conn, player_tag, player)
@@ -74,7 +114,7 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
 )
 async def remove_tracked_player(
     mongo_conn: DbConn,
-    _=Depends(require_auth),
+    _=Depends(require_remove_player_token),
     player_tag: str = Depends(require_tracked_player),
 ):
     try:

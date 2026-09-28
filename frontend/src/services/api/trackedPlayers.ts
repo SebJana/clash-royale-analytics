@@ -15,23 +15,23 @@ export async function fetchAllTrackedPlayersCount(): Promise<PlayerCount> {
 export async function trackPlayer(
   playerTag: string
 ): Promise<{ status: string; tag: string }> {
-  if (!validatePlayerTagSyntax(playerTag)) {
-    throw new Error(`Player with tag ${playerTag} does not exist`);
+  const tag = playerTag.trim();
+  if (!validatePlayerTagSyntax(tag)) {
+    throw new Error("Invalid player tag. Enter a tag like #YYRJQY28.");
   }
 
-  const tag = encodeURIComponent(playerTag);
-  const response = await api.post(`/players/${tag}`);
+  const response = await api.post(`/players/${encodeURIComponent(tag)}`);
   return response.data;
 }
 
 export async function untrackPlayer(
   playerTag: string
 ): Promise<{ status: string; tag: string }> {
-  if (!validatePlayerTagSyntax(playerTag)) {
-    throw new Error(`Player with tag ${playerTag} does not exist`);
+  const tag = playerTag.trim();
+  if (!validatePlayerTagSyntax(tag)) {
+    throw new Error("Invalid player tag. Enter a tag like #YYRJQY28.");
   }
 
-  const tag = encodeURIComponent(playerTag);
-  const response = await api.delete(`/players/${tag}`);
+  const response = await api.delete(`/players/${encodeURIComponent(tag)}`);
   return response.data;
 }

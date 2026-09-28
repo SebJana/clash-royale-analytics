@@ -18,7 +18,7 @@ export function datetimeToLocale(time: string): string {
   }
 
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "—";
 
   // Locale & timezone of user
   return new Intl.DateTimeFormat(undefined, {
@@ -57,7 +57,10 @@ export function getTodayDateTime(): string {
  * @returns YYYY-MM-DD format
  */
 export function formatDateForInput(date: Date): string {
-  return date.toISOString().slice(0, 10); // Format as YYYY-MM-DD
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 /**
@@ -67,7 +70,7 @@ export function formatDateForInput(date: Date): string {
  */
 export function getClashRoyaleReleaseDate(): Date {
   // Official launch date for Clash Royale
-  return new Date("2016-03-02");
+  return new Date(2016, 2, 2);
 }
 
 /**
@@ -85,39 +88,47 @@ export function getClashRoyaleReleaseDate(): Date {
  */
 export function isValidDateRange(
   startDateString: string,
-  endDateString: string
+  endDateString: string,
 ) {
   if (!startDateString || !endDateString) {
     return false;
   }
 
-  // Convert to dates
-  const startDate = new Date(startDateString);
-  const endDate = new Date(endDateString);
+  // Date inputs are calendar dates in the browser's local timezone. Parsing
+  // YYYY-MM-DD with new Date() would interpret them as UTC instead.
+  const isCalendarDate = (value: string) => {
+    // Require the YYYY-MM-DD format before checking whether the date exists.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return false;
+    }
+    // Split date by (required) hyphens
+    const [year, month, day] = value.split("-").map(Number);
+    // Month is zero-indexed in JS
+    const parsed = new Date(year, month - 1, day);
+    return (
+      parsed.getFullYear() === year &&
+      parsed.getMonth() === month - 1 &&
+      parsed.getDate() === day
+    );
+  };
 
-  // When the given strings can't be converted into a valid date
-  if (
-    !startDate ||
-    Number.isNaN(startDate.getTime()) ||
-    !endDate ||
-    Number.isNaN(endDate.getTime())
-  ) {
+  if (!isCalendarDate(startDateString) || !isCalendarDate(endDateString)) {
     return false;
   }
 
-  const today = new Date();
+  const today = formatDateForInput(new Date());
 
   // Upon selecting an end date in the future
-  if (endDate > today) {
+  if (endDateString > today) {
     return false;
   }
   // Upon selecting a start date too far in the past (before the Clash Royale launch)
-  if (startDate < getClashRoyaleReleaseDate()) {
+  if (startDateString < formatDateForInput(getClashRoyaleReleaseDate())) {
     return false;
   }
 
   // End date is before start date
-  if (endDate < startDate) {
+  if (endDateString < startDateString) {
     return false;
   }
   // TODO possibly limit time range (max N years)?

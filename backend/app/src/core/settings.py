@@ -24,6 +24,7 @@ class Settings:
     MOST_SKILLFUL_CARD: str = os.getenv("MOST_SKILLFUL_CARD", "")
     MOST_MOUSEY_CARD: str = os.getenv("MOST_MOUSEY_CARD", "")
 
+    # TODO add setting where neither .lower() nor any fuzzy matching are used to have a "secure" option
     # How close does the given security question answer need to be to the actual one from .env?
     SECURITY_FUZZY_THRESHOLD: int = 95  # Keep in high 90s to let cards with typos pass
 
@@ -32,18 +33,118 @@ class Settings:
         0.33  # Adjust what share of the captcha is digits (range: 0-1)
     )
 
+    # Maximum number of cards shown together in one Halli Galli round.
+    # Keep this equal to the number shown by the frontend, since both sides
+    # need to count the same cards when deciding whether a fruit wins.
+    HALLI_GALLI_GAME_ROUND_CARDS = 4
+
+    # Keep this many future cards prepared for the frontend to preload.
+    # One new card enters per round, so this is also how many rounds ahead
+    # add_next_round picks a card. The value is saved with each new game.
+    HALLI_GALLI_MAX_PRELOADED_CARDS = 3
+
+    # Maximum number of reusable rendered PNGs for each fruit and amount pair.
+    # For example, banana with four fruits has its own pool of this size.
+    # NOTE This is a security relevant setting, if variations are not arbitrarily big
+    # an "attacker" could start fingerprinting the already known images and compare
+    # the incoming (from the same pool) to those
+    HALLI_GALLI_CARD_VARIATIONS_PER_COMBINATION = 25
+
+    # Rotate raw card variations after they are created, so that an automated attack
+    # does not receive the same variations of cards over and over for hours.
+    # Reusing a variation does not extend its lifetime.
+    HALLI_GALLI_CARD_TTL_MINUTES = 10
+
+    # A fruit counts as a Halli Galli only when its visible total equals this
+    # number exactly. Tune it together with the maximum fruit amount per card
+    # and the number of cards shown, since these determine how often a win occurs.
+    HALLI_GALLI_WINNING_FRUIT_COUNT = 5
+
+    # Base reaction time in milliseconds before adding jitter and the calibrated
+    # network delay.
+    # Every round receives a deadline, including those without a winning count.
+    # An early next-card request is therefore handled the same way in both cases.
+    HALLI_GALLI_ROUND_WINDOW_MS = 1750
+    # Sample uniformly within plus or minus this percentage of the base time.
+    # At 2000 ms and 12.5%, the sampled window is 1750 to 2250 ms.
+    HALLI_GALLI_ROUND_JITTER_PERCENT = 12.5
+    # Do not ask the frontend to reveal the next card more often than this.
+    # Longer game windows still produce a longer interval automatically.
+    HALLI_GALLI_MIN_NEXT_CARD_INTERVAL_MS = 3000
+
+    # TODO Also randomly decide how many fruit at once (5,6,7) win?
+
+    # When enabled, require a click on a fruit at the edge chosen for the game.
+    # When disabled, a click anywhere on the required winning card is enough;
+    # that card is still randomly chosen as oldest or newest when the game starts.
+    HALLI_GALLI_REQUIRE_TARGET_FRUIT = True
+    # Fruits whose relevant edges are this close to the extreme also count.
+    # The value is normalized to card width for left/right and height for top/bottom.
+    HALLI_GALLI_TARGET_FRUIT_BUFFER = 0.05
+    # Expand each side of the target fruit's hitbox by X% of that fruit's
+    # bounding-box width or height to allow slightly imprecise clicks.
+    HALLI_GALLI_TARGET_FRUIT_HITBOX_PADDING = 0.05
+
+    # Number of mistakes the player can make before losing the game.
+    # A mistake includes buzzing incorrectly or failing to beat the bot.
+    # The player loses when their remaining lives reach zero.
+    HALLI_GALLI_PLAYER_LIVES = 3
+
+    # Number of rounds the bot can lose before the player wins the game.
+    # Keeping player and bot lives equal gives both sides the same number of
+    # allowed losses. Skew these values to adjust the game's difficulty.
+    HALLI_GALLI_BOT_LIVES = 3
+
+    # A completed calibration ID can create exactly one game session within 15
+    # seconds. The normal browser flow uses it immediately, while the short
+    # lifetime limits opportunities to hand it to another client.
+    HALLI_GALLI_CALIBRATION_TTL_SECONDS = 15
+    # The server sends this many nonce-bound probes during one calibration run.
+    HALLI_GALLI_CALIBRATION_PROBE_COUNT = 10
+    # At least this many probes must receive a valid reply for a passing result.
+    HALLI_GALLI_CALIBRATION_MIN_SAMPLES = 7
+    # Each browser pong must arrive within this server-measured time limit.
+    HALLI_GALLI_CALIBRATION_PROBE_TIMEOUT_SECONDS = 1.0
+    # Reject connections whose fastest and slowest valid RTT samples differ by more than this.
+    HALLI_GALLI_CALIBRATION_MAX_JITTER_MS = 150
+    # Cap the saved median at 500 ms. This has one of the largest effects on
+    # poor-network players: a generous cap helps genuine high-latency clients,
+    # but also gives an AI attack bot more time if it deliberately slows traffic.
+    # It remains above the roughly 269 ms broad-Internet P90 reported by
+    # CAIDA's Frankfurt monitor.
+    # TODO: Revisit accessibility for very high-latency players. At about
+    # 950 ms RTT, this cap credits only 500 ms, and the 1-second probe timeout
+    # leaves little room for variation. Evaluate a fairer allowance and probe
+    # timeout without rewarding clients that deliberately delay replies.
+    HALLI_GALLI_CALIBRATION_MAX_RTT_MS = 500
+    # Browser origins permitted to open the calibration WebSocket. Configure the
+    # production frontend origin with HALLI_GALLI_WS_ALLOWED_ORIGINS.
+    HALLI_GALLI_WS_ALLOWED_ORIGINS = tuple(
+        origin.strip()
+        for origin in os.getenv(
+            "HALLI_GALLI_WS_ALLOWED_ORIGINS",
+            "http://localhost,http://127.0.0.1,"
+            "http://localhost:3000,http://localhost:5173,"
+            "http://127.0.0.1:3000,http://127.0.0.1:5173",
+        ).split(",")
+        if origin.strip()
+    )
+
     # Token Expiry Minutes
     CAPTCHA_TOKEN_EXPIRES_IN: int = (
         30  # How long does the user have access to try wordle?
     )
     # Keep this one short, to minimize brute force attacks on the answers (+ rate limiting on verify route)
     WORDLE_TOKEN_EXPIRES_IN: int = (
+        5  # How long does the user have access to start Halli Galli?
+    )
+    HALLI_GALLI_TOKEN_EXPIRES_IN: int = (
         5  # How long does the user have access to try the security questions?
     )
     SECURITY_TOKEN_EXPIRES_IN: int = (
         3  # How long does the user have access to the auth token request?
     )
-    AUTH_TOKEN_EXPIRES_IN: int = (
+    REMOVE_PLAYER_TOKEN_EXPIRES_IN: int = (
         15  # How long does the user have access to protected routes?
     )
 
@@ -87,6 +188,7 @@ class Settings:
     )  # 5 minutes (how long does a captcha challenge stay valid in cache)
     # Time PER VALID GUESS on the wordle challenge, as every new guess resets the redis json and ttl
     CACHE_TTL_WORDLE_CHALLENGE: int = 10 * 60  # 10 minutes
+    CACHE_TTL_HALLI_GALLI: int = 15 * 60  # 10 minutes
     CACHE_TTL_NYT_WORDLE_ANSWER: int = 6 * 60 * 60  # 6 hours
 
 

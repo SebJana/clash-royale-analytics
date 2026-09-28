@@ -77,10 +77,14 @@
   max-width: 200px;
 }
 
+.decks-virtual-list {
+  position: relative;
+  width: 100%;
+}
+
 .decks-deck-row {
   display: flex;
   gap: var(--spacing-2xl);
-  margin-bottom: var(--spacing-2xl);
   align-items: center;
   flex-wrap: wrap;
   padding-bottom: var(--spacing-2xl);
@@ -91,7 +95,9 @@
 }
 
 .deck-section {
-  flex: 0 0 auto;
+  flex: 0 1 700px;
+  width: 100%;
+  min-width: 0;
   max-width: 700px;
 }
 
@@ -108,6 +114,21 @@
   min-width: 180px;
 }
 
+.decks-game-modes-tooltip {
+  display: grid;
+  gap: var(--spacing-xs);
+  max-width: 280px;
+}
+
+.decks-game-modes-tooltip ul {
+  margin: 0;
+  padding-left: var(--spacing-lg);
+}
+
+.decks-game-modes-tooltip li + li {
+  margin-top: var(--spacing-xs);
+}
+
 .decks-loading-spinner {
   margin: var(--spacing-2xl) auto;
   display: block;
@@ -118,9 +139,13 @@
     flex-direction: column;
     gap: var(--spacing-lg);
     align-items: center;
+    padding-top: var(--spacing-md);
+    padding-bottom: var(--spacing-3xl);
   }
 
   .deck-section {
+    /* The desktop flex basis would become a 700px height in the stacked layout. */
+    flex: none;
     min-width: unset;
     max-width: unset;
   }

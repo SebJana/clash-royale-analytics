@@ -3,7 +3,8 @@ import {
   internalNamesToDisplayNames,
   internalDisplayMapToDisplayNamesList,
 } from "../../utils/gameModes";
-import { ChevronDown, ChevronUp, Search } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { FilterSearch } from "../filterSearch/filterSearch";
 import "./gameModeFilter.css";
 
 type GameModeOption = {
@@ -20,7 +21,7 @@ type GameModeOption = {
  *
  * Key behaviors:
  * - Empty selection array means "all modes selected" (no filtering / no query param)
- * - Empty selection intentionally has no bonbons; bonbons only represent an explicit subset
+ * - Empty selection intentionally has no bonbons; bonbons represent explicit selections
  * - Multiple internal modes may share one display name, so they are selected and removed together
  * - Clicking a selected bonbon directly removes its display group from the selection
  */
@@ -43,7 +44,7 @@ export function GameModeFilter({
   // Convert raw names from the API into the labels shown to the user.
   const gameModesMap = useMemo(
     () => internalNamesToDisplayNames(gameModes),
-    [gameModes]
+    [gameModes],
   );
 
   // Build one option for each display name. This keeps related internal names
@@ -59,20 +60,25 @@ export function GameModeFilter({
           .map(([internal]) => internal),
       }))
       .sort((a, b) =>
-        a.display.localeCompare(b.display, undefined, { sensitivity: "base" })
+        a.display.localeCompare(b.display, undefined, { sensitivity: "base" }),
       );
   }, [gameModesMap]);
 
   // A Set makes repeated selected-state checks cheap while rendering the list.
   const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const allModesSelected =
+    options.length > 0 &&
+    options.every((option) =>
+      option.internals.every((internal) => selectedSet.has(internal)),
+    );
 
   // Only explicit selections become bonbons. [] means all modes, therefore no bonbons.
   const selectedOptions = useMemo(
     () =>
       options.filter((option) =>
-        option.internals.some((internal) => selectedSet.has(internal))
+        option.internals.some((internal) => selectedSet.has(internal)),
       ),
-    [options, selectedSet]
+    [options, selectedSet],
   );
 
   // Search both the friendly label and the internal value. The latter is useful
@@ -85,8 +91,8 @@ export function GameModeFilter({
       ({ display, internals }) =>
         display.toLocaleLowerCase().includes(normalizedSearch) ||
         internals.some((internal) =>
-          internal.toLocaleLowerCase().includes(normalizedSearch)
-        )
+          internal.toLocaleLowerCase().includes(normalizedSearch),
+        ),
     );
   }, [options, searchTerm]);
 
@@ -105,7 +111,12 @@ export function GameModeFilter({
   };
 
   const selectAllModes = () => {
-    // Empty is intentionally the all-modes state, not an empty result set.
+    // Keep every raw mode selected so the user can remove individual display groups.
+    onChange(options.flatMap((option) => option.internals));
+  };
+
+  const clearSelection = () => {
+    // Empty means no game mode filter, so the API includes all modes.
     onChange([]);
   };
 
@@ -183,34 +194,37 @@ export function GameModeFilter({
               id="game-mode-filter-dropdown"
               className="game-mode-filter-dropdown"
             >
-              <label className="game-mode-filter-search">
-                <Search aria-hidden="true" />
-                <span className="sr-only">Search game modes</span>
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search game modes"
-                />
-              </label>
+              <FilterSearch
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Search game modes"
+              />
+
+              <div className="game-mode-filter-actions">
+                <button
+                  type="button"
+                  className="game-mode-filter-action-button game-mode-filter-select-all"
+                  onClick={selectAllModes}
+                  disabled={allModesSelected || options.length === 0}
+                  title="Select all game modes, including search results not shown"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="game-mode-filter-action-button game-mode-filter-clear"
+                  onClick={clearSelection}
+                  disabled={selected.length === 0}
+                >
+                  Clear selection
+                </button>
+              </div>
 
               <div
                 className="game-mode-filter-options"
                 role="listbox"
                 aria-label="Game modes"
               >
-                {/* Resetting to [] is how the API knows to include every saved game mode. */}
-                <button
-                  type="button"
-                  className={`game-mode-filter-option ${
-                    selected.length === 0 ? "is-selected" : ""
-                  }`}
-                  onClick={selectAllModes}
-                  role="option"
-                  aria-selected={selected.length === 0}
-                >
-                  All game modes
-                </button>
                 {filteredOptions.map((option) => (
                   <button
                     key={option.display}
