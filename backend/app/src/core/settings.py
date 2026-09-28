@@ -144,7 +144,7 @@ class Settings:
     SECURITY_TOKEN_EXPIRES_IN: int = (
         3  # How long does the user have access to the auth token request?
     )
-    AUTH_TOKEN_EXPIRES_IN: int = (
+    REMOVE_PLAYER_TOKEN_EXPIRES_IN: int = (
         15  # How long does the user have access to protected routes?
     )
 

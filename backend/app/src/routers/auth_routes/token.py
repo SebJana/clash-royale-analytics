@@ -1,4 +1,4 @@
-"""Final authentication token exchange route."""
+"""Final player-removal token exchange route."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
@@ -11,8 +11,8 @@ from routers.auth_routes.common import round_token_scheme
 router = APIRouter()
 
 
-@router.post("/token", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
-async def get_auth_token(
+@router.post("/remove_player_token", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
+async def get_remove_player_token(
     credentials: HTTPAuthorizationCredentials | None = Depends(round_token_scheme),
 ):
     if not credentials or not validate_access_token(
@@ -25,8 +25,8 @@ async def get_auth_token(
         )
 
     return {
-        "auth_token": create_access_token(
-            type=AvailableTokenTypes.AUTH.value,
-            expires_minutes=settings.AUTH_TOKEN_EXPIRES_IN,
+        "remove_player_token": create_access_token(
+            type=AvailableTokenTypes.REMOVE_PLAYER_TOKEN.value,
+            expires_minutes=settings.REMOVE_PLAYER_TOKEN_EXPIRES_IN,
         )
     }

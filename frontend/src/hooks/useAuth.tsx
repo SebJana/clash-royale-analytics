@@ -4,7 +4,7 @@ import { jwtDecode } from "jwt-decode";
 import type { AuthState } from "../types/auth";
 import { AuthContext } from "../contexts/AuthContext";
 import type { AuthContextType } from "../contexts/AuthContext";
-import { setAuthToken, clearAuthToken } from "../services/api/auth";
+import { setRemovePlayerToken, clearRemovePlayerToken } from "../services/api/auth";
 
 // Props interface for AuthProvider component - accepts child components to wrap with auth context
 interface AuthProviderProps {
@@ -12,7 +12,7 @@ interface AuthProviderProps {
 }
 
 // localStorage key for persisting auth state
-const AUTH_STORAGE_KEY = "clash_royale_auth";
+const REMOVE_PLAYER_TOKEN_STORAGE_KEY = "clash_royale_remove_player_token";
 
 /**
  * Parse JWT token to extract expiration time using jwt-decode library
@@ -44,23 +44,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Restore auth state from localStorage on app start
   useEffect(() => {
-    const savedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
+    const savedAuth = localStorage.getItem(REMOVE_PLAYER_TOKEN_STORAGE_KEY);
     if (savedAuth) {
       try {
         const parsed: AuthState = JSON.parse(savedAuth);
         // Check if token is still valid (not expired)
         if (parsed.expiresAt && parsed.expiresAt > Date.now()) {
           setAuthState(parsed);
-          if (parsed.authToken) {
-            setAuthToken(parsed.authToken);
+          if (parsed.removePlayerToken) {
+            setRemovePlayerToken(parsed.removePlayerToken);
           }
         } else {
           // Token expired, clear it
-          localStorage.removeItem(AUTH_STORAGE_KEY);
+          localStorage.removeItem(REMOVE_PLAYER_TOKEN_STORAGE_KEY);
         }
       } catch {
         // Invalid saved data, clear it
-        localStorage.removeItem(AUTH_STORAGE_KEY);
+        localStorage.removeItem(REMOVE_PLAYER_TOKEN_STORAGE_KEY);
       }
     }
   }, []);
@@ -74,20 +74,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const newAuthState: AuthState = {
       isAuthenticated: true,
-      authToken: token,
+      removePlayerToken: token,
       expiresAt,
     };
 
     setAuthState(newAuthState);
-    setAuthToken(token);
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
+    setRemovePlayerToken(token);
+    localStorage.setItem(REMOVE_PLAYER_TOKEN_STORAGE_KEY, JSON.stringify(newAuthState));
   }, []);
 
   // Logout user and clear all auth data
   const logout = useCallback(() => {
     setAuthState({ isAuthenticated: false });
-    clearAuthToken();
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    clearRemovePlayerToken();
+    localStorage.removeItem(REMOVE_PLAYER_TOKEN_STORAGE_KEY);
   }, []);
 
   // Check if user is authenticated and token hasn't expired

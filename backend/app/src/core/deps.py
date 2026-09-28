@@ -113,13 +113,13 @@ auth_scheme = HTTPBearer()
 
 
 # Dependency that ensures authorization token is received and validated
-def require_auth(credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)):
+def require_remove_player_token(credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)):
     """
     Validates a Bearer token provided via the Authorization header.
     """
     token = credentials.credentials
 
-    if not validate_access_token(token, AvailableTokenTypes.AUTH.value):
+    if not validate_access_token(token, AvailableTokenTypes.REMOVE_PLAYER_TOKEN.value):
         raise HTTPException(
             status_code=403,
             detail="No authorization, invalid or expired auth token.",

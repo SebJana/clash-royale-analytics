@@ -18,7 +18,7 @@ import {
   getWordleId,
   submitWordleGuess,
   verifySecurityQuestions,
-  getAuthToken,
+  getRemovePlayerToken,
 } from "../../services/api/auth";
 import "./authModal.css";
 
@@ -220,8 +220,8 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
         },
       );
 
-      const { auth_token } = await getAuthToken(security_token);
-      login(auth_token);
+      const { remove_player_token } = await getRemovePlayerToken(security_token);
+      login(remove_player_token);
       resetAuthFlow();
       onSuccess();
       onClose();

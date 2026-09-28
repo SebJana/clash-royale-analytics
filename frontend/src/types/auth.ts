@@ -109,12 +109,12 @@ export type SecurityTokenResponse = {
   security_token: string;
 };
 
-export type AuthTokenResponse = {
-  auth_token: string;
+export type RemovePlayerTokenResponse = {
+  remove_player_token: string;
 };
 
 export type AuthState = {
   isAuthenticated: boolean;
-  authToken?: string;
+  removePlayerToken?: string;
   expiresAt?: number;
 };

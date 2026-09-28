@@ -35,8 +35,8 @@ router.include_router(token.router)
 #    halli_galli_token; losing ends this attempt.
 # 4) Security Questions:
 #    Use the halli_galli_token to answer the questions for a security_token.
-# 5) Auth Token:
-#    Exchange the security_token for the final auth_token.
+# 5) Player-Removal Token:
+#    Exchange the security_token for the final remove_player_token.
 
 # Use relatively strict rate limiting here to try and limit bot attack opportunities
 

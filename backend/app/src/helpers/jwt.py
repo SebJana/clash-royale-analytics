@@ -11,7 +11,7 @@ class AvailableTokenTypes(StrEnum):
     HALLI_GALLI = "halli_galli"
     SECURITY = "security"
     WORDLE = "wordle"
-    AUTH = "auth"
+    REMOVE_PLAYER_TOKEN = "remove_player_token"
 
 
 def create_access_token(type: str, expires_minutes: int = 30):

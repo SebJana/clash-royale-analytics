@@ -11,7 +11,7 @@ import type {
   WordleVerifyRequest,
   SecurityQuestionsRequest,
   SecurityTokenResponse,
-  AuthTokenResponse,
+  RemovePlayerTokenResponse,
 } from "../../types/auth";
 
 // Capability tokens authorize the next authentication step. Every HTTP call
@@ -189,11 +189,11 @@ export async function verifySecurityQuestions(
   return response.data;
 }
 
-// Step 5: Get final auth token
-export async function getAuthToken(
+// Step 5: Get the final player-removal token
+export async function getRemovePlayerToken(
   securityToken: string,
-): Promise<AuthTokenResponse> {
-  const response = await api.post<AuthTokenResponse>("/auth/token", undefined, {
+): Promise<RemovePlayerTokenResponse> {
+  const response = await api.post<RemovePlayerTokenResponse>("/auth/remove_player_token", undefined, {
     headers: {
       Authorization: `Bearer ${securityToken}`,
     },
@@ -201,12 +201,12 @@ export async function getAuthToken(
   return response.data;
 }
 
-// Utility: Set auth token in axios headers
-export function setAuthToken(token: string): void {
+// Utility: Set player-removal token in axios headers
+export function setRemovePlayerToken(token: string): void {
   api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 }
 
-// Utility: Clear auth token from axios headers
-export function clearAuthToken(): void {
+// Utility: Clear player-removal token from axios headers
+export function clearRemovePlayerToken(): void {
   delete api.defaults.headers.common["Authorization"];
 }

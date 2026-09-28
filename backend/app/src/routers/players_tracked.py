@@ -4,7 +4,7 @@ from core.deps import (
     DbConn,
     CrApi,
     require_tracked_player,
-    require_auth,
+    require_remove_player_token,
 )
 from clash_royale_api import (
     ClashRoyaleMaintenanceError,
@@ -114,7 +114,7 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
 )
 async def remove_tracked_player(
     mongo_conn: DbConn,
-    _=Depends(require_auth),
+    _=Depends(require_remove_player_token),
     player_tag: str = Depends(require_tracked_player),
 ):
     try:
