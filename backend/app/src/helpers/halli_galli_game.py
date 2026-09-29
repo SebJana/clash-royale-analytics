@@ -17,6 +17,11 @@ from helpers.halli_galli_card import (
 from core.settings import settings
 from redis_service import RedisConn
 
+# TODO add min reaction time, if that is beat that was either guessing or a CV pipeline, not a human
+# TODO add logging how many tries are needed, win rate, reaction times, etc. to get a feel for
+# how hard this is (also log network delay)
+# Are there good monitoring frameworks that can do exactly that, on a per route basis?
+
 # The calibration stores RTT in milliseconds, while round deadlines use seconds.
 MILLISECONDS_PER_SECOND = 1000
 # Use half of the measured round-trip time to estimate the delay of a buzz

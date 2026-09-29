@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -9,19 +10,23 @@ import { Button, CircularProgress } from "@mui/material";
 import {
   Bot,
   Cherry,
+  ChevronUp,
   Citrus,
   Gauge,
   Grape,
   Heart,
   Pause,
   Play,
-  RotateCcw,
   UserRound,
   Zap,
 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
-import { AuthChallengeError, getAuthErrorFeedback, type AuthErrorFeedback } from "../../utils/authErrors";
+import {
+  AuthChallengeError,
+  getAuthErrorFeedback,
+  type AuthErrorFeedback,
+} from "../../utils/authErrors";
 import {
   buzzHalliGalliRound,
   getHalliGalliCard,
@@ -32,6 +37,7 @@ import {
 } from "../../services/api/auth";
 import type {
   HalliGalliGameResponse,
+  HalliGalliPublicRules,
   HalliGalliRoundReason,
   HalliGalliRoundResponse,
 } from "../../types/auth";
@@ -50,6 +56,8 @@ import {
   type VisibleCard,
 } from "./halliGalliFlow";
 import "./halliGalli.css";
+import { AuthActionButton } from "./authActionButton";
+import { useAuthCooldown } from "../../hooks/useAuthCooldown";
 
 type Phase =
   | "loading"
@@ -64,6 +72,20 @@ type Phase =
   | "lost"
   | "error";
 const ROUND_FEEDBACK_MS = 2200;
+const CARD_ASPECT_RATIO = 5 / 7;
+// Full rules are shown only if the maximum card count still fits at this width.
+// Desktop width alone doesn't mean there's enough height for readable cards.
+const DESKTOP_RULES_MIN_CARD_WIDTH = 200;
+// Only used to measure the hidden loading copy before the backend sends rules.
+// Keep these representative values in sync with the current game configuration.
+const LOADING_RULES: HalliGalliPublicRules = {
+  winning_fruit_count: 5,
+  visible_card_count: 4,
+  max_preloaded_cards: 3,
+  winning_card_age: "oldest",
+  require_target_fruit: true,
+  target_fruit_edge: "right",
+};
 
 const feedbackText: Record<HalliGalliRoundReason, string> = {
   correct_buzz: "Halli Galli! The bot loses a life.",
@@ -104,6 +126,13 @@ export function HalliGalli({
   );
   const [game, setGame] = useState<HalliGalliGameResponse | null>(null);
   const [pile, setPile] = useState<VisibleCard[]>([]);
+  const pileRef = useRef<HTMLDivElement>(null);
+  const desktopRulesRef = useRef<HTMLDivElement>(null);
+  const [showDesktopRules, setShowDesktopRules] = useState(false);
+  const [pileLayout, setPileLayout] = useState({ columns: 1, rows: 1 });
+  const showingGame = game !== null;
+  const rules = game?.rules ?? LOADING_RULES;
+  const configuredCardCount = rules.visible_card_count;
   const [playerLives, setPlayerLives] = useState(0);
   const [botLives, setBotLives] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -115,6 +144,7 @@ export function HalliGalli({
   const [pauseAfterRound, setPauseAfterRound] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
   const [error, setError] = useState<AuthErrorFeedback | null>(null);
+  const cooldown = useAuthCooldown(error);
   const pauseAfterRoundRef = useRef(false);
   const buzzRef = useRef<(card: VisibleCard, x: number, y: number) => void>(
     () => {},
@@ -126,6 +156,100 @@ export function HalliGalli({
   useEffect(() => {
     callbacksRef.current = { onWin, onWordleExpired };
   }, [onWin, onWordleExpired]);
+
+  // Reserve the full configured window so cards do not resize as it fills.
+  // Empty slots stay empty; temporary card placeholders would disappear again
+  // as soon as the first card is revealed and make the round start look inconsistent.
+  useEffect(() => {
+    const element = pileRef.current;
+    if (!element || !showingGame) return;
+    const count = configuredCardCount;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      const gap = parseFloat(getComputedStyle(element).gap) || 0;
+      let best = { columns: 1, rows: count };
+      let largestWidth = 0;
+      for (let columns = 1; columns <= count; columns++) {
+        const rows = Math.ceil(count / columns);
+        const cardWidth = Math.min(
+          (width - gap * (columns - 1)) / columns,
+          ((height - gap * (rows - 1)) / rows) * CARD_ASPECT_RATIO,
+        );
+        if (cardWidth > largestWidth) {
+          largestWidth = cardWidth;
+          best = { columns, rows };
+        }
+      }
+      setPileLayout((previous) =>
+        previous.columns === best.columns && previous.rows === best.rows
+          ? previous
+          : best,
+      );
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [configuredCardCount, showingGame]);
+
+  // Show full desktop instructions when they leave room for the entire pile
+  // at a readable card width. Reserve the timer even before play starts.
+  useLayoutEffect(() => {
+    const pileElement = pileRef.current;
+    const rules = desktopRulesRef.current;
+    const panel = pileElement?.parentElement;
+    const content = panel?.parentElement;
+    const heading = panel?.querySelector<HTMLElement>(".auth-stage-heading");
+    const lives = panel?.querySelector<HTMLElement>(".halli-lives");
+    if (!pileElement || !rules || !panel || !content || !heading || !lives)
+      return;
+
+    const update = () => {
+      const panelStyle = getComputedStyle(panel);
+      const contentStyle = getComputedStyle(content);
+      const gap = parseFloat(panelStyle.gap) || 0;
+      const cardGap = parseFloat(getComputedStyle(pileElement).gap) || 0;
+      const width =
+        panel.clientWidth -
+        parseFloat(panelStyle.paddingLeft) -
+        parseFloat(panelStyle.paddingRight);
+      const columns = Math.min(
+        configuredCardCount,
+        Math.max(
+          1,
+          Math.floor(
+            (width + cardGap) / (DESKTOP_RULES_MIN_CARD_WIDTH + cardGap),
+          ),
+        ),
+      );
+      const rows = Math.ceil(configuredCardCount / columns);
+      const minimumPileHeight =
+        (rows * DESKTOP_RULES_MIN_CARD_WIDTH) / CARD_ASPECT_RATIO +
+        (rows - 1) * cardGap;
+      const availableHeight =
+        content.clientHeight -
+        parseFloat(contentStyle.paddingTop) -
+        parseFloat(contentStyle.paddingBottom) -
+        parseFloat(panelStyle.paddingTop) -
+        parseFloat(panelStyle.paddingBottom) -
+        2 -
+        heading.offsetHeight -
+        lives.offsetHeight -
+        44 -
+        4 * gap;
+      setShowDesktopRules(
+        window.matchMedia("(min-width: 769px)").matches &&
+          rules.offsetHeight + minimumPileHeight <= availableHeight,
+      );
+    };
+    // Decide before paint, otherwise the full rules can appear a frame later
+    // and shift the lives and cards while the player is looking at them.
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(content);
+    observer.observe(rules);
+    observer.observe(heading);
+    observer.observe(lives);
+    return () => observer.disconnect();
+  }, [configuredCardCount, showingGame]);
 
   useEffect(() => {
     // This attempt owns its socket, timers, ciphertext, and object URLs. Effect
@@ -178,10 +302,14 @@ export function HalliGalli({
       if (!active) return;
       clearTimer();
       setPhase("error");
-      setError(getAuthErrorFeedback(
-        tokenExpired(wordleToken) ? new AuthChallengeError("WORDLE_TOKEN_EXPIRED") : err,
-        "halli_galli",
-      ));
+      setError(
+        getAuthErrorFeedback(
+          tokenExpired(wordleToken)
+            ? new AuthChallengeError("WORDLE_TOKEN_EXPIRED")
+            : err,
+          "halli_galli",
+        ),
+      );
     }
     /** Wait for the next-card cadence or result feedback to finish. */
     function waitUntil(when: number): Promise<void> {
@@ -341,8 +469,12 @@ export function HalliGalli({
               active &&
               result.clear_cards &&
               result.game_status === "playing"
-            )
+            ) {
               clearVisiblePile();
+              setPhase((previous) =>
+                previous === "animating" ? "advancing" : previous,
+              );
+            }
           }, ROUND_FEEDBACK_MS);
         }
         if (result.game_status === "player_won") {
@@ -401,7 +533,10 @@ export function HalliGalli({
           return;
         }
         if (result.clear_cards) clearVisiblePile();
-        if (active) await reveal(next.round_index, next.image_id);
+        if (active) {
+          setPhase("advancing");
+          await reveal(next.round_index, next.image_id);
+        }
         // On an ordinary round the next image is already cached. Reveal it
         // before fetching the far future image so the cadence stays smooth.
         if (!buzz) {
@@ -503,9 +638,6 @@ export function HalliGalli({
     buzzRef.current(card, x, y);
   }
 
-  const visibleCount = game?.rules.visible_card_count ?? 1;
-  const desktopRows = Math.ceil(visibleCount / 4);
-  const mobileRows = Math.ceil(visibleCount / 2);
   const messageTone =
     phase === "won" || (phase === "animating" && feedback === "correct_buzz")
       ? "good"
@@ -537,25 +669,25 @@ export function HalliGalli({
     feedback === "late_buzz" ? (
       <Gauge className="halli-late-icon" size={38} aria-hidden="true" />
     ) : null;
-  const ruleText = game && (
+  const ruleText = (
     <>
       <p>
         Buzz when one fruit totals exactly{" "}
-        <strong>{game.rules.winning_fruit_count}</strong> across the visible
-        cards. Every visible card counts, including all{" "}
-        <strong>{game.rules.visible_card_count}</strong> once they are shown.
+        <strong>{rules.winning_fruit_count}</strong> across the visible cards.
+        Every visible card counts, including all{" "}
+        <strong>{rules.visible_card_count}</strong> once they are shown.
       </p>
       <p>
         Count only the <strong>actual fruit emojis</strong>. Ignore colored
         blobs, noise, and all other distractions.
       </p>
       <p className="halli-click-rule">
-        Click the <strong>{game.rules.winning_card_age}</strong> card of the{" "}
+        Click the <strong>{rules.winning_card_age}</strong> card of the{" "}
         <strong>winning fruit</strong>.{" "}
-        {game.rules.require_target_fruit ? (
+        {rules.require_target_fruit ? (
           <>
-            Click the <strong>{game.rules.target_fruit_edge}most</strong> fruit
-            on that card.
+            Click the <strong>{rules.target_fruit_edge}most</strong> fruit on
+            that card.
           </>
         ) : (
           <>
@@ -572,60 +704,124 @@ export function HalliGalli({
     </>
   );
 
+  const loadingIndicator = (
+    <div className={`halli-loading is-${loadingStage}`} role="status">
+      <div className={`halli-loading-visual is-${loadingStage}`}>
+        {loadingStage === "calibrating" && (
+          <div className="halli-loading-fruits" aria-hidden="true">
+            <Cherry size={30} />
+            <Citrus size={30} />
+            <Grape size={30} />
+          </div>
+        )}
+        <span className="halli-loading-core">
+          <CircularProgress
+            className="halli-loading-spinner"
+            size={40}
+            aria-label="Loading Halli Galli"
+          />
+        </span>
+      </div>
+      <div className="halli-loading-copy">
+        <strong>
+          {loadingStage === "calibrating"
+            ? "Checking connectivity…"
+            : "Preparing cards…"}
+        </strong>
+      </div>
+      <div className="halli-loading-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+    </div>
+  );
+
   return (
-    <div className={`halli-galli auth-step phase-${phase}`}>
+    <div
+      className={`halli-galli auth-step phase-${phase}`}
+      aria-busy={phase === "loading"}
+    >
       <h3 className="auth-stage-heading">
         Play Halli Galli to prove your reaction speed
       </h3>
-      {phase === "loading" && (
-        <div className={`halli-loading is-${loadingStage}`} role="status">
-          <div className={`halli-loading-visual is-${loadingStage}`}>
-            {loadingStage === "calibrating" && (
-              <div className="halli-loading-fruits" aria-hidden="true">
-                <Cherry size={30} />
-                <Citrus size={30} />
-                <Grape size={30} />
+      <div
+        className={`halli-desktop-rules${showDesktopRules ? " is-visible" : ""}`}
+        aria-hidden={!game || !showDesktopRules}
+      >
+        <div
+          className={`halli-rules${!game ? " is-loading" : ""}`}
+          ref={desktopRulesRef}
+        >
+          {game ? (
+            ruleText
+          ) : (
+            <>
+              <div className="halli-rules-measure">{ruleText}</div>
+              <div className="halli-rules-blocks">
+                <span className="auth-skeleton" />
+                <span className="auth-skeleton is-highlighted" />
+                <span className="auth-skeleton" />
               </div>
-            )}
-            <span className="halli-loading-core">
-              <CircularProgress
-                className="halli-loading-spinner"
-                size={40}
-                aria-label="Loading Halli Galli"
-              />
-            </span>
-          </div>
-          <div className="halli-loading-copy">
-            <strong>
-              {loadingStage === "calibrating"
-                ? "Checking connectivity…"
-                : "Preparing cards…"}
-            </strong>
-          </div>
-          <div className="halli-loading-dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
+            </>
+          )}
         </div>
-      )}
-      {game && phase !== "loading" && (
+      </div>
+      {!game && (
         <>
-          <div className="halli-rules">{ruleText}</div>
-          <details className="halli-mobile-rules">
-            <summary>
-              Buzz at {game.rules.winning_fruit_count} ·{" "}
-              {game.rules.winning_card_age} winning card ·{" "}
-              {game.rules.require_target_fruit
-                ? `${game.rules.target_fruit_edge}most fruit`
-                : "anywhere"}
-            </summary>
-            <div className="halli-rules">{ruleText}</div>
-          </details>
+          {!showDesktopRules && (
+            <div className="halli-rules-placeholder" aria-hidden="true">
+              <span className="auth-skeleton" />
+              <span className="auth-skeleton" />
+            </div>
+          )}
+          <div className="halli-lives" aria-hidden="true">
+            <div>
+              <span className="halli-life-label">
+                <UserRound size={21} /> You
+              </span>
+              <span className="auth-skeleton halli-lives-placeholder" />
+            </div>
+            <div>
+              <span className="auth-skeleton halli-lives-placeholder" />
+              <span className="halli-life-label">
+                Bot <Bot size={21} />
+              </span>
+            </div>
+          </div>
+          <div className="halli-timer-row" aria-hidden="true">
+            <div className="halli-pause-slot" />
+          </div>
+          <div className="halli-pile halli-placeholder-pile" ref={pileRef}>
+            {phase === "loading" && loadingIndicator}
+          </div>
+        </>
+      )}
+      {game && (
+        <>
+          {!showDesktopRules && (
+            <details className="halli-mobile-rules">
+              <summary>
+                <span>
+                  Rules: Buzz at {game.rules.winning_fruit_count} ·{" "}
+                  {game.rules.winning_card_age} ·{" "}
+                  {game.rules.require_target_fruit
+                    ? `${game.rules.target_fruit_edge}most`
+                    : "anywhere"}
+                </span>
+                <ChevronUp
+                  className="halli-rules-toggle"
+                  size={18}
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="halli-rules">{ruleText}</div>
+            </details>
+          )}
           <div className="halli-lives" aria-label="Remaining lives">
             <div>
-              <span>
-                <UserRound size={18} /> You
+              <span className="halli-life-label">
+                <UserRound size={21} aria-hidden="true" /> <span>You</span>
               </span>
               <span aria-label={`${playerLives} lives left`}>
                 {Array.from({ length: game.player_lives }, (_, i) => (
@@ -639,9 +835,6 @@ export function HalliGalli({
               </span>
             </div>
             <div>
-              <span>
-                <Bot size={18} /> Bot
-              </span>
               <span aria-label={`${botLives} lives left`}>
                 {Array.from({ length: game.bot_lives }, (_, i) => (
                   <Heart
@@ -651,6 +844,9 @@ export function HalliGalli({
                     className={i < botLives ? "life-active" : "life-empty"}
                   />
                 ))}
+              </span>
+              <span className="halli-life-label">
+                <span>Bot</span> <Bot size={21} aria-hidden="true" />
               </span>
             </div>
           </div>
@@ -694,18 +890,17 @@ export function HalliGalli({
           </div>
           <div
             className="halli-pile"
+            ref={pileRef}
             style={
               {
-                "--visible-cards": Math.min(visibleCount, 4),
-                "--visible-cards-mobile": Math.min(visibleCount, 2),
-                "--pile-rows-desktop": desktopRows,
-                "--pile-rows-mobile": mobileRows,
-                "--pile-height-desktop": `${desktopRows * 286 + (desktopRows - 1) * 8}px`,
+                "--pile-columns": pileLayout.columns,
+                "--pile-rows": pileLayout.rows,
               } as CSSProperties
             }
             // TODO keep sliding window for cards or have the n + 1 card replace the oldest
             // current card so that all cards keep their position until they're replaced
           >
+            {phase === "loading" && loadingIndicator}
             {phase === "animating" && (
               <div
                 className={`halli-result-message ${messageTone} ${feedback === "correct_buzz" ? "is-correct" : ""} ${feedback === "missed_halli_galli" ? "is-missed" : ""}`}
@@ -784,7 +979,7 @@ export function HalliGalli({
               phase === "won" ||
               phase === "lost") && (
               <div
-                className={`halli-center-message phase-${phase} ${messageTone}`}
+                className={`halli-center-message phase-${phase} ${messageTone}${phase === "won" || phase === "lost" ? ` auth-outcome-panel ${phase === "won" ? "is-success" : "is-retry"}` : ""}`}
                 role="status"
               >
                 {phase === "ready" && (
@@ -819,15 +1014,14 @@ export function HalliGalli({
                   <>
                     <h4>You won!</h4>
                     <p>You beat the bot.</p>
-                    <Button
-                      variant="contained"
-                      size="large"
+                    <AuthActionButton
+                      action="continue"
                       onClick={() => {
                         if (winToken) callbacksRef.current.onWin(winToken);
                       }}
                     >
                       Continue
-                    </Button>
+                    </AuthActionButton>
                   </>
                 )}
                 {phase === "lost" && (
@@ -835,15 +1029,12 @@ export function HalliGalli({
                     {lateBuzzIcon}
                     <h4>Game over</h4>
                     <p>{lateBuzzDetail ?? feedbackMessage}</p>
-                    <Button
-                      variant="contained"
-                      size="large"
-                      className="auth-outcome-button is-retry"
+                    <AuthActionButton
+                      action="retry"
                       onClick={() => setAttempt((value) => value + 1)}
                     >
-                      <RotateCcw size={18} aria-hidden="true" />
-                      <span>Try Again</span>
-                    </Button>
+                      Try Again
+                    </AuthActionButton>
                   </>
                 )}
               </div>
@@ -852,24 +1043,36 @@ export function HalliGalli({
         </>
       )}
       {phase === "error" && (
-        <div className={`halli-finale bad${game ? " is-error-overlay" : ""}`} role="alert">
-          <p>{error?.message}</p>
-          <Button
-            variant="contained"
-            className="auth-outcome-button is-retry"
+        <div
+          className="halli-finale bad is-error-overlay auth-outcome-panel is-retry"
+          role="alert"
+        >
+          <h4>Try again</h4>
+          <p>{cooldown.message}</p>
+          <AuthActionButton
+            action="retry"
+            disabled={cooldown.remainingSeconds > 0}
             onClick={() => {
               if (error?.recovery === "restart") {
                 callbacksRef.current.onWordleExpired();
               } else if (tokenExpired(wordleToken)) {
-                setError(getAuthErrorFeedback(new AuthChallengeError("WORDLE_TOKEN_EXPIRED"), "halli_galli"));
+                setError(
+                  getAuthErrorFeedback(
+                    new AuthChallengeError("WORDLE_TOKEN_EXPIRED"),
+                    "halli_galli",
+                  ),
+                );
               } else {
                 setAttempt((value) => value + 1);
               }
             }}
           >
-            <RotateCcw size={18} aria-hidden="true" />
-            <span>{error?.recovery === "restart" ? "Restart Verification" : "Try Again"}</span>
-          </Button>
+            <span>
+              {error?.recovery === "restart"
+                ? "Restart Verification"
+                : "Try Again"}
+            </span>
+          </AuthActionButton>
         </div>
       )}
     </div>

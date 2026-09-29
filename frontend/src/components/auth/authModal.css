@@ -5,30 +5,36 @@
   color: var(--text-primary);
 }
 
-/* Let Halli Galli fit its content; smaller screens scroll the outer dialog. */
-.auth-modal.halli-galli-modal .MuiDialog-container.MuiDialog-scrollBody {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: safe center;
-}
-
-.auth-modal.halli-galli-modal .MuiDialog-container.MuiDialog-scrollBody::after {
-  display: none;
-}
-
+/* The game uses the available viewport; only expanded rules add scroll. */
 .auth-modal.halli-galli-modal .MuiDialog-paper {
-  flex-shrink: 0;
-  width: min(1100px, calc(100vw - 32px));
+  width: min(1100px, calc(100% - 16px));
   max-width: 1100px;
-  height: auto;
-  max-height: none;
-  overflow: visible;
+  height: calc(100dvh - 16px);
+  max-height: calc(100dvh - 16px);
+  margin: 8px;
 }
 
 .auth-modal.halli-galli-modal .MuiDialogContent-root {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
-  overflow: visible;
+  padding: var(--spacing-sm);
+}
+
+.auth-modal.halli-galli-modal .halli-galli.auth-step {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: var(--spacing-sm);
+  gap: var(--spacing-sm);
+}
+
+/* Expanded instructions grow the whole game panel inside the scroll area. */
+.auth-modal.halli-galli-modal
+  .halli-galli.auth-step:has(.halli-mobile-rules[open]) {
+  flex: none;
+  min-height: 100%;
+  height: auto;
 }
 
 .auth-modal.wordle-modal .MuiDialog-paper {
@@ -47,12 +53,7 @@
   gap: var(--spacing-sm);
 }
 
-@media (max-width: 600px) {
-  /* Halli Galli already names the challenge inside the dialog. Reuse the
-     title row for cards on narrow screens, while keeping Cancel available. */
-  .auth-modal.halli-galli-modal .MuiDialogTitle-root {
-    display: none;
-  }
+@media (max-width: 600px), (max-height: 500px) {
   .auth-modal.halli-galli-modal .MuiDialogContent-root {
     display: flex;
     flex-direction: column;
@@ -61,14 +62,32 @@
   .auth-modal.halli-galli-modal .MuiDialogActions-root {
     padding: var(--spacing-xs);
   }
+  .auth-modal.halli-galli-modal .halli-galli.auth-step {
+    padding: var(--spacing-xs);
+    gap: var(--spacing-xs);
+  }
 }
 
 .auth-modal .MuiDialogTitle-root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
   background-color: var(--bg-overlay-light);
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-light);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-xl);
+}
+
+.auth-step-count {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .auth-modal .MuiDialogContent-root {
@@ -231,6 +250,54 @@
   background-color: var(--bg-overlay-medium);
 }
 
+.auth-skeleton {
+  display: block;
+  border-radius: var(--radius-sm);
+  background: var(--bg-overlay-strong);
+  animation: auth-skeleton-pulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes auth-skeleton-pulse {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-skeleton {
+    animation: none;
+  }
+}
+
+.captcha-container input.is-incorrect {
+  border-color: var(--color-error);
+  animation: captcha-input-shake 360ms ease-in-out;
+}
+
+@keyframes captcha-input-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .captcha-container input.is-incorrect {
+    animation: none;
+  }
+}
+
 .captcha-buttons {
   display: flex;
   gap: var(--spacing-md);
@@ -381,16 +448,15 @@
   position: relative;
   flex: 1;
   min-width: 0;
-  align-self: stretch;
+  align-self: center;
 }
 
 .auth-feedback-anchor .auth-error-overlay {
-  top: auto;
-  bottom: 0;
-  left: 0;
-  width: fit-content;
+  position: static;
+  width: 100%;
   max-width: 100%;
   transform: none;
+  pointer-events: auto;
 }
 
 .error-message {
@@ -407,181 +473,143 @@
   min-width: 300px;
 }
 
-/* Responsive design */
-@media (max-width: 768px) {
-  .auth-modal .MuiDialogContent-root {
-    padding: var(--spacing-md);
-  }
-
-  .auth-step {
-    padding: var(--spacing-md);
-    margin: var(--spacing-md) auto 0 auto;
-    gap: var(--spacing-sm);
-  }
-
-  .captcha-container {
-    width: 100%;
-    gap: var(--spacing-sm);
-  }
-
-  .security-questions {
-    max-width: 100%;
-    gap: var(--spacing-md);
-  }
-
-  .error-message {
-    width: calc(100% - 2 * var(--spacing-md));
-    max-width: 450px;
-    margin: 0 auto var(--spacing-md) auto;
-    word-wrap: break-word;
-  }
-}
-
-@media (max-width: 480px) {
+/* Keep controls and feedback inside the viewport on phones and tablets. */
+@media (max-width: 768px), (max-height: 500px) {
   .auth-modal .MuiDialog-paper {
-    margin: var(--spacing-xs);
-    width: calc(100% - 2 * var(--spacing-xs));
-    max-height: 95vh;
-    max-width: 100%;
-  }
-
-  .auth-modal .MuiDialogContent-root {
-    padding: var(--spacing-sm);
-    min-height: auto;
-    overflow-x: hidden;
+    width: calc(100% - 16px);
+    max-width: calc(100% - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: 8px;
   }
 
   .auth-modal .MuiDialogTitle-root {
-    padding: var(--spacing-sm);
-    font-size: var(--font-lg);
-    word-wrap: break-word;
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 18px;
+    line-height: 1.3;
+  }
+
+  .auth-modal .MuiDialogContent-root {
+    min-height: 0;
+    padding: 8px;
+  }
+
+  /* MUI removes content's top padding immediately after a dialog title. */
+  .auth-modal .MuiDialogTitle-root + .MuiDialogContent-root:has(.captcha-step) {
+    padding-top: 12px;
+  }
+
+  .auth-modal .auth-step {
+    min-width: 0;
+    margin: 0 auto;
+    padding: 8px;
+    gap: 8px;
+    overflow: visible;
+  }
+
+  .auth-modal .auth-stage-heading {
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    font-size: clamp(16px, 4vw, 20px);
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .auth-modal .captcha-container {
+    gap: 8px;
+  }
+
+  .auth-modal .security-questions {
+    gap: 8px;
+  }
+
+  .auth-modal .question-group {
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .auth-modal .question-group label {
+    font-size: 14px;
+    line-height: 1.3;
+  }
+
+  /* iOS zooms focused text fields smaller than 16px. Preserve pinch zoom. */
+  .auth-modal input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: max(16px, 1rem);
+  }
+
+  .auth-modal .MuiButton-root {
+    min-width: 0;
+    min-height: 44px;
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 14px;
+    line-height: 1.25;
+    text-transform: none;
+    overflow-wrap: anywhere;
+  }
+
+  .auth-modal .security-submit {
+    margin-top: 0;
+  }
+
+  .auth-modal .captcha-buttons {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .auth-modal .captcha-buttons .MuiButton-root {
+    flex: 1 0 auto;
+    white-space: nowrap;
   }
 
   .auth-modal .MuiDialogActions-root {
-    padding: var(--spacing-sm) var(--spacing-sm)
-      max(var(--spacing-sm), env(safe-area-inset-bottom));
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px max(8px, env(safe-area-inset-bottom));
   }
 
-  .auth-step {
-    padding: var(--spacing-sm);
-    margin: var(--spacing-sm) auto 0 auto;
-    gap: var(--spacing-sm);
-    max-width: 100%;
-    overflow-x: hidden;
-    box-sizing: border-box;
+  .auth-modal .MuiDialogActions-root > :not(:first-of-type) {
+    margin-left: 0;
   }
 
-  .auth-step .auth-stage-heading {
-    max-width: 26ch;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    margin-bottom: var(--spacing-sm);
-    font-size: var(--font-xl);
-    line-height: 1.4;
-  }
-
-  .auth-step p {
-    font-size: var(--font-sm);
-    margin-bottom: var(--spacing-xs);
-    word-wrap: break-word;
-    max-width: 100%;
-  }
-
-  .captcha-container {
-    gap: var(--spacing-sm);
-    width: 100%;
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-
-  .captcha-image {
-    max-width: 100%;
-    height: auto;
-  }
-
-  .security-questions {
-    gap: var(--spacing-sm);
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .question-group {
-    gap: var(--spacing-xs);
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .question-group label {
-    font-size: var(--font-sm);
-    word-wrap: break-word;
-    max-width: 100%;
-  }
-
-  .question-group input {
-    padding: var(--spacing-sm);
-    font-size: var(--font-sm);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  .captcha-buttons {
-    gap: var(--spacing-sm);
-    width: 100%;
-    max-width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .captcha-buttons .MuiButton-root {
-    min-width: 120px;
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-sm);
-    flex: 1;
-    max-width: 100%;
-  }
-
-  .error-message {
-    padding: var(--spacing-sm);
-    font-size: var(--font-sm);
-    min-width: 0;
-    width: calc(100% - 2 * var(--spacing-sm));
-    max-width: 100%;
-    margin: 0 auto var(--spacing-sm) auto;
-    word-wrap: break-word;
-    box-sizing: border-box;
+  .auth-modal .auth-error-overlay {
+    font-size: 14px;
+    line-height: 1.3;
   }
 }
 
-@media (max-width: 600px) {
-  .auth-modal .MuiDialog-container.MuiDialog-scrollBody {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: safe center;
-  }
+.auth-modal .MuiDialogActions-root > .MuiButton-root {
+  flex-shrink: 0;
+}
 
-  .auth-modal .MuiDialog-container.MuiDialog-scrollBody::after {
-    display: none;
+@media (max-height: 500px) and (min-width: 600px) {
+  .auth-modal .auth-step:has(.security-questions) {
+    max-width: 700px;
   }
-
-  .auth-modal .MuiDialog-paper.MuiDialog-paperScrollBody,
-  .auth-modal.halli-galli-modal .MuiDialog-paper.MuiDialog-paperScrollBody {
-    flex-shrink: 0;
-    width: calc(100vw - 8px);
-    max-width: calc(100vw - 8px);
-    height: auto;
-    max-height: none;
-    margin: var(--spacing-xs) auto;
-    overflow-y: visible;
+  .auth-modal .security-questions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 100%;
+    gap: 12px;
   }
-
-  .auth-modal .MuiDialogContent-root,
-  .auth-modal.halli-galli-modal .MuiDialogContent-root {
-    overflow-y: visible;
+  .auth-modal .question-group {
+    justify-content: space-between;
+    min-width: 0;
+    gap: 4px;
   }
-
-  .auth-modal.halli-galli-modal .halli-galli.auth-step {
-    flex: none;
-    height: auto;
-    min-height: 0;
+  .auth-modal .security-submit {
+    grid-column: 1 / -1;
+  }
+  .auth-modal .auth-stage-heading {
+    font-size: 16px;
   }
 }

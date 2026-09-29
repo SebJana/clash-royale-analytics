@@ -23,7 +23,7 @@ async def get_remove_player_token(
             status_code=401,
             detail={
                 "code": "SECURITY_TOKEN_EXPIRED",
-                "message": "Security questions took too long. Restart verification.",
+                "message": "Verification took too long. Restart verification.",
             },
         )
 

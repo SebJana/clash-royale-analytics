@@ -5,8 +5,12 @@
   gap: var(--spacing-md);
   box-sizing: border-box;
 }
-.halli-mobile-rules {
-  display: none;
+
+.auth-modal .halli-galli.auth-step {
+  /* Animated cards may grow past the board without growing the dialog's scroll area. */
+  /* Win/loss transforms must not briefly enlarge the parent's scroll area.
+     Expanded rules can still grow this panel and scroll in DialogContent. */
+  overflow: clip;
 }
 
 .halli-loading {
@@ -163,9 +167,10 @@
 }
 
 .halli-lives {
-  display: flex;
-  justify-content: space-around;
-  gap: var(--spacing-lg);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--spacing-sm);
   width: 100%;
 }
 .halli-lives > div,
@@ -176,7 +181,35 @@
   gap: var(--spacing-xs);
 }
 .halli-lives > div {
-  flex-wrap: wrap;
+  min-width: 0;
+  min-height: 21px;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+
+.halli-lives > div:last-child {
+  justify-content: flex-end;
+}
+.halli-lives span,
+.halli-lives svg {
+  flex-shrink: 0;
+}
+.halli-lives .halli-life-label {
+  height: 21px;
+  font-size: 14px;
+  line-height: 21px;
+}
+.halli-lives svg {
+  display: block;
+  width: 21px;
+  height: 21px;
+}
+/* Center the visible strokes against the filled hearts, rather than the SVG boxes. */
+.halli-life-label .lucide-user-round {
+  transform: translateY(-0.5px);
+}
+.halli-life-label .lucide-bot {
+  transform: translateY(-1px);
 }
 .halli-lives > div:first-child .life-active {
   color: var(--color-error);
@@ -215,6 +248,7 @@
   color: var(--text-primary);
   font-size: var(--font-sm);
 }
+/* Keep the timer row's space during loading, pauses and results so cards don't jump. */
 .halli-timer-label.is-idle {
   visibility: hidden;
 }
@@ -241,6 +275,14 @@
   padding: 0;
 }
 .halli-progress.is-idle {
+  visibility: hidden;
+}
+.halli-galli:is(.phase-ready, .phase-starting, .phase-round_ready, .phase-error)
+  .halli-timer-row {
+  visibility: hidden;
+}
+.halli-galli:is(.phase-won, .phase-lost) .halli-timer-row {
+  /* Keep the final cards in the same position after the result animation. */
   visibility: hidden;
 }
 .halli-checking-status {
@@ -371,15 +413,18 @@
 }
 
 .halli-pile {
+  container-type: size;
   position: relative;
   display: grid;
-  grid-template-columns: repeat(var(--visible-cards), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--pile-rows-desktop), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--pile-columns), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--pile-rows), minmax(0, 1fr));
   align-items: center;
   justify-items: center;
   gap: var(--spacing-sm);
   width: 100%;
-  height: var(--pile-height-desktop);
+  flex: 1;
+  min-height: 0;
+  height: auto;
 }
 .halli-card {
   display: block;
@@ -389,8 +434,20 @@
   background: var(--bg-overlay-medium);
   cursor: pointer;
   overflow: hidden;
-  width: 100%;
-  max-width: 200px;
+  box-sizing: border-box;
+  /* Match the layout calculation in halliGalli.tsx: size for the configured
+     rows, not the number of cards currently visible. Keep the 8px gap in sync. */
+  width: min(
+    100%,
+    calc((100cqh - (var(--pile-rows) - 1) * 8px) / var(--pile-rows) * 5 / 7)
+  );
+  height: auto;
+  max-width: 100%;
+  aspect-ratio: 5 / 7;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
   touch-action: manipulation;
   animation: halli-card-in 220ms ease-out;
 }
@@ -405,7 +462,7 @@
 .halli-card img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   user-select: none;
 }
 .halli-card.is-winning {
@@ -687,6 +744,195 @@
   }
 }
 
+/* Measure full rules without consuming space while the compact view is used. */
+.halli-desktop-rules {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.halli-rules-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: rgba(52, 152, 219, 0.14);
+  flex-shrink: 0;
+}
+.halli-rules-placeholder .auth-skeleton {
+  width: 40%;
+  height: 14px;
+}
+/* Hidden copy reserves the real wrapped height; only three broad blocks are shown. */
+.halli-rules.is-loading {
+  position: relative;
+}
+.halli-rules-measure {
+  visibility: hidden;
+}
+.halli-rules-blocks {
+  position: absolute;
+  inset: var(--spacing-lg);
+  display: grid;
+  grid-template-rows: 1.5fr 1fr 1.25fr;
+  gap: var(--spacing-sm);
+}
+.halli-rules-blocks .is-highlighted {
+  background: rgba(52, 152, 219, 0.2);
+  border: 1px solid var(--color-primary);
+}
+.halli-lives-placeholder {
+  width: 71px;
+  height: 21px;
+}
+.halli-pile > .halli-loading {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  gap: 8px;
+  padding: 8px;
+  z-index: 3;
+  background: rgba(36, 36, 36, 0.72);
+}
+.halli-pile .halli-loading-visual {
+  width: min(120px, 30cqh);
+  height: min(120px, 30cqh);
+  flex-shrink: 0;
+}
+.halli-pile .halli-loading-core {
+  width: min(76px, 100%);
+  height: min(76px, 100%);
+  box-sizing: border-box;
+}
+.halli-pile .halli-loading-copy strong {
+  font-size: clamp(14px, 5cqh, 20px);
+}
+.halli-placeholder-pile {
+  border-radius: var(--radius-lg);
+  background: var(--bg-overlay-light);
+}
+.halli-desktop-rules.is-visible {
+  position: static;
+  width: 100%;
+  height: auto;
+  flex-shrink: 0;
+  overflow: visible;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Compact instructions remain expandable when the full rules cannot fit. */
+.halli-mobile-rules {
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
+  text-align: left;
+  color: var(--text-primary);
+}
+.halli-mobile-rules summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
+  padding: 8px 12px;
+  min-height: 44px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: rgba(52, 152, 219, 0.14);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.halli-mobile-rules summary::-webkit-details-marker {
+  display: none;
+}
+.halli-mobile-rules summary::marker {
+  content: "";
+}
+.halli-mobile-rules summary > span {
+  min-width: 0;
+}
+.halli-rules-toggle {
+  display: block;
+  flex: none;
+  transform: rotate(180deg);
+  transition: transform var(--transition-fast);
+}
+.halli-mobile-rules[open] .halli-rules-toggle {
+  transform: rotate(0deg);
+}
+.halli-mobile-rules > .halli-rules {
+  margin-top: 4px;
+}
+.halli-mobile-rules[open] ~ .halli-pile {
+  flex: none;
+  height: clamp(240px, 55dvh, 600px);
+}
+.halli-galli .auth-stage-heading,
+.halli-lives,
+.halli-timer-row {
+  flex-shrink: 0;
+}
+.halli-galli .halli-loading {
+  flex: 1;
+  min-height: 0;
+}
+.halli-finale,
+.halli-center-message,
+.halli-result-message {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.halli-finale .MuiButton-root,
+.halli-center-message .MuiButton-root {
+  max-width: 100%;
+  white-space: normal;
+}
+
+@media (max-width: 768px), (max-height: 500px) {
+  .halli-mobile-rules summary {
+    min-height: 0;
+    padding: 6px 8px;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .halli-rules-placeholder {
+    min-height: 32px;
+    padding: 6px 8px;
+  }
+  .halli-mobile-rules .halli-rules {
+    padding: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .halli-mobile-rules .halli-rules p:first-child {
+    font-size: 14px;
+    font-weight: normal;
+  }
+  .halli-mobile-rules .halli-rules p + p {
+    margin-top: 6px;
+  }
+  .halli-mobile-rules .halli-rules strong {
+    font-size: 1em;
+  }
+  .halli-mobile-rules .halli-rules .halli-click-rule {
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+}
+
 @media (max-width: 600px) {
   .halli-galli.auth-step {
     flex: 1;
@@ -695,38 +941,6 @@
     margin: 0;
     padding: var(--spacing-xs);
     gap: var(--spacing-xs);
-  }
-  /* Expanded rules need their own height. Let the dialog content scroll while
-     the lives, progress bar, and cards stay below the instructions. */
-  .halli-galli.auth-step:has(.halli-mobile-rules[open]) {
-    height: auto;
-    min-height: 100%;
-  }
-  /* Keep the full rules on the Start screen. During play, the summary leaves
-     room for every card while the full text remains one click away. */
-  .halli-galli.auth-step:not(.phase-ready):not(.phase-starting) > .halli-rules {
-    display: none;
-  }
-  .halli-galli.auth-step:not(.phase-ready):not(.phase-starting)
-    > .halli-mobile-rules {
-    display: block;
-  }
-  .halli-mobile-rules {
-    width: 100%;
-    flex-shrink: 0;
-    text-align: left;
-    color: var(--text-primary);
-  }
-  .halli-mobile-rules summary {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border: 1px solid var(--color-primary);
-    border-radius: var(--radius-sm);
-    background: rgba(52, 152, 219, 0.14);
-    font-size: var(--font-sm);
-    cursor: pointer;
-  }
-  .halli-mobile-rules > .halli-rules {
-    margin-top: var(--spacing-xs);
   }
   .halli-rules {
     padding: var(--spacing-md);
@@ -740,42 +954,24 @@
   }
   .halli-pile {
     flex: 1;
-    min-height: 200px;
-    grid-template-columns: repeat(var(--visible-cards-mobile), minmax(0, 1fr));
-    grid-template-rows: repeat(var(--pile-rows-mobile), minmax(0, 1fr));
+    min-height: 0;
     height: auto;
-  }
-  .halli-mobile-rules[open] ~ .halli-pile {
-    flex: none;
-    min-height: 220px;
-    grid-template-rows: repeat(var(--pile-rows-mobile), auto);
-  }
-  /* Card height follows the available grid row. Its width stays within the
-     column and keeps the backend PNG's 320:448 click coordinate ratio. */
-  .halli-card {
-    width: auto;
-    height: min(100%, calc((100vw - 32px) / var(--visible-cards-mobile) * 1.4));
-    max-width: 100%;
-    aspect-ratio: 5 / 7;
   }
   .halli-card img {
     width: 100%;
     height: 100%;
   }
-  .halli-mobile-rules[open] ~ .halli-pile .halli-card {
-    width: 100%;
-    height: auto;
-  }
   .halli-lives {
     font-size: var(--font-sm);
   }
   .halli-loading {
-    flex: 1;
-    min-height: 250px;
     padding: var(--spacing-sm);
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .halli-rules-toggle {
+    transition: none;
+  }
   .halli-loading-visual::before,
   .halli-loading-visual::after,
   .halli-loading-core,
@@ -797,5 +993,20 @@
   .halli-impact-ring,
   .halli-impact-rays {
     display: none;
+  }
+}
+
+@media (max-height: 500px) {
+  .halli-center-message {
+    min-height: 0;
+    padding: 8px;
+    gap: 4px;
+  }
+  .halli-center-message .halli-late-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .halli-center-message h4 {
+    font-size: 18px;
   }
 }

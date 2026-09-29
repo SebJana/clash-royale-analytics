@@ -1,11 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
-import { PartyPopper, RotateCcw } from "lucide-react";
+import { PartyPopper } from "lucide-react";
+import { AuthActionButton } from "./authActionButton";
+import { CircularProgress } from "@mui/material";
 import { isValidGuess } from "../../utils/wordle";
-import { getAuthErrorFeedback } from "../../utils/authErrors";
+import {
+  getAuthErrorFeedback,
+  type AuthErrorFeedback,
+} from "../../utils/authErrors";
+import { useAuthCooldown } from "../../hooks/useAuthCooldown";
 import "./wordle.css";
 
 // Props for Wordle game component
 interface WordleGameProps {
+  readonly loading?: boolean;
+  readonly disabled?: boolean;
   readonly guessesAllowed: number; // Maximum number of guesses
   readonly onGuess: (guess: string) => Promise<{
     correct: boolean;
@@ -34,6 +42,8 @@ export function WordleGame({
   onGuess,
   onFailure,
   onSuccess,
+  loading = false,
+  disabled = false,
 }: WordleGameProps) {
   const [guesses, setGuesses] = useState<string[]>([]);
   const [evaluations, setEvaluations] = useState<string[][]>([]);
@@ -46,7 +56,8 @@ export function WordleGame({
   const [letterStates, setLetterStates] = useState<Record<string, string>>({});
   const [shakeCurrentRow, setShakeCurrentRow] = useState(false); // Invalid guess animation
   const [showGameEndPopup, setShowGameEndPopup] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<AuthErrorFeedback | null>(null);
+  const cooldown = useAuthCooldown(error);
   const [isRestarting, setIsRestarting] = useState(false);
 
   // Animation state management for flip reveal
@@ -119,13 +130,17 @@ export function WordleGame({
 
   // Validates guess, submits to API, and triggers animations
   const handleSubmit = useCallback(async () => {
+    // Both keyboards reach this handler. Disabling the visible Enter key alone
+    // wouldn't stop a physical keyboard from submitting during the cooldown.
     if (
+      disabled ||
+      cooldown.remainingSeconds > 0 ||
       isSubmitting ||
       isAnimationRunning
     )
       return;
 
-    setError("");
+    setError(null);
     if (currentGuess.length !== WORDLE_WORD_LENGTH) {
       return;
     }
@@ -142,7 +157,7 @@ export function WordleGame({
       }
     } catch (error) {
       console.error("Error validating guess:", error);
-      setError("Couldn't check that word. Please try again.");
+      setError({ message: "Couldn't check that word. Please try again." });
       setIsSubmitting(false);
       return;
     }
@@ -243,7 +258,8 @@ export function WordleGame({
     } catch (error) {
       console.error("Error submitting guess:", error);
       const feedback = getAuthErrorFeedback(error, "wordle_guess");
-      setError(feedback.recovery ? "" : feedback.message);
+      // The parent owns restart menus; show only errors that can be fixed on this board here.
+      setError(feedback.recovery ? null : feedback);
     } finally {
       setIsSubmitting(false);
     }
@@ -257,12 +273,14 @@ export function WordleGame({
     guessesAllowed,
     letterStates,
     animateLetterReveal,
+    disabled,
+    cooldown.remainingSeconds,
   ]);
 
   // Handle displayed keyboard input
   const handleKeyboardInput = useCallback(
     (key: string) => {
-      if (gameStatus !== "playing" || isAnimationRunning) return;
+      if (disabled || gameStatus !== "playing" || isAnimationRunning) return;
 
       if (key === "ENTER") {
         if (!isSubmitting) {
@@ -282,13 +300,14 @@ export function WordleGame({
       currentGuess.length,
       isSubmitting,
       isAnimationRunning,
+      disabled,
     ],
   );
 
   // Handle actual keyboard input for typing letters, backspace, and enter
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (gameStatus === "playing" && !isAnimationRunning) {
+      if (!disabled && gameStatus === "playing" && !isAnimationRunning) {
         if (event.key === "Enter") {
           // Submit guess when Enter is pressed
           if (!isSubmitting) {
@@ -314,15 +333,26 @@ export function WordleGame({
     currentGuess.length,
     isSubmitting,
     isAnimationRunning,
+    disabled,
   ]);
 
   return (
-    <div className="wordle-game">
+    <div className="wordle-game" aria-busy={loading}>
       <h3 className="auth-stage-heading">
         Solve the Wordle to prove your reasoning skills
       </h3>
+      {error && (
+        <div className="auth-error-overlay wordle-error-overlay" role="alert">
+          {cooldown.message}
+        </div>
+      )}
       <div className="wordle-grid">
-        {error && <div className="auth-error-overlay wordle-error-overlay" role="alert">{error}</div>}
+        {loading && (
+          <div className="wordle-loading-status" role="status">
+            <CircularProgress size={28} className="auth-loading-spinner" />
+            <span>Preparing Wordle…</span>
+          </div>
+        )}
         {/* Render game grid with rows for each guess attempt */}
         {Array.from({ length: guessesAllowed }, (_, i) => (
           <div
@@ -402,7 +432,11 @@ export function WordleGame({
                 } ${letterStates[key] || ""}`}
                 onClick={() => handleKeyboardInput(key)}
                 disabled={
-                  gameStatus !== "playing" || isSubmitting || isAnimationRunning
+                  disabled ||
+                  gameStatus !== "playing" ||
+                  isSubmitting ||
+                  isAnimationRunning ||
+                  (key === "ENTER" && cooldown.remainingSeconds > 0)
                 }
               >
                 {key === "BACKSPACE" ? "⌫" : key}
@@ -415,53 +449,59 @@ export function WordleGame({
       {/* Game end popup for win/loss */}
       {showGameEndPopup && (
         <div className="game-end-popup">
-          <div className="popup-content">
+          <div
+            className={`popup-content auth-outcome-panel ${gameStatus === "won" ? "is-success" : "is-retry"}`}
+          >
             {gameStatus === "won" ? (
               <>
                 <h2 className="wordle-solved-title">
                   <PartyPopper size={26} aria-hidden="true" /> Solved!
                 </h2>
-                <p>You've proven your puzzle-solving skills.</p>
-                <p>
-                  <a
-                    href={`https://dictionary.cambridge.org/dictionary/english/${solution}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="definition-link"
-                  >
-                    Look up definition
-                  </a>
-                </p>
-                <button
-                  className="popup-button auth-outcome-button is-success"
+                <div className="wordle-result-copy">
+                  <p>You've proven your puzzle-solving skills.</p>
+                  <p>
+                    <a
+                      href={`https://dictionary.cambridge.org/dictionary/english/${solution}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="definition-link"
+                    >
+                      Look up definition
+                    </a>
+                  </p>
+                </div>
+                <AuthActionButton
+                  action="continue"
                   onClick={() => {
                     setShowGameEndPopup(false);
                     onSuccess?.();
                   }}
                 >
                   Continue
-                </button>
+                </AuthActionButton>
               </>
             ) : (
               <>
                 <h2>Game Over</h2>
-                <p>
-                  The correct solution was:{" "}
-                  <strong>{solution.toUpperCase()}</strong>
-                </p>
-                <p>
-                  <a
-                    href={`https://dictionary.cambridge.org/dictionary/english/${solution}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="definition-link"
-                  >
-                    Look up definition
-                  </a>
-                </p>
-                <button
-                  className="popup-button auth-outcome-button is-retry"
-                  disabled={isRestarting}
+                <div className="wordle-result-copy">
+                  <p>
+                    The correct solution was:{" "}
+                    <strong>{solution.toUpperCase()}</strong>
+                  </p>
+                  <p>
+                    <a
+                      href={`https://dictionary.cambridge.org/dictionary/english/${solution}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="definition-link"
+                    >
+                      Look up definition
+                    </a>
+                  </p>
+                </div>
+                <AuthActionButton
+                  action="retry"
+                  busy={isRestarting}
                   onClick={async () => {
                     setIsRestarting(true);
                     try {
@@ -472,9 +512,8 @@ export function WordleGame({
                     }
                   }}
                 >
-                  <RotateCcw size={18} aria-hidden="true" />
-                  <span>{isRestarting ? "Loading..." : "Try Again"}</span>
-                </button>
+                  {isRestarting ? "Preparing…" : "Try Again"}
+                </AuthActionButton>
               </>
             )}
           </div>
