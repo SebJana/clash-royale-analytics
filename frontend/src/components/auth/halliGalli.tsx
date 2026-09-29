@@ -555,6 +555,9 @@ export function HalliGalli({
 
     /** Calibrate, create the game, and fill its initial window before play. */
     async function start() {
+      // Rules belong to one attempt. Hide the previous game's instructions
+      // while calibration and game creation fetch the new rules.
+      setGame(null);
       try {
         if (tokenExpired(wordleToken)) {
           fail(new AuthChallengeError("WORDLE_TOKEN_EXPIRED"));
