@@ -84,7 +84,12 @@ def validate_between_request(request: BetweenRequest):
     start = request.start_date
     end = request.end_date
     release = get_clash_royale_release_date()
-    today = date.today()
+
+    # The request dates are calendar dates in the user's timezone. Validate the
+    # timezone before using it to decide which calendar day is "today".
+    if not valid_timezone(request.timezone):
+        raise ParamsRequestError(f"Timezone {request.timezone} does not exist")
+    today = datetime.now(ZoneInfo(request.timezone)).date()
 
     # Check if start is after release
     if start < release:
@@ -104,10 +109,6 @@ def validate_between_request(request: BetweenRequest):
         raise ParamsRequestError(
             f"Request can only span {settings.MAX_TIME_RANGE_DAYS} days"
         )
-
-    # Check if timezone exists
-    if not valid_timezone(request.timezone):
-        raise ParamsRequestError(f"Timezone {request.timezone} does not exist")
 
 
 def validate_battles_request(request: BattlesRequest):
