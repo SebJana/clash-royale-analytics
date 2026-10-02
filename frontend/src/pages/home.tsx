@@ -50,6 +50,8 @@ function getErrorMessage(error: unknown): string {
   if (code === "PLAYER_NOT_FOUND")
     return "Player not found. Check the tag and try again.";
   if (code === "PLAYER_NOT_TRACKED") return "That player isn't being tracked.";
+  if (code === "TRACKING_CAPACITY_REACHED")
+    return "The maximum number of tracked players is reached. No new players can be added right now.";
   if (code === "CR_API_AUTH_FAILED")
     return (
       "Clash Royale rejected the API connection, so this player can't be tracked right now. " +
@@ -75,17 +77,23 @@ function getErrorMessage(error: unknown): string {
 }
 
 function HomePage() {
+  // Incremented after a player is added or removed, so the player list and
+  // the tracked player count are fetched again instead of staying stale.
+  const [trackedPlayersVersion, setTrackedPlayersVersion] = useState(0);
+
   const {
     data: players,
     loading: playersLoading,
     error: playersError,
-  } = useFetch<Players>(fetchAllTrackedPlayers, []);
+  } = useFetch<Players>(fetchAllTrackedPlayers, [trackedPlayersVersion]);
 
   const {
     data: playerCount,
     loading: playerCountLoading,
     error: playerCountError,
-  } = useFetch<PlayerCount>(fetchAllTrackedPlayersCount, []);
+  } = useFetch<PlayerCount>(fetchAllTrackedPlayersCount, [
+    trackedPlayersVersion,
+  ]);
 
   const {
     data: battleCount,
@@ -115,7 +123,13 @@ function HomePage() {
     return () => window.clearTimeout(timer);
   }, [showAuthSuccess]);
 
-  if (playersLoading || playerCountLoading || battleCountLoading)
+  // Only the first load replaces the page with a spinner. A refetch after
+  // adding or removing a player keeps the page and its status messages.
+  if (
+    (playersLoading && !players) ||
+    (playerCountLoading && !playerCount) ||
+    (battleCountLoading && !battleCount)
+  )
     return <CircularProgress className="home-loading-spinner" />;
   if (playersError || playerCountError || battleCountError)
     return (
@@ -168,6 +182,7 @@ function HomePage() {
     try {
       const result = await trackPlayer(addedPlayerTag);
       setTrackingSuccess(`${result.status}: ${result.tag}`);
+      setTrackedPlayersVersion((version) => version + 1);
 
       // Clear the input field
       setAddedPlayerTag("");
@@ -199,6 +214,7 @@ function HomePage() {
     try {
       const result = await untrackPlayer(untrackedPlayerTag);
       setUntrackingSuccess(`${result.status}: ${result.tag}`);
+      setTrackedPlayersVersion((version) => version + 1);
 
       // Clear the input field
       setUntrackedPlayerTag("");
@@ -240,7 +256,7 @@ function HomePage() {
             <StatCard
               value={formatNumberWithSuffix(battleCount?.totalBattleCount ?? 0)}
               label={`${pluralize(
-                playerCount?.activePlayerCount ?? 0,
+                battleCount?.totalBattleCount ?? 0,
                 "Battle",
                 "Battles",
               )} on record`}
