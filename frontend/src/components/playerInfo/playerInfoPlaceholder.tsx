@@ -1,32 +1,28 @@
-import { PlayerError } from "../playerError/playerError";
 import "./playerInfo.css";
 
+/**
+ * Header shown while a player has no stored profile yet.
+ *
+ * Only players tracked before profile snapshots existed reach this, until
+ * the data scraper's first profile refresh for them. Battles and statistics
+ * below work without the profile.
+ */
 export function PlayerInfoPlaceholder({
   tag,
   name,
-  retry,
-  retryAttempts,
-  onRetryAttempt,
 }: Readonly<{
   tag: string;
   name?: string;
-  retry: () => Promise<unknown>;
-  retryAttempts: number;
-  onRetryAttempt: () => void;
 }>) {
   return (
     <div className="player-info-component-container player-info-placeholder">
       <div className="player-info-component-basic-info">
         <h1 className="player-info-component-name">{name || "Player"}</h1>
         <p className="player-info-component-tag">{tag}</p>
+        <p className="player-info-component-sync-hint">
+          Profile stats are being loaded, this can take a few minutes
+        </p>
       </div>
-      <PlayerError
-        compact
-        title="Couldn't load player information"
-        sources={[{ label: "player information", failed: true, retry }]}
-        retryAttempts={retryAttempts}
-        onRetryAttempt={onRetryAttempt}
-      />
     </div>
   );
 }

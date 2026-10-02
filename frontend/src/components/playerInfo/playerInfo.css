@@ -47,6 +47,43 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* Small hint how old the shown data is. Each part stays on one line and
+   wraps as a whole, so narrow screens show one part per line. */
+.player-info-component-sync-hint {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--spacing-md);
+  row-gap: var(--spacing-xs);
+  margin: var(--spacing-sm) 0 0 0;
+  font-size: var(--font-sm);
+  font-style: italic;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.player-info-component-sync-hint span {
+  white-space: nowrap;
+}
+
+/* The row above a gap hint drops its separator line, so the hint reads as
+   part of that row instead of a separate entry. */
+.player-info-component-info-item:has(+ .player-info-component-gap-hint) {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* Untracked periods below the tracked since date; wraps like normal text.
+   Left aligned like the row labels: the section heading above is centered,
+   and an inherited centering detaches the hint from its row. */
+.player-info-component-gap-hint {
+  margin: 0;
+  text-align: left;
+  font-size: var(--font-sm);
+  font-style: italic;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
 .player-info-component-details {
   display: grid;
   grid-template-columns: 1fr;

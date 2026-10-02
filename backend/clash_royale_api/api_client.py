@@ -289,11 +289,15 @@ class ClashRoyaleAPI:
         Validates the tag syntax and verifies the a player with that tag exists
         by fetching the player profile from the Clash Royale API.
 
+        The full profile is returned, so the caller can store it as the first
+        profile snapshot without a second request.
+
         Args:
             player_tag (str): The player tag starting with '#' (e.g., "#YYRJQY28")
 
         Returns:
-            str: The player's name when the API confirms the player exists.
+            dict: The player's profile (with a non-empty "name") when the API
+                confirms the player exists.
 
         Raises:
             ClashRoyalePlayerCheckError: If the tag or API response is invalid,
@@ -324,7 +328,7 @@ class ClashRoyaleAPI:
         if not isinstance(player_info, dict) or not player_info.get("name"):
             raise ClashRoyaleInvalidResponseError()
 
-        return player_info["name"]
+        return player_info
 
     async def get_player_battle_logs(self, player_tag: str):
         """

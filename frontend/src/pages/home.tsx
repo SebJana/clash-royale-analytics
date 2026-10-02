@@ -81,6 +81,10 @@ function HomePage() {
   // the tracked player count are fetched again instead of staying stale.
   const [trackedPlayersVersion, setTrackedPlayersVersion] = useState(0);
 
+  // Refetch the search list and the tracked player count on this page
+  const refreshTrackedPlayers = () =>
+    setTrackedPlayersVersion((version) => version + 1);
+
   const {
     data: players,
     loading: playersLoading,
@@ -182,7 +186,7 @@ function HomePage() {
     try {
       const result = await trackPlayer(addedPlayerTag);
       setTrackingSuccess(`${result.status}: ${result.tag}`);
-      setTrackedPlayersVersion((version) => version + 1);
+      refreshTrackedPlayers();
 
       // Clear the input field
       setAddedPlayerTag("");
@@ -214,7 +218,7 @@ function HomePage() {
     try {
       const result = await untrackPlayer(untrackedPlayerTag);
       setUntrackingSuccess(`${result.status}: ${result.tag}`);
-      setTrackedPlayersVersion((version) => version + 1);
+      refreshTrackedPlayers();
 
       // Clear the input field
       setUntrackedPlayerTag("");
@@ -283,6 +287,9 @@ function HomePage() {
               View Player
             </button>
           </div>
+          {/* TODO add jump to player button popup after adding one so one
+          can instantly view the newly tracked player (has to be some delay tho
+          to give the queue a chance to ingest that player) */}
           <div className="adding-section">
             <h2 className="section-header">Add New Player</h2>
             <p className="section-description">

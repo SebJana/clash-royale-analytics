@@ -352,8 +352,8 @@ class KeyStore:
     async def _validate_unknown(self):
         """Test keys without a conclusive usable/invalid result yet."""
         for key_id in self._ids:
-            # A replaced configuration may have started while our HTTP probe
-            # was in flight. It owns the new inventory, so stop writing ours.
+            # A replaced configuration may have started while this HTTP probe
+            # was in flight. It owns the new inventory, so stop writing this one.
             if await self.redis.get(self._name("config")) != self._config_id:
                 return
             if await self.redis.hget(self._name("status"), key_id):
@@ -412,7 +412,7 @@ class KeyStore:
                     try:
                         if await self.redis.get("crkeys:maintenance:next"):
                             statuses = await self.redis.hgetall(self._name("status"))
-                            # A key known to be rejected cannot tell us whether
+                            # A key known to be rejected cannot show whether
                             # maintenance ended, so choose a usable/unknown one.
                             probe_id = next(
                                 (
@@ -628,9 +628,8 @@ class KeyStore:
     async def close(self):
         if self._validator_task:
             self._validator_task.cancel()
-            try:
-                await self._validator_task
-            except asyncio.CancelledError:
-                await self.redis.aclose()
-                raise
+            # gather returns the validator's own cancellation as a result.
+            # Awaiting the task directly would raise it, ending the caller's
+            # shutdown before its other connections are closed.
+            await asyncio.gather(self._validator_task, return_exceptions=True)
         await self.redis.aclose()

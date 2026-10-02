@@ -15,20 +15,14 @@ export function PlayerError({
   message,
   title = "Couldn't load this page",
   compact = false,
-  retryAttempts: controlledRetryAttempts,
-  onRetryAttempt,
 }: Readonly<{
   sources: PlayerErrorSource[];
   message?: string;
   title?: string;
   compact?: boolean;
-  retryAttempts?: number;
-  onRetryAttempt?: () => void;
 }>) {
   const [isRetrying, setIsRetrying] = useState(false);
-  const [localRetryAttempts, setLocalRetryAttempts] = useState(0);
-  // The profile keeps this count in the layout so a fresh ping cannot reset it.
-  const retryAttempts = controlledRetryAttempts ?? localRetryAttempts;
+  const [retryAttempts, setRetryAttempts] = useState(0);
   const retriesExhausted =
     retryAttempts >= MAX_RETRY_ATTEMPTS && !isRetrying;
   const failedSources = sources.filter((source) => source.failed);
@@ -40,11 +34,7 @@ export function PlayerError({
 
   const retry = async () => {
     if (isRetrying || retryAttempts >= MAX_RETRY_ATTEMPTS) return;
-    if (controlledRetryAttempts === undefined) {
-      setLocalRetryAttempts((attempts) => attempts + 1);
-    } else {
-      onRetryAttempt?.();
-    }
+    setRetryAttempts((attempts) => attempts + 1);
     setIsRetrying(true);
     // Retry every failed request; one successful request should not hide another failure.
     try {

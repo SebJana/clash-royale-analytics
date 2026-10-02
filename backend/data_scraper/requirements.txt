@@ -3,3 +3,4 @@
 -r ./clash_royale_api/requirements.txt
 -r ./api_key_store/requirements.txt
 -r ./redis_service/requirements.txt
+-r ./scrape_schedule/requirements.txt

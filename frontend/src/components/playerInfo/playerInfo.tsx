@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronUp } from "lucide-react";
 import type { Player } from "../../types/player";
 import { round } from "../../utils/number";
-import { formatDateForInput } from "../../utils/datetime";
+import { formatDateForInput, formatTimeAgo } from "../../utils/datetime";
 import { StatCard } from "../statCard/statCard";
 import "./playerInfo.css";
 
@@ -80,6 +80,25 @@ function getAccountAgeBreakdown(creationDateStr: string) {
   return { years, weeks, days };
 }
 
+// How often the "updated ... ago" hint is recalculated
+const SYNC_HINT_REFRESH_MS = 30_000;
+
+/**
+ * Keep the current time in state, updated every intervalMs.
+ * Lets relative times like "3 minutes ago" advance without new data.
+ *
+ * @param intervalMs - Update interval in milliseconds
+ * @returns The current time in milliseconds
+ */
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
+    return () => window.clearInterval(timer);
+  }, [intervalMs]);
+  return now;
+}
+
 export function PlayerInfo({
   player,
 }: Readonly<{
@@ -88,12 +107,34 @@ export function PlayerInfo({
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(
     getExpandedInfoState()
   );
+  const now = useNow(SYNC_HINT_REFRESH_MS);
 
-  const accountAgeDays =
-    player?.badges?.find((b) => b.name === "YearsPlayed")?.progress ?? 0;
+  // Data is not live: battles are checked every few minutes, the profile
+  // about once a day. The hint tells users how old the shown data is.
+  const battlesSyncedAgo = formatTimeAgo(
+    player?.syncInfo?.battlesSyncedAt,
+    now,
+  );
+  const profileSyncedAgo = formatTimeAgo(
+    player?.syncInfo?.profileSyncedAt,
+    now,
+  );
 
-  const accountCreationDate = getAccountCreationDate(accountAgeDays);
-  const elapsedTimeSplit = getAccountAgeBreakdown(accountCreationDate);
+  // The account age only exists as the YearsPlayed badge (progress = days
+  // since creation), which the Clash Royale API does not return for every
+  // account. Counting a missing badge as 0 days would show today as the
+  // creation date, so both show the same dash as other missing dates.
+  const accountAgeDays = player?.badges?.find(
+    (b) => b.name === "YearsPlayed"
+  )?.progress;
+
+  const accountCreationDate =
+    accountAgeDays === undefined
+      ? null
+      : getAccountCreationDate(accountAgeDays);
+  const elapsedTimeSplit = accountCreationDate
+    ? getAccountAgeBreakdown(accountCreationDate)
+    : null;
 
   const winPercentage =
     player?.battleCount > 0
@@ -115,6 +156,22 @@ export function PlayerInfo({
           {Boolean(player?.trophies) && (
             <p className="player-info-component-trophies">
               🏆 {player.trophies.toLocaleString()}
+            </p>
+          )}
+          {player?.syncInfo && (
+            <p className="player-info-component-sync-hint">
+              <span>
+                {battlesSyncedAgo
+                  ? `Battles updated ${battlesSyncedAgo}`
+                  : "Battles not synced yet"}
+              </span>
+              {profileSyncedAgo && (
+                // Profile stats are refreshed about once a day, so they can
+                // trail the battles shown below by hours.
+                <span>
+                  Profile stats updated {profileSyncedAgo} (can lag behind)
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -145,7 +202,7 @@ export function PlayerInfo({
                 Created On:
               </span>
               <span className="player-info-component-info-value">
-                {accountCreationDate}
+                {accountCreationDate ?? "—"}
               </span>
             </div>
             <div className="player-info-component-info-item">
@@ -153,10 +210,32 @@ export function PlayerInfo({
                 Account Age:
               </span>
               <span className="player-info-component-info-value">
-                {elapsedTimeSplit.years}y {elapsedTimeSplit.weeks}w{" "}
-                {elapsedTimeSplit.days}d
+                {elapsedTimeSplit
+                  ? `${elapsedTimeSplit.years}y ${elapsedTimeSplit.weeks}w ${elapsedTimeSplit.days}d`
+                  : "—"}
               </span>
             </div>
+            {player?.syncInfo?.trackedSince && (
+              <div className="player-info-component-info-item">
+                <span className="player-info-component-info-label">
+                  Tracked Since:
+                </span>
+                <span className="player-info-component-info-value">
+                  {player.syncInfo.trackedSince}
+                </span>
+              </div>
+            )}
+            {player?.syncInfo?.trackingGaps?.map((gap) => (
+              <p
+                key={`${gap.from}-${gap.to}`}
+                className="player-info-component-gap-hint"
+              >
+                {gap.from === gap.to
+                  ? `Not tracked on ${gap.from} for ${gap.hours} h`
+                  : `Not tracked ${gap.from} – ${gap.to}`}
+                , battles from then may be missing
+              </p>
+            ))}
           </div>
         </div>
 

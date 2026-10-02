@@ -1,12 +1,14 @@
-import time
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi_limiter.depends import RateLimiter
 from typing import Optional, List
 from datetime import datetime
 
-import httpx
-
-from core.deps import DbConn, CrApi, RedConn, require_tracked_player
+from core.deps import (
+    DbConn,
+    RedConn,
+    TrackedPlayerDep,
+    require_tracked_player,
+)
 from core.settings import settings
 from helpers.validate import (
     validate_between_request,
@@ -15,14 +17,13 @@ from helpers.validate import (
     ParamsRequestError,
 )
 from models.schema import BetweenRequest, BattlesRequest
-from clash_royale_api import ClashRoyaleMaintenanceError
-from api_key_store import NoKeyAvailable, KeyStoreUnavailable
 from redis_service import get_redis_json, set_redis_json, build_redis_key
 from mongo import (
     get_last_battles,
     get_decks_win_percentage,
     get_cards_win_percentage,
     get_daily_stats,
+    get_player_profile as get_stored_profile,
 )
 
 # TODO: Add consistent rate limits to all player data routes (profile, battles,
@@ -36,74 +37,51 @@ router = APIRouter(
 
 @router.get(
     "/{player_tag}/profile",
-    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+    # The profile is a database lookup now, so the limit only guards against
+    # abuse. It still allows the frontend's polling during a first sync.
+    dependencies=[Depends(RateLimiter(times=60, seconds=60))],
     responses={
-        403: {
-            "description": "Player is untracked or Clash Royale rejected the request"
-        },
-        404: {"description": "Player not found"},
-        429: {"description": "Clash Royale API rate limit exceeded"},
-        500: {"description": "Player profile request failed"},
-        502: {"description": "Clash Royale API request failed"},
-        503: {"description": "Clash Royale API or key store unavailable"},
+        403: {"description": "Invalid or untracked player"},
+        404: {"description": "No profile snapshot stored yet"},
+        500: {"description": "Player profile lookup failed"},
     },
 )
-async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn):
-    # TODO how to handle more active users than the allowed key limit of the Clash Royale API?
-    # maybe save/cache the player data upon every refresh/request here?
-    # only 1 call per cycle per user, but 1 call per cycle for every user no matter if their data is even being viewed
+async def get_player_profile(
+    player_tag: str, player: TrackedPlayerDep, mongo_conn: DbConn
+):
+    # Profiles are snapshots the data scraper refreshes once a day (and the
+    # add route stores on tracking). Serving them from Mongo keeps page views
+    # from spending Clash Royale API requests.
     try:
-        params = {"playerTag": player_tag}
-        key = await build_redis_key(
-            conn=redis_conn, service="crApi", resource="playerProfile", params=params
-        )
-        cached_stats = await get_redis_json(redis_conn, key)
-
-        if cached_stats is not None:
-            return cached_stats
-
-        player_stats = await cr_api.get_player_info(player_tag)
-        await set_redis_json(
-            redis_conn, key, player_stats, ttl=settings.CACHE_TTL_PLAYER_PROFILE
-        )
-        return player_stats
-
-    except ClashRoyaleMaintenanceError as e:
-        raise HTTPException(status_code=e.code, detail=e.detail)
-
-    except NoKeyAvailable as e:
+        stored = await get_stored_profile(mongo_conn, player_tag)
+    except Exception:
         raise HTTPException(
-            status_code=503,
-            detail=str(e),
-            headers={"Retry-After": str(int(e.retry_after))},
-        ) from e
-
-    except KeyStoreUnavailable as e:
-        raise HTTPException(
-            status_code=503, detail="Clash Royale key store unavailable"
-        ) from e
-
-    except httpx.HTTPStatusError as http_err:
-        status = http_err.response.status_code if http_err.response else 502
-        # Common Clash Royale API errors
-        if status == 404:
-            raise HTTPException(status_code=404, detail="Player not found")
-        elif status == 403:
-            raise HTTPException(
-                status_code=403, detail="Forbidden – check API token or IP whitelist"
-            )
-        elif status == 429:
-            raise HTTPException(
-                status_code=429, detail="Rate limit exceeded, try again later"
-            )
-        else:
-            raise HTTPException(status_code=status, detail="Clash Royale API error")
-
-    except Exception as e:
-        # Network / timeout / DNS errors / unknown error
-        raise HTTPException(
-            status_code=500, detail=f"Error while contacting Clash Royale API: {e}"
+            status_code=500, detail=f"Failed to fetch the profile of {player_tag}"
         )
+
+    if not stored or not stored.get("profile"):
+        # Only players tracked before snapshots existed, until the scraper's
+        # first profile refresh for them. The frontend shows a placeholder
+        # with the name, so it needs no second request for it.
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "PROFILE_NOT_SYNCED",
+                "message": f"No profile stored for {player_tag} yet",
+                "name": player.name,
+            },
+        )
+    # The sync times tell the frontend how current the shown data is. Battles
+    # are checked every few minutes, the profile about once a day.
+    return {
+        **stored["profile"],
+        "syncInfo": {
+            "battlesSyncedAt": player.last_battles_sync_at,
+            "profileSyncedAt": stored.get("syncedAt"),
+            "trackedSince": player.tracked_since,
+            "trackingGaps": player.tracking_gaps,
+        },
+    }
 
 
 @router.get(
@@ -118,6 +96,7 @@ async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn
 )
 async def last_battles(
     player_tag: str,
+    player: TrackedPlayerDep,
     mongo_conn: DbConn,
     redis_conn: RedConn,
     req: BattlesRequest = Depends(),
@@ -129,9 +108,19 @@ async def last_battles(
         # 2) the current datetime, which equals the last req.limit battles, the last N battles
         cutoff = req.before or datetime.now()
 
-        params = {"playerTag": player_tag, "before": cutoff, "limit": req.limit}
-        key = await build_redis_key(
-            conn=redis_conn, service="crApi", resource="playerBattles", params=params
+        # Without an explicit cutoff the result is "the latest N battles". It
+        # only changes with a new sync version, so the key must not contain
+        # the current time; otherwise it would never be hit again.
+        params = {
+            "playerTag": player_tag,
+            "before": req.before or "latest",
+            "limit": req.limit,
+        }
+        key = build_redis_key(
+            service="crApi",
+            resource="playerBattles",
+            params=params,
+            player_version=player.sync_version,
         )
         cached_battles = await get_redis_json(redis_conn, key)
 
@@ -144,6 +133,16 @@ async def last_battles(
             raise HTTPException(
                 status_code=404, detail=f"No battles found for {player_tag}"
             )
+
+        if player.first_sync_pending and not battles.get("battles"):
+            # A just-tracked player whose first battle sync has not finished.
+            # Not cached: the next request after the sync must see the battles,
+            # and a player without new battles keeps the same sync version.
+            return {
+                "player_tag": player_tag,
+                "last_battles": battles,
+                "first_sync_pending": True,
+            }
 
         await set_redis_json(redis_conn, key, battles, ttl=settings.CACHE_TTL_BATTLES)
         return {"player_tag": player_tag, "last_battles": battles}
@@ -173,6 +172,7 @@ async def last_battles(
 )
 async def deck_percentage_stats(
     player_tag: str,
+    player: TrackedPlayerDep,
     mongo_conn: DbConn,
     redis_conn: RedConn,
     game_modes: Optional[List[str]] = Query(None),
@@ -189,8 +189,11 @@ async def deck_percentage_stats(
             "timezone": req.timezone,
             "gameModes": validated_game_modes,
         }
-        key = await build_redis_key(
-            conn=redis_conn, service="crApi", resource="playerDecks", params=params
+        key = build_redis_key(
+            service="crApi",
+            resource="playerDecks",
+            params=params,
+            player_version=player.sync_version,
         )
         cached_decks = await get_redis_json(redis_conn, key)
 
@@ -247,6 +250,7 @@ async def deck_percentage_stats(
 )
 async def card_percentage_stats(
     player_tag: str,
+    player: TrackedPlayerDep,
     mongo_conn: DbConn,
     redis_conn: RedConn,
     game_modes: Optional[List[str]] = Query(None),
@@ -263,8 +267,11 @@ async def card_percentage_stats(
             "timezone": req.timezone,
             "gameModes": validated_game_modes,
         }
-        key = await build_redis_key(
-            conn=redis_conn, service="crApi", resource="playerCards", params=params
+        key = build_redis_key(
+            service="crApi",
+            resource="playerCards",
+            params=params,
+            player_version=player.sync_version,
         )
         cached_cards = await get_redis_json(redis_conn, key)
 
@@ -321,6 +328,7 @@ async def card_percentage_stats(
 )
 async def daily_player_statistics(
     player_tag: str,
+    player: TrackedPlayerDep,
     mongo_conn: DbConn,
     redis_conn: RedConn,
     game_modes: Optional[List[str]] = Query(None),
@@ -337,8 +345,11 @@ async def daily_player_statistics(
             "timezone": req.timezone,
             "gameModes": validated_game_modes,
         }
-        key = await build_redis_key(
-            conn=redis_conn, service="crApi", resource="dailyStats", params=params
+        key = build_redis_key(
+            service="crApi",
+            resource="dailyStats",
+            params=params,
+            player_version=player.sync_version,
         )
         cached_stats = await get_redis_json(redis_conn, key)
 

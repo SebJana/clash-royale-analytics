@@ -18,6 +18,8 @@ from core.settings import settings
 from redis_service import CacheRedisConn, RedisConn
 from clash_royale_api import ClashRoyaleAPI
 from api_key_store import KeyStore, KeyStoreConfig, NoKeyAvailable, KeyStoreUnavailable, keys_from_env
+from scrape_schedule import Schedule, BATTLES_SCHEDULE, PROFILES_SCHEDULE
+from core.deps import ScrapeSchedules
 from mongo import MongoConn
 from helpers.ip_utils import rate_limit_key_func
 
@@ -96,6 +98,13 @@ async def lifespan(app: FastAPI):
     print(f"[INFO] App Clash Royale keys: {inventory}")
     app.state.cr_api = cr_api
     app.state.key_store = key_store
+    # The scraping schedules live in the same non-evicting Redis. The API only
+    # adds and removes players; the data scraper claims and processes them.
+    app.state.scrape_schedules = ScrapeSchedules(
+        battles=Schedule(key_redis, BATTLES_SCHEDULE),
+        profiles=Schedule(key_redis, PROFILES_SCHEDULE),
+        redis=key_redis,
+    )
 
     # Retry Redis
     redis_conn = CacheRedisConn(

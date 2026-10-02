@@ -1,9 +1,13 @@
+import time
+
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi_limiter.depends import RateLimiter
+from redis.exceptions import RedisError
 from core.deps import (
     DbConn,
     CrApi,
-    require_tracked_player,
+    Schedules,
+    TrackedPlayerDep,
     require_remove_player_token,
 )
 from clash_royale_api import (
@@ -21,11 +25,50 @@ from mongo import (
     insert_tracked_player,
     deactivate_tracked_player,
     get_players_count,
+    check_player_tracked,
+    save_player_profile,
 )
+from scrape_schedule import CAPACITY_MAX_AGE_S, read_capacity
+from core.settings import settings
 
 router = APIRouter(prefix="/players", tags=["Tracked Players"])
 
 
+async def ensure_tracking_capacity(
+    mongo_conn: DbConn, schedules: Schedules, player_tag: str
+):
+    """Reject a new player if the data scraper cannot sync one more in time.
+
+    The scraper publishes how many players its keys can keep within the
+    battle log window. Already tracked players always pass, and so does every
+    player while no recent estimate exists (scraper not running yet).
+
+    Raises:
+        HTTPException: 503 with code TRACKING_CAPACITY_REACHED.
+    """
+
+    try:
+        capacity = await read_capacity(schedules.redis, CAPACITY_MAX_AGE_S)
+    except RedisError:
+        capacity = None
+    if capacity is None or capacity.max_players is None:
+        return
+    if await check_player_tracked(mongo_conn, player_tag):
+        return
+    if await get_players_count(mongo_conn) >= capacity.max_players:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "TRACKING_CAPACITY_REACHED",
+                "message": "The maximum number of tracked players is reached",
+            },
+        )
+
+
+# TODO Paginate this list (cursor by playerTag, limit per page) and cache it,
+# invalidated when a player is added, removed, or renamed. Every home page
+# visit currently loads all tracked players, which grows with every player.
+# Beyond ~10k players, replace it with a server-side search by tag/name prefix.
 @router.get(
     "",
     dependencies=[Depends(RateLimiter(times=15, seconds=60))],
@@ -62,14 +105,24 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
         404: {"description": "Player tag invalid or player not found"},
         500: {"description": "Could not save tracked player"},
         502: {"description": "Clash Royale API request failed"},
-        503: {"description": "Clash Royale API or key store unavailable"},
+        503: {
+            "description": "Clash Royale API or key store unavailable, "
+            "or the scraper has no capacity for another player"
+        },
     },
 )
-async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi):
+async def add_tracked_player(
+    player_tag: str, mongo_conn: DbConn, cr_api: CrApi, schedules: Schedules
+):
     # Use the same trimmed tag for the Clash Royale check and the stored player.
     player_tag = player_tag.strip()
+
+    # Checked before the Clash Royale request, so a full scraper does not
+    # spend app key requests on players it would reject anyway.
+    await ensure_tracking_capacity(mongo_conn, schedules, player_tag)
+
     try:
-        player = await cr_api.check_existing_player(player_tag)
+        profile = await cr_api.check_existing_player(player_tag)
     # Keep missing players and Clash Royale failures separate for the frontend.
     except ClashRoyaleMaintenanceError as e:
         raise HTTPException(
@@ -123,21 +176,42 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
         ) from e
 
     try:
-        status_insert = await insert_tracked_player(mongo_conn, player_tag, player)
-
-        if status_insert == "reactivated":
-            return {"status": "Player is now being tracked again", "tag": player_tag}
-        if status_insert == "created":
-            return {"status": "Player is now being tracked", "tag": player_tag}
-        if status_insert == "already_tracked":
-            return {"status": "Player is already being tracked", "tag": player_tag}
-
-        return {"status": "Player is being tracked", "tag": player_tag}
-
+        status_insert = await insert_tracked_player(
+            mongo_conn, player_tag, profile["name"]
+        )
+        # The verification response is a complete profile. Storing it as the
+        # first snapshot makes the profile page work right away, without
+        # another Clash Royale request.
+        await save_player_profile(mongo_conn, player_tag, profile)
     except Exception:
         raise HTTPException(
             status_code=500, detail=f"Player {player_tag} could not be tracked"
         )
+
+    if status_insert in ("created", "reactivated"):
+        # Due time 0 puts the player in front of the battle schedule, so its
+        # first battle sync starts within seconds instead of after a full
+        # interval. The profile was just stored, so its refresh is due after
+        # the normal period. Mongo is written first: the scraper's reconciler
+        # relies on that order.
+        try:
+            await schedules.battles.add(player_tag, due_ms=0)
+            await schedules.profiles.add(
+                player_tag,
+                due_ms=int((time.time() + settings.PROFILE_MIN_INTERVAL) * 1000),
+            )
+        except RedisError as e:
+            # The reconciler schedules the player within a few minutes anyway.
+            print(f"[WARNING] Could not schedule {player_tag} immediately: {e}")
+
+    if status_insert == "reactivated":
+            return {"status": "Player is now being tracked again", "tag": player_tag}
+    if status_insert == "created":
+        return {"status": "Player is now being tracked", "tag": player_tag}
+    if status_insert == "already_tracked":
+        return {"status": "Player is already being tracked", "tag": player_tag}
+
+    return {"status": "Player is being tracked", "tag": player_tag}
 
 
 @router.delete(
@@ -151,9 +225,11 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
 )
 async def remove_tracked_player(
     mongo_conn: DbConn,
+    schedules: Schedules,
+    player: TrackedPlayerDep,
     _=Depends(require_remove_player_token),
-    player_tag: str = Depends(require_tracked_player),
 ):
+    player_tag = player.tag
     try:
         affected_player_count = await deactivate_tracked_player(mongo_conn, player_tag)
 
@@ -165,6 +241,14 @@ async def remove_tracked_player(
                 status_code=404,
                 detail=f"Player with tag {player_tag} is not being tracked",
             )
+
+        try:
+            await schedules.battles.remove(player_tag)
+            await schedules.profiles.remove(player_tag)
+        except RedisError as e:
+            # The scraper drops inactive players on their next claim or the
+            # next reconciliation, so this is only a delay.
+            print(f"[WARNING] Could not unschedule {player_tag}: {e}")
 
         return {"status": "Player is not being tracked anymore", "tag": player_tag}
 

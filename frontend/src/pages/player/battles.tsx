@@ -82,6 +82,8 @@ export default function PlayerBattles() {
     () => battles?.pages.flatMap((p) => p.last_battles.battles) ?? [],
     [battles],
   );
+  // A just-tracked player has no battles until its first sync finished
+  const firstSyncPending = battles?.pages[0]?.first_sync_pending === true;
 
   // Use loading state logic
   const { isInitialLoad } = usePageLoadingState({
@@ -333,11 +335,19 @@ export default function PlayerBattles() {
             )}
 
             {/* Show message when no battles are found and not loading */}
-            {battlesList.length === 0 && !battlesLoading && !cardsLoading && (
-              <div className="battles-end-user-message">
-                <p>No battles found</p>
-              </div>
-            )}
+            {battlesList.length === 0 &&
+              !battlesLoading &&
+              !cardsLoading &&
+              (firstSyncPending ? (
+                <div className="battles-end-user-message">
+                  <CircularProgress className="battles-loading-spinner" />
+                  <p>Fetching this player's battles for the first time...</p>
+                </div>
+              ) : (
+                <div className="battles-end-user-message">
+                  <p>No battles found</p>
+                </div>
+              ))}
           </>
         )}
       </div>

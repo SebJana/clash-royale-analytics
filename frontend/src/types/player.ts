@@ -23,4 +23,14 @@ export type Player = {
     name: string;
   };
   badges?: Badge[];
+  // When the backend last refreshed the shown data (UTC, null until the
+  // first sync). Not part of the Clash Royale profile itself.
+  syncInfo?: {
+    battlesSyncedAt: string | null;
+    profileSyncedAt: string | null;
+    // Date the player was first tracked (YYYY-MM-DD)
+    trackedSince: string | null;
+    // Periods the player was untracked, long enough to have missed battles
+    trackingGaps?: { from: string; to: string; hours: number }[];
+  };
 };

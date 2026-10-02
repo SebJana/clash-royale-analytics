@@ -14,9 +14,7 @@ router = APIRouter(prefix="/battles", tags=["Total battles"])
 )
 async def fetch_battles_count(mongo_conn: DbConn, redis_conn: RedConn):
     try:
-        key = await build_redis_key(
-            conn=redis_conn, service="crApi", resource="totalBattles"
-        )
+        key = build_redis_key(service="crApi", resource="totalBattles")
         cached_battle_count = await get_redis_json(redis_conn, key)
 
         if cached_battle_count is not None:

@@ -191,9 +191,7 @@ async def validate_game_modes(redis_conn: RedConn, game_modes: Optional[List[str
     if not game_modes:
         return game_modes
 
-    key = await build_redis_key(
-        conn=redis_conn, service="crApi", resource="allGameModes"
-    )
+    key = build_redis_key(service="crApi", resource="allGameModes")
     all_game_modes = await get_redis_json(redis_conn, key)
 
     # If there are no game modes in the redis, don't validate the given game_modes

@@ -200,8 +200,7 @@ async def get_nyt_wordle_token(redis_conn: RedConn, req: NYTWordleAnswerRequest)
     # Convert current time to user's timezone to get correct date for their location
     today_str = datetime.now(ZoneInfo(req.timezone)).date().isoformat()
 
-    key = await build_redis_key(
-        conn=redis_conn,
+    key = build_redis_key(
         service="crApi",
         resource="wordleAnswer",
         params={"timezone": req.timezone},

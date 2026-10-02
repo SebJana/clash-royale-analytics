@@ -27,4 +27,6 @@ export type LastBattles = {
     latestBattleTime: string;
     earliestBattleTime: string;
   };
+  // Set while a just-tracked player's first battle sync has not finished
+  first_sync_pending?: boolean;
 };

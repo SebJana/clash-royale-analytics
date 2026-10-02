@@ -11,6 +11,7 @@ COPY backend/mongo/requirements.txt /app/mongo/requirements.txt
 COPY backend/redis_service/requirements.txt /app/redis_service/requirements.txt
 COPY backend/clash_royale_api/requirements.txt /app/clash_royale_api/requirements.txt
 COPY backend/api_key_store/requirements.txt /app/api_key_store/requirements.txt
+COPY backend/scrape_schedule/requirements.txt /app/scrape_schedule/requirements.txt
 
 # Install any needed packages specified in requirements.txt
 RUN apt-get update && apt-get install -y --no-install-recommends libcairo2 \
@@ -21,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/mongo/ /app/mongo/
 COPY backend/clash_royale_api/ /app/clash_royale_api/
 COPY backend/api_key_store/ /app/api_key_store/
+COPY backend/scrape_schedule/ /app/scrape_schedule/
 COPY backend/redis_service/ /app/redis_service/
 COPY backend/app/src/ /app/src/
 

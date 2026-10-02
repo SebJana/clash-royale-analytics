@@ -14,15 +14,28 @@ from .players_read import (
     get_tracked_players,
     check_player_tracked,
     get_players_count,
+    get_tracked_player_cache_state,
+    get_player_sync_state,
+    get_tracked_players_sync_times,
 )
 from .players_write import (
     insert_tracked_player,
     set_player_name,
     deactivate_tracked_player,
+    record_battle_sync,
+    record_battle_sync_failure,
+    backfill_player_sync_fields,
+    backfill_tracking_gaps,
 )
 
 from .game_modes_write import insert_game_modes
 from .game_modes_read import get_game_modes
+
+from .cards_read import get_cards
+from .cards_write import save_cards
+
+from .player_profiles_read import get_player_profile
+from .player_profiles_write import save_player_profile
 
 __all__ = [
     "MongoConn",
@@ -42,13 +55,30 @@ __all__ = [
     "get_tracked_players",
     "check_player_tracked",
     "get_players_count",
+    "get_tracked_player_cache_state",
+    "get_player_sync_state",
+    "get_tracked_players_sync_times",
     ## write
     "insert_tracked_player",
     "set_player_name",
     "deactivate_tracked_player",
+    "record_battle_sync",
+    "record_battle_sync_failure",
+    "backfill_player_sync_fields",
+    "backfill_tracking_gaps",
     # game_modes
     ## read
     "get_game_modes",
     ## write
     "insert_game_modes",
+    # cards
+    ## read
+    "get_cards",
+    ## write
+    "save_cards",
+    # player_profiles
+    ## read
+    "get_player_profile",
+    ## write
+    "save_player_profile",
 ]

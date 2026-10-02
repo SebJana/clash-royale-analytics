@@ -161,6 +161,16 @@ class Settings:
     # MongoDB Configuration
     MONGO_CLIENT_NAME: str = "cr-analytics-api"
 
+    # Untracked periods shorter than this are not shown on the player page.
+    # The first sync after reactivation fetches the last 25 battles, so a short
+    # gap loses nothing; an hour of nonstop play is about 20 battles.
+    TRACKING_GAP_HINT_MIN_S: int = 60 * 60  # 1 hour
+
+    # A newly tracked player's profile snapshot is refreshed after this time.
+    # NOTE Keep equal to PROFILE_MIN_INTERVAL in the data scraper settings,
+    # which schedules every later refresh.
+    PROFILE_MIN_INTERVAL: float = 24 * 60 * 60  # 1 day
+
     # Maximum time interval that can be requested using a BetweenRequest for decks, cards, stats
     # NOTE: If none is wanted, just set the limit to an arbitrarily big number
     MAX_TIME_RANGE_DAYS: int = 10 * 365
@@ -169,14 +179,14 @@ class Settings:
     MAX_BATTLES: int = 100
 
     # Cache TTL (Time To Live) in seconds
-    # Cache is being invalidated in every data scraping cycle
-    # Cache data is always as up-to-date as the most recently scraped data from MongoDB
-    # Keep TTL still in the minutes to hours range as fallback
-    # to not risk having outdated data upon synchronization errors or scraping errors
+    # Player statistics are keyed by the player's syncVersion, which changes
+    # whenever the data scraper stores new battles for that player. Cached data is
+    # therefore always as up-to-date as the most recently scraped data in MongoDB.
+    # Keep TTL still in the minutes to hours range as fallback, and for data
+    # without a per-player version (game modes, total battle count)
 
     CACHE_TTL_CARDS: int = 6 * 60 * 60  # 6 hours
     CACHE_TTL_GAME_MODES: int = 1 * 60 * 60  # 1 hour
-    CACHE_TTL_PLAYER_PROFILE: int = 15 * 60  # 15 minutes
     CACHE_TTL_TOTAL_BATTLES: int = 15 * 60  # 15 minutes
     CACHE_TTL_PLAYER_BATTLE_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_BATTLES: int = (

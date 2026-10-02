@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import {
   useInfiniteQuery,
   useQueryClient,
@@ -10,6 +10,9 @@ import { fetchLastBattles } from "../services/api/lastBattles";
 
 const min = 60_000; // 1 minute in milliseconds
 const cacheDuration = 5 * min;
+// Poll interval while a just-tracked player's first battle sync is running.
+// The backend syncs new players within seconds.
+const firstSyncPollInterval = 3_000;
 
 /**
  * Hook for fetching player battles with infinite scroll pagination
@@ -54,6 +57,11 @@ export function usePlayerBattlesInfinite(
     staleTime: cacheDuration,
     // Keep data in memory - after that it gets garbage collected
     gcTime: cacheDuration,
+    // Poll only until the first battle sync of a just-tracked player finished
+    refetchInterval: (query) =>
+      query.state.data?.pages[0]?.first_sync_pending
+        ? firstSyncPollInterval
+        : false,
     // Disable automatic refetching to reduce unnecessary API calls
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -65,6 +73,18 @@ export function usePlayerBattlesInfinite(
     // When user hits reload they're back to seeing only the last X default loaded battles
     meta: { persist: false },
   });
+
+  // The battles page polls faster than the profile while a just-tracked
+  // player's first sync runs. Once the battles arrive, refresh the profile
+  // too, so its "Battles updated" hint matches the battles shown.
+  const firstSyncPending = q.data?.pages[0]?.first_sync_pending === true;
+  const wasFirstSyncPending = useRef(firstSyncPending);
+  useEffect(() => {
+    if (wasFirstSyncPending.current && !firstSyncPending) {
+      queryClient.invalidateQueries({ queryKey: ["playerProfile", playerTag] });
+    }
+    wasFirstSyncPending.current = firstSyncPending;
+  }, [firstSyncPending, playerTag, queryClient]);
 
   // Force reset to first page when data becomes stale to prevent mass API calls
   useEffect(() => {

@@ -43,6 +43,11 @@ services:
       - .env
     networks:
       - cr-analytics
+    # Read-only scraper status for administrators. Bound to the host's
+    # loopback interface only: reachable from a shell on this machine or an
+    # SSH tunnel, never from the network. Do not proxy it through nginx.
+    ports:
+      - "127.0.0.1:9100:9100"
     restart: unless-stopped
 
   # Reconstructible database/API/media data. Eviction is acceptable here.
@@ -80,6 +85,7 @@ services:
       - cr-analytics
 
   # Shared key leases and scheduling state. Never evict active coordination data.
+  # The battle schedule needs roughly 250 bytes per tracked player.
   redis-key-store:
     image: redis:8.0-alpine
     command: >
@@ -87,7 +93,7 @@ services:
       --requirepass ${REDIS_PASSWORD}
       --appendonly yes
       --appendfsync everysec
-      --maxmemory 64mb
+      --maxmemory 128mb
       --maxmemory-policy noeviction
     volumes:
       - redis-key-store-data:/data

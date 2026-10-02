@@ -12,9 +12,7 @@ router = APIRouter(prefix="/game_modes", tags=["Game Modes"])
 async def fetch_game_modes(mongo_conn: DbConn, redis_conn: RedConn):
 
     try:
-        key = await build_redis_key(
-            conn=redis_conn, service="crApi", resource="allGameModes"
-        )
+        key = build_redis_key(service="crApi", resource="allGameModes")
         cached_game_modes = await get_redis_json(redis_conn, key)
 
         if cached_game_modes is not None:

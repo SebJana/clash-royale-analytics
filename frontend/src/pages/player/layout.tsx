@@ -1,14 +1,14 @@
 import { Outlet, NavLink, useParams, useLocation } from "react-router-dom";
-import { usePlayerProfile } from "../../hooks/usePlayerProfile";
+import {
+  usePlayerProfile,
+  getProfileErrorCode,
+} from "../../hooks/usePlayerProfile";
 import { House, Menu, X, ChevronLeft } from "lucide-react";
 import { PlayerInfo } from "../../components/playerInfo/playerInfo";
 import { PlayerInfoPlaceholder } from "../../components/playerInfo/playerInfoPlaceholder";
 import { PlayerErrorBoundary } from "../../components/playerError/playerErrorBoundary";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { fetchAllTrackedPlayers } from "../../services/api/trackedPlayers";
-import { pingApi } from "../../services/api/ping";
 import Lottie from "lottie-react";
 import emptyBox from "../../assets/animations/emptyBox.json";
 import genericError from "../../assets/animations/404.json";
@@ -19,7 +19,6 @@ import "./layout.css";
 export default function PlayerLayout() {
   const { playerTag = "" } = useParams();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [profileRetryAttempts, setProfileRetryAttempts] = useState(0);
   const encodedTag = encodeURIComponent(playerTag ?? "");
   const { pathname } = useLocation();
 
@@ -29,59 +28,30 @@ export default function PlayerLayout() {
   const {
     data: player,
     isLoading: playerLoading,
-    isFetched: profileFetched,
     isError: isPlayerError,
     error: playerError,
-    errorUpdatedAt: profileErrorUpdatedAt,
-    refetch: refetchPlayer,
   } = usePlayerProfile(playerTag ?? "");
 
-  // Keep the count while the placeholder briefly unmounts for a fresh API check.
-  useEffect(() => setProfileRetryAttempts(0), [playerTag, player]);
-
-  const errorDetail = axios.isAxiosError<{
-    detail?: { code?: string };
-  }>(playerError)
-    ? playerError.response?.data?.detail
-    : undefined;
-  // Only invalid and untracked tags need the full-page error.
+  // The profile comes from the database, so a failure means the player is
+  // unknown, has no profile snapshot yet, or the backend has a problem.
+  const errorCode = getProfileErrorCode(playerError);
   const isNotFound =
     playerError?.message === "Invalid player tag" ||
-    (axios.isAxiosError(playerError) &&
-      playerError.response?.status === 403 &&
-      (errorDetail?.code === "INVALID_PLAYER_TAG" ||
-        errorDetail?.code === "PLAYER_NOT_TRACKED"));
-  const { isError: isApiDown, isSuccess: isApiReachable } = useQuery({
-    // Check each profile failure against the current backend state, not an old ping.
-    queryKey: ["apiPing", playerTag, profileErrorUpdatedAt],
-    queryFn: pingApi,
-    enabled: isPlayerError && !isNotFound,
-    retry: false,
-    staleTime: 0,
-    gcTime: 60_000,
-    // Keep the placeholder visible while checking the backend again.
-    placeholderData: (previousData) => previousData,
-  });
-  const showProfilePlaceholder =
-    !isNotFound &&
-    isApiReachable &&
-    (isPlayerError || (profileFetched && !player));
+    errorCode === "INVALID_PLAYER_TAG" ||
+    errorCode === "PLAYER_NOT_TRACKED";
+  // Players tracked before profile snapshots existed have none until the
+  // scraper's first refresh. The rest of the page works without it.
+  const profileNotSynced = errorCode === "PROFILE_NOT_SYNCED";
+  const notSyncedName = axios.isAxiosError<{ detail?: { name?: string } }>(
+    playerError,
+  )
+    ? playerError.response?.data?.detail?.name
+    : undefined;
 
-  // The tracked-player list can supply the name when the live profile fails.
-  const { data: trackedPlayers } = useQuery({
-    queryKey: ["trackedPlayers"],
-    queryFn: fetchAllTrackedPlayers,
-    enabled: showProfilePlaceholder && !player,
-    staleTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
-  });
-  const knownName = player?.name ?? trackedPlayers?.activePlayers[playerTag];
-
-  if (playerLoading && !profileFetched)
+  if (playerLoading)
     return <CircularProgress className="layout-loading-spinner" />;
-  if (isPlayerError && !isNotFound && !isApiReachable && !isApiDown)
-    return <CircularProgress className="layout-loading-spinner" />;
-  if (isPlayerError && (isNotFound || isApiDown)) {
+  // A failed refetch keeps the previously loaded profile on screen
+  if (isPlayerError && !player && !profileNotSynced) {
     console.log(playerError);
 
     const displayMessage = isNotFound
@@ -167,16 +137,12 @@ export default function PlayerLayout() {
         </div>
       </nav>
       <header className="player-header">
-        {showProfilePlaceholder ? (
-          <PlayerInfoPlaceholder
-            tag={playerTag}
-            name={knownName}
-            retry={refetchPlayer}
-            retryAttempts={profileRetryAttempts}
-            onRetryAttempt={() => setProfileRetryAttempts((count) => count + 1)}
-          />
+        {player ? (
+          <PlayerInfo player={player} />
         ) : (
-          player && <PlayerInfo player={player} />
+          profileNotSynced && (
+            <PlayerInfoPlaceholder tag={playerTag} name={notSyncedName} />
+          )
         )}
       </header>
       <main className="player-content">

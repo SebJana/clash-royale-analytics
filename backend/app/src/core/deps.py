@@ -1,10 +1,15 @@
+from dataclasses import dataclass
+from datetime import datetime
+from core.settings import settings
 from fastapi import Depends, Request, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Annotated
 from helpers.jwt import validate_access_token, AvailableTokenTypes
 from redis_service import CacheRedisConn, RedisConn
 from clash_royale_api import ClashRoyaleAPI
-from mongo import MongoConn, check_player_tracked
+from mongo import MongoConn, get_tracked_player_cache_state
+from scrape_schedule import Schedule
+from redis.asyncio import Redis
 
 
 # Dependency that returns the database connection
@@ -59,18 +64,68 @@ def get_cr_api(request: Request) -> ClashRoyaleAPI:
     return api
 
 
+@dataclass(frozen=True)
+class ScrapeSchedules:
+    """The data scraper's per-player schedules and the Redis they live in.
+
+    The API only adds and removes players and reads the published capacity;
+    the data scraper claims and processes the players.
+    """
+
+    battles: Schedule
+    profiles: Schedule
+    redis: Redis
+
+
+# Dependency that returns the per-player scraping schedules
+def get_scrape_schedules(request: Request) -> ScrapeSchedules:
+    schedules = getattr(request.app.state, "scrape_schedules", None)
+    if schedules is None:
+        raise HTTPException(status_code=500, detail="Scrape schedules not initialized")
+    return schedules
+
+
 # Global dependencies for usage in the routes
 CrApi = Annotated[ClashRoyaleAPI, Depends(get_cr_api)]
 DbConn = Annotated[MongoConn, Depends(get_mongo)]
 RedConn = Annotated[CacheRedisConn, Depends(get_redis)]
 AuthStateConn = Annotated[RedisConn, Depends(get_auth_state_redis)]
 CardImageConn = Annotated[RedisConn, Depends(get_card_image_redis)]
+Schedules = Annotated[ScrapeSchedules, Depends(get_scrape_schedules)]
+
+
+@dataclass(frozen=True)
+class TrackedPlayer:
+    """A validated, tracked player and the version of its stored battle data.
+
+    sync_version changes whenever the data scraper stores new battles for the
+    player. Cache keys built with it are invalidated per player, not globally.
+    first_sync_pending is True from tracking until the first battle sync ends.
+    last_battles_sync_at is when the scraper last checked the battle log (naive
+    UTC), whether or not it found new battles. tracked_since is the date the
+    player was first tracked (YYYY-MM-DD), None if unknown. tracking_gaps
+    lists untracked periods long enough to have lost battles, as
+    {"from", "to"} dates (YYYY-MM-DD) and their length in whole "hours".
+    """
+
+    tag: str
+    name: str | None
+    sync_version: int
+    first_sync_pending: bool
+    last_battles_sync_at: datetime | None
+    tracked_since: str | None
+    tracking_gaps: list[dict]
 
 
 # Dependency that ensures the given player tag is active in the players collection
-async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbConn):
+async def require_tracked_player(
+    player_tag: str, cr_api: CrApi, mongo_conn: DbConn
+) -> TrackedPlayer:
     """
     FastAPI dependency that ensures a given player tag is valid and currently tracked.
+
+    FastAPI caches the result per request, so a router-level dependency and a
+    TrackedPlayerDep route parameter share one Mongo lookup.
 
     Args:
         player_tag (str): Player tag from the path.
@@ -78,7 +133,7 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
         mongo_conn (DbConn): Injected Mongo connection (for tracked/active check).
 
     Returns:
-        str: The player tag when validation succeeds.
+        TrackedPlayer: The player tag and its sync version when validation succeeds.
 
     Raises:
         HTTPException 403 with a specific code if the tag is invalid or untracked.
@@ -95,7 +150,8 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
         )
 
     # Check if the player is in players collection and active
-    if not await check_player_tracked(mongo_conn, player_tag):
+    state = await get_tracked_player_cache_state(mongo_conn, player_tag)
+    if state is None:
         raise HTTPException(
             status_code=403,
             detail={
@@ -104,7 +160,46 @@ async def require_tracked_player(player_tag: str, cr_api: CrApi, mongo_conn: DbC
             },
         )
 
-    return player_tag  # When its a valid and tracked player, return the tag
+    # When its a valid and tracked player, return it with its data version
+    return TrackedPlayer(
+        tag=player_tag,
+        name=state["playerName"],
+        sync_version=state["syncVersion"],
+        first_sync_pending=state["firstSyncPending"],
+        last_battles_sync_at=state["lastBattlesSyncAt"],
+        # insertedAt is stored as "YYYY-MM-DD HH-MM-SS"; the date is enough
+        tracked_since=str(state["insertedAt"])[:10] if state["insertedAt"] else None,
+        tracking_gaps=_relevant_tracking_gaps(state["trackingGaps"]),
+    )
+
+
+def _relevant_tracking_gaps(gaps: list[dict]) -> list[dict]:
+    """Keep untracked periods of at least TRACKING_GAP_HINT_MIN_S, as dates.
+
+    Timestamps are stored as "YYYY-MM-DD HH-MM-SS" strings.
+    """
+
+    relevant = []
+    for gap in gaps:
+        try:
+            start = datetime.strptime(gap["from"], "%Y-%m-%d %H-%M-%S")
+            end = datetime.strptime(gap["to"], "%Y-%m-%d %H-%M-%S")
+        except (KeyError, TypeError, ValueError):
+            continue
+        seconds = (end - start).total_seconds()
+        if seconds >= settings.TRACKING_GAP_HINT_MIN_S:
+            relevant.append(
+                {
+                    "from": gap["from"][:10],
+                    "to": gap["to"][:10],
+                    # A gap within one day is described by its length instead
+                    "hours": max(1, round(seconds / 3600)),
+                }
+            )
+    return relevant
+
+
+TrackedPlayerDep = Annotated[TrackedPlayer, Depends(require_tracked_player)]
 
 
 # OAuth2 scheme used only for extracting "Authorization: Bearer <token>"

@@ -451,6 +451,11 @@ export default function PlayerDecks() {
     }
 
     if (appliedFilters.includeCardFilterMode === true) {
+      // TODO Move include mode to the backend: match the selected cards with
+      // $all early in get_decks_win_percentage and add them to the cache key.
+      // Over long date ranges the route returns thousands of decks only to
+      // filter most of them out here. Match mode below stays in the frontend,
+      // since it scores every deck anyway.
       // Include mode: deck must contain ALL selected cards (strict filtering)
       const filteredDecks = allDecks.filter((deck) => {
         return appliedFilters.cards.every((appliedCard) =>

@@ -134,3 +134,31 @@ export function isValidDateRange(
   // TODO possibly limit time range (max N years)?
   return true;
 }
+
+/**
+ * Describe how long ago an API timestamp was, in minutes: "3 min ago".
+ * From one hour on hours are added, "5 h 12 min ago", which stays readable
+ * for data that is up to a day old.
+ * Assumes UTC if no timezone is present, like datetimeToLocale.
+ * @param time ISO 8601 string (e.g. "2025-09-08T22:52:42")
+ * @param now Reference time in milliseconds (default: current time)
+ * @returns Relative time text, or null if the timestamp is missing or invalid
+ */
+export function formatTimeAgo(
+  time: string | null | undefined,
+  now: number = Date.now(),
+): string | null {
+  if (!time) return null;
+
+  const hasTZ = /(Z|[+-]\d{2}:\d{2})$/i.test(time);
+  const date = new Date(hasTZ ? time : time + "Z");
+  if (Number.isNaN(date.getTime())) return null;
+
+  // Small clock differences between server and browser must not read as
+  // a time in the future.
+  const minutes = Math.max(0, Math.floor((now - date.getTime()) / 60_000));
+  if (minutes < 1) return "less than 1 min ago";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} h ${minutes % 60} min ago`;
+}
