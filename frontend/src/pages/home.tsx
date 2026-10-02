@@ -24,10 +24,15 @@ import axios from "axios";
 import { StatCard } from "../components/statCard/statCard";
 import "./home.css";
 
+// TODO [KEY PERFORMANCE IMPROVEMENT] lazy load card images from CDN to page after opening,
+// don't let this load block any other loading and rendering tho
+
 function getErrorMessage(error: unknown): string {
-  if (!axios.isAxiosError<{
-    detail?: string | { code?: string; message?: string };
-  }>(error)) {
+  if (
+    !axios.isAxiosError<{
+      detail?: string | { code?: string; message?: string };
+    }>(error)
+  ) {
     return error instanceof Error
       ? error.message
       : "Something went wrong. Please try again.";
@@ -97,7 +102,7 @@ function HomePage() {
   const [untrackingError, setUntrackingError] = useState<string | null>(null);
   const [trackingSuccess, setTrackingSuccess] = useState<string | null>(null);
   const [untrackingSuccess, setUntrackingSuccess] = useState<string | null>(
-    null
+    null,
   );
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAuthSuccess, setShowAuthSuccess] = useState(false);
@@ -224,12 +229,12 @@ function HomePage() {
           <div className="home-stat-cards-container">
             <StatCard
               value={formatNumberWithSuffix(
-                playerCount?.activePlayerCount ?? 0
+                playerCount?.activePlayerCount ?? 0,
               )}
               label={`Tracked ${pluralize(
                 playerCount?.activePlayerCount ?? 0,
                 "Player",
-                "Players"
+                "Players",
               )}`}
             />
             <StatCard
@@ -237,7 +242,7 @@ function HomePage() {
               label={`${pluralize(
                 playerCount?.activePlayerCount ?? 0,
                 "Battle",
-                "Battles"
+                "Battles",
               )} on record`}
             />
           </div>
@@ -298,7 +303,9 @@ function HomePage() {
               <span
                 className={`untrack-auth-status${isAuthenticated ? " is-unlocked" : ""}`}
                 role="img"
-                aria-label={isAuthenticated ? "Verified" : "Verification required"}
+                aria-label={
+                  isAuthenticated ? "Verified" : "Verification required"
+                }
                 title={isAuthenticated ? "Verified" : "Verification required"}
               >
                 <span className="untrack-auth-icon" aria-hidden="true">
@@ -347,11 +354,17 @@ function HomePage() {
               </button>
             )}
 
-            <div className="untrack-auth-feedback" role="status" aria-atomic="true">
+            <div
+              className="untrack-auth-feedback"
+              role="status"
+              aria-atomic="true"
+            >
               {showAuthSuccess && isAuthenticated && (
                 <div className="home-success-message untrack-auth-success">
                   <CircleCheck size={20} aria-hidden="true" />
-                  <span>Verification complete! Enter a player tag to remove.</span>
+                  <span>
+                    Verification complete! Enter a player tag to remove.
+                  </span>
                 </div>
               )}
             </div>

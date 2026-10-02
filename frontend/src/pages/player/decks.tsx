@@ -245,6 +245,9 @@ function VirtualDeckList({
   );
 }
 
+// TODO page and filters should load and display upon error only regarding decks/cards/plots routes
+// not game modes and cards
+
 // TODO add same error handling for all pages if no data is found or the tag is invalid
 export default function PlayerDecks() {
   const { playerTag = "" } = useParams();
