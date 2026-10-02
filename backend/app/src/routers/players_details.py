@@ -16,6 +16,7 @@ from helpers.validate import (
 )
 from models.schema import BetweenRequest, BattlesRequest
 from clash_royale_api import ClashRoyaleMaintenanceError
+from api_key_store import NoKeyAvailable, KeyStoreUnavailable
 from redis_service import get_redis_json, set_redis_json, build_redis_key
 from mongo import (
     get_last_battles,
@@ -34,7 +35,16 @@ router = APIRouter(
 
 
 @router.get(
-    "/{player_tag}/profile", dependencies=[Depends(RateLimiter(times=10, seconds=60))]
+    "/{player_tag}/profile",
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+    responses={
+        403: {"description": "Player is untracked or Clash Royale rejected the request"},
+        404: {"description": "Player not found"},
+        429: {"description": "Clash Royale API rate limit exceeded"},
+        500: {"description": "Player profile request failed"},
+        502: {"description": "Clash Royale API request failed"},
+        503: {"description": "Clash Royale API or key store unavailable"},
+    },
 )
 async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn):
     # TODO how to handle more active users than the allowed key limit of the Clash Royale API?
@@ -59,6 +69,12 @@ async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn
     except ClashRoyaleMaintenanceError as e:
         raise HTTPException(status_code=e.code, detail=e.detail)
 
+    except NoKeyAvailable as e:
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": str(int(e.retry_after))}) from e
+
+    except KeyStoreUnavailable as e:
+        raise HTTPException(status_code=503, detail="Clash Royale key store unavailable") from e
+
     except httpx.HTTPStatusError as http_err:
         status = http_err.response.status_code if http_err.response else 502
         # Common Clash Royale API errors
@@ -82,7 +98,14 @@ async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn
         )
 
 
-@router.get("/{player_tag}/battles")
+@router.get(
+    "/{player_tag}/battles",
+    responses={
+        403: {"description": "Invalid or untracked player, or invalid request parameters"},
+        404: {"description": "No battles found for the player"},
+        500: {"description": "Battle lookup failed"},
+    },
+)
 async def last_battles(
     player_tag: str,
     mongo_conn: DbConn,
@@ -118,6 +141,9 @@ async def last_battles(
     except ParamsRequestError as e:
         raise HTTPException(status_code=e.code, detail=e.detail)
 
+    except HTTPException:
+        raise
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -125,7 +151,14 @@ async def last_battles(
         )
 
 
-@router.get("/{player_tag}/decks/stats")
+@router.get(
+    "/{player_tag}/decks/stats",
+    responses={
+        403: {"description": "Invalid or untracked player, or invalid request parameters"},
+        404: {"description": "No decks found for the player"},
+        500: {"description": "Deck statistics lookup failed"},
+    },
+)
 async def deck_percentage_stats(
     player_tag: str,
     mongo_conn: DbConn,
@@ -180,6 +213,9 @@ async def deck_percentage_stats(
     except ParamsRequestError as e:
         raise HTTPException(status_code=e.code, detail=e.detail)
 
+    except HTTPException:
+        raise
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -187,7 +223,14 @@ async def deck_percentage_stats(
         )
 
 
-@router.get("/{player_tag}/cards/stats")
+@router.get(
+    "/{player_tag}/cards/stats",
+    responses={
+        403: {"description": "Invalid or untracked player, or invalid request parameters"},
+        404: {"description": "No cards found for the player"},
+        500: {"description": "Card statistics lookup failed"},
+    },
+)
 async def card_percentage_stats(
     player_tag: str,
     mongo_conn: DbConn,
@@ -242,6 +285,9 @@ async def card_percentage_stats(
     except ParamsRequestError as e:
         raise HTTPException(status_code=e.code, detail=e.detail)
 
+    except HTTPException:
+        raise
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -249,7 +295,14 @@ async def card_percentage_stats(
         )
 
 
-@router.get("/{player_tag}/stats/daily")
+@router.get(
+    "/{player_tag}/stats/daily",
+    responses={
+        403: {"description": "Invalid or untracked player, or invalid request parameters"},
+        404: {"description": "No daily statistics found for the player"},
+        500: {"description": "Daily statistics lookup failed"},
+    },
+)
 async def daily_player_statistics(
     player_tag: str,
     mongo_conn: DbConn,
@@ -305,6 +358,9 @@ async def daily_player_statistics(
 
     except ParamsRequestError as e:
         raise HTTPException(status_code=e.code, detail=e.detail)
+
+    except HTTPException:
+        raise
 
     except Exception as e:
         raise HTTPException(

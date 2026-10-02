@@ -10,6 +10,7 @@ COPY data_scraper/requirements.txt /app/requirements.txt
 COPY mongo/requirements.txt /app/mongo/requirements.txt
 COPY redis_service/requirements.txt /app/redis_service/requirements.txt
 COPY clash_royale_api/requirements.txt /app/clash_royale_api/requirements.txt
+COPY api_key_store/requirements.txt /app/api_key_store/requirements.txt
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
@@ -17,6 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy shared mongo connection + redis connection + cr api client + data scraper source
 COPY mongo/ /app/mongo/
 COPY clash_royale_api/ /app/clash_royale_api/
+COPY api_key_store/ /app/api_key_store/
 COPY redis_service/ /app/redis_service/
 COPY data_scraper/src/ /app/src/
 
@@ -24,4 +26,4 @@ COPY data_scraper/src/ /app/src/
 ENV PYTHONPATH=/app
 
 # Run the application
-CMD ["python", "src/main.py"]
+CMD ["sh", "-c", "export CR_API_BOOT_ID=${CR_API_BOOT_ID:-$(cat /proc/sys/kernel/random/uuid)}; exec python src/main.py"]

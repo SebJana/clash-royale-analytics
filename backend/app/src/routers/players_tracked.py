@@ -15,6 +15,7 @@ from clash_royale_api import (
     ClashRoyaleConnectionError,
     ClashRoyaleInvalidResponseError,
 )
+from api_key_store import NoKeyAvailable, KeyStoreUnavailable
 from mongo import (
     get_tracked_players,
     insert_tracked_player,
@@ -25,7 +26,11 @@ from mongo import (
 router = APIRouter(prefix="/players", tags=["Tracked Players"])
 
 
-@router.get("", dependencies=[Depends(RateLimiter(times=15, seconds=60))])
+@router.get(
+    "",
+    dependencies=[Depends(RateLimiter(times=15, seconds=60))],
+    responses={500: {"description": "Tracked player lookup failed"}},
+)
 async def list_tracked_players(mongo_conn: DbConn):
     try:
         players = await get_tracked_players(mongo_conn)
@@ -36,7 +41,10 @@ async def list_tracked_players(mongo_conn: DbConn):
         )
 
 
-@router.get("/count")
+@router.get(
+    "/count",
+    responses={500: {"description": "Tracked player count lookup failed"}},
+)
 async def fetch_tracked_player_count(mongo_conn: DbConn):
     try:
         players_count = await get_players_count(mongo_conn)
@@ -47,7 +55,16 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
         )
 
 
-@router.post("/{player_tag}", dependencies=[Depends(RateLimiter(times=3, seconds=60))])
+@router.post(
+    "/{player_tag}",
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
+    responses={
+        404: {"description": "Player tag invalid or player not found"},
+        500: {"description": "Could not save tracked player"},
+        502: {"description": "Clash Royale API request failed"},
+        503: {"description": "Clash Royale API or key store unavailable"},
+    },
+)
 async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi):
     # Use the same trimmed tag for the Clash Royale check and the stored player.
     player_tag = player_tag.strip()
@@ -59,6 +76,12 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
             status_code=e.code,
             detail={"code": "CR_API_MAINTENANCE", "message": e.detail},
         ) from e
+    except NoKeyAvailable as e:
+        raise HTTPException(status_code=503, detail={"code": "CR_API_KEYS_BUSY", "message": str(e)},
+                            headers={"Retry-After": str(int(e.retry_after))}) from e
+    except KeyStoreUnavailable as e:
+        raise HTTPException(status_code=503, detail={"code": "CR_API_KEY_STORE_UNAVAILABLE",
+                                                     "message": "Clash Royale key store unavailable"}) from e
     except ClashRoyaleInvalidTagError as e:
         raise HTTPException(
             status_code=404,
@@ -110,7 +133,13 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
 
 
 @router.delete(
-    "/{player_tag}", dependencies=[Depends(RateLimiter(times=3, seconds=60))]
+    "/{player_tag}",
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
+    responses={
+        403: {"description": "Invalid or untracked player, or invalid removal token"},
+        404: {"description": "Tracked player not found"},
+        500: {"description": "Could not remove tracked player"},
+    },
 )
 async def remove_tracked_player(
     mongo_conn: DbConn,

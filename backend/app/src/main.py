@@ -4,6 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi_limiter import FastAPILimiter
 from redis.asyncio import Redis
+from fastapi.responses import JSONResponse
 
 from routers import (
     players_details,
@@ -16,6 +17,7 @@ from routers import (
 from core.settings import settings
 from redis_service import CacheRedisConn, RedisConn
 from clash_royale_api import ClashRoyaleAPI
+from api_key_store import KeyStore, KeyStoreConfig, NoKeyAvailable, KeyStoreUnavailable, keys_from_env
 from mongo import MongoConn
 from helpers.ip_utils import rate_limit_key_func
 
@@ -74,10 +76,26 @@ async def retry_async(func, name):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    # Retry Clash Royale API
-    cr_api = ClashRoyaleAPI(api_key=settings.API_TOKEN)
-    await retry_async(cr_api.check_connection, name="Clash Royale API")
+    # This Redis is deliberately separate from response/media cache Redis:
+    # evicting a lease or cooldown could make a busy key appear available.
+    # app and scraper use the same Redis server but different pool namespaces.
+    key_redis = Redis(host=settings.KEY_STORE_REDIS_HOST, port=settings.REDIS_PORT,
+                      password=settings.REDIS_PASSWORD, decode_responses=True)
+    await retry_async(key_redis.ping, name="key store Redis")
+    key_store = KeyStore(
+        "app", keys_from_env("app"), key_redis,
+        KeyStoreConfig(
+            requests_per_second=settings.CR_KEY_REQUESTS_PER_SECOND,
+            pool_requests_per_second=settings.CR_KEY_POOL_REQUESTS_PER_SECOND,
+        ),
+    )
+    cr_api = ClashRoyaleAPI(key_store=key_store)
+    # Startup probes are coordinated in Redis. Multiple API workers should
+    # reuse one validation pass and see the same usable-key count.
+    inventory = await retry_async(cr_api.check_connection, name="Clash Royale key inventory")
+    print(f"[INFO] App Clash Royale keys: {inventory}")
     app.state.cr_api = cr_api
+    app.state.key_store = key_store
 
     # Retry Redis
     redis_conn = CacheRedisConn(
@@ -137,6 +155,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     await app.state.cr_api.close()
+    await app.state.key_store.close()
     mongo_conn.close()
     await redis_conn.close()
     await card_image_redis.close()
@@ -145,6 +164,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.exception_handler(NoKeyAvailable)
+async def no_key_available(_request: Request, exc: NoKeyAvailable):
+    return JSONResponse(status_code=503, content={"detail": "No Clash Royale API key is currently available"},
+                        headers={"Retry-After": str(max(1, int(exc.retry_after)))})
+
+
+@app.exception_handler(KeyStoreUnavailable)
+async def key_store_unavailable(_request: Request, _exc: KeyStoreUnavailable):
+    return JSONResponse(status_code=503, content={"detail": "Clash Royale key store unavailable"})
 
 # Add CORS middleware for local development
 app.add_middleware(
@@ -173,3 +203,20 @@ app.include_router(auth.router, prefix="/api")
 @app.get("/api/ping")
 async def ping():
     return {"status": "ok"}
+
+
+@app.get("/api/ready")
+async def ready():
+    # Ping only proves this process is running. Readiness also needs a usable
+    # key and a closed maintenance circuit; counts never include raw tokens.
+    try:
+        inventory = await app.state.key_store.inventory()
+        maintenance = await app.state.key_store.in_maintenance()
+    except (AttributeError, KeyStoreUnavailable):
+        return JSONResponse(status_code=503, content={"status": "key_store_unavailable"})
+    if maintenance:
+        return JSONResponse(status_code=503, content={"status": "maintenance", "keys": inventory})
+    if inventory["usable"] == 0:
+        state = "no_valid_keys" if inventory["invalid"] == inventory["configured"] else "validation_pending"
+        return JSONResponse(status_code=503, content={"status": state, "keys": inventory})
+    return {"status": "ok", "keys": inventory}

@@ -11,7 +11,11 @@ from routers.auth_routes.common import round_token_scheme
 router = APIRouter()
 
 
-@router.post("/remove_player_token", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
+@router.post(
+    "/remove_player_token",
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    responses={401: {"description": "Security token missing or expired"}},
+)
 async def get_remove_player_token(
     credentials: HTTPAuthorizationCredentials | None = Depends(round_token_scheme),
 ):

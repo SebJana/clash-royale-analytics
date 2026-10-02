@@ -104,7 +104,11 @@ def _halli_galli_status(game: HalliGalliGame) -> dict:
     }
 
 
-@router.get("/halli_galli_id", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
+@router.get(
+    "/halli_galli_id",
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    responses={401: {"description": "Wordle token or calibration invalid"}},
+)
 async def get_halli_galli_id(
     auth_state_conn: AuthStateConn,
     card_image_conn: CardImageConn,
@@ -190,6 +194,10 @@ async def get_halli_galli_id(
 @router.post(
     "/halli_galli_card/{game_id}/{round_index}",
     dependencies=[Depends(RateLimiter(times=60, seconds=60))],
+    responses={
+        404: {"description": "Game or prepared card not found"},
+        409: {"description": "Card image changed during preload"},
+    },
 )
 async def get_halli_galli_card(
     game_id: str,
@@ -259,7 +267,10 @@ async def get_halli_galli_card(
     raise HTTPException(status_code=409, detail="Card image changed; retry preload")
 
 
-@router.get("/halli_galli_status/{game_id}")
+@router.get(
+    "/halli_galli_status/{game_id}",
+    responses={404: {"description": "Halli Galli game not found"}},
+)
 async def get_halli_galli_status(
     game_id: str, auth_state_conn: AuthStateConn, response: Response
 ):
@@ -448,7 +459,14 @@ async def _apply_action(
     return await _handle_round_end(game, round_index, req, card_image_conn)
 
 
-@router.post("/halli_galli_action/{game_id}/{round_index}")
+@router.post(
+    "/halli_galli_action/{game_id}/{round_index}",
+    responses={
+        404: {"description": "Halli Galli game not found"},
+        409: {"description": "Round or game state changed"},
+        422: {"description": "Invalid action or click details"},
+    },
+)
 async def act_on_halli_galli_round(
     game_id: str,
     round_index: int,

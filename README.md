@@ -37,8 +37,8 @@ MOST_SKILLFUL_CARD="Card2"
 MOST_MOUSEY_CARD="Card3"
 
 # Clash Royale API Keys
-DATA_SCRAPER_API_KEY = ey31asd23...
-APP_API_KEY = ey41eas...
+CR_API_APP_KEY_1=YOUR_APP_KEY
+CR_API_SCRAPER_KEY_1=YOUR_SCRAPER_KEY
 ```
 
 ### Environment Variables Explained
@@ -90,13 +90,13 @@ LAN HTTP supports the game but does **not** protect Wordle tokens, reveal keys, 
 
 #### Clash Royale API Keys
 
-- `DATA_SCRAPER_API_KEY`: API Key used to run the cyclic tracking and refreshing of selected player(s)
-- `APP_API_KEY`: API Key used to query on-demand data for an active user
+- `CR_API_APP_KEY_<number>` and `CR_API_SCRAPER_KEY_<number>` in `.env` belong to separate app and scraper pools. Do not reuse a key across pools.
+- Run `python backend/api_key_store/manage_env.py` to manage groups and keys. Adding a custom group prompts for its first key; deleting one removes all its keys. Option 7 keeps adding keys to one group until you press Enter. Key input is hidden. Custom groups are discovered from `.env` and need a caller that creates a `KeyStore` for that group. Restart affected services after edits.
+- Per-key rates default to 1 request/second for both the app and scraper in their Python settings. Optional pool-wide caps are disabled by default; shared retry and timing defaults live in `KeyStoreConfig`.
 
-It’s possible to use the same key for both parameters/roles, but for modulation purposes and to comply with the request limitations stated by Clash Royale, it’s advised to use separate keys. Get your API Keys from the official Clash Royale API website: https://developer.clashroyale.com
+The pools share a dedicated `redis-key-store` with `noeviction`. On startup, keys are validated once per boot generation; ready keys are leased least recently used across workers. HTTP 429 applies `Retry-After` or bounded backoff. Maintenance pauses requests and triggers sparse shared probes. After bounded acquisition retries, the API returns 503 with `Retry-After`, and the scraper defers its job. `/api/ready` reports usable key counts. For multiple replicas of one service, set a shared `CR_API_BOOT_ID` per deployment so they share startup validation.
 
-// TODO (potentially) add the option to use multiple keys with a key rotation for the Clash Royale API calls
-Make it a shared module for both data scraping and the api
+
 
 ### 2. Docker Setup (Production)
 

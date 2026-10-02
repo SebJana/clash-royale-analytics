@@ -4,12 +4,21 @@ import httpx
 from core.deps import CrApi, RedConn
 from core.settings import settings
 from clash_royale_api import ClashRoyaleMaintenanceError
+from api_key_store import NoKeyAvailable, KeyStoreUnavailable
 from redis_service import get_redis_json, set_redis_json, build_redis_key
 
 router = APIRouter(prefix="/cards", tags=["Cards"])
 
 
-@router.get("")
+@router.get(
+    "",
+    responses={
+        403: {"description": "Clash Royale API rejected the request"},
+        429: {"description": "Clash Royale API rate limit exceeded"},
+        502: {"description": "Clash Royale API request failed"},
+        503: {"description": "Clash Royale API or key store unavailable"},
+    },
+)
 async def get_cards(cr_api: CrApi, redis_conn: RedConn):
     try:
         # Check cache
@@ -30,6 +39,12 @@ async def get_cards(cr_api: CrApi, redis_conn: RedConn):
 
     except ClashRoyaleMaintenanceError as e:
         raise HTTPException(status_code=e.code, detail=e.detail)
+
+    except NoKeyAvailable as e:
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": str(int(e.retry_after))}) from e
+
+    except KeyStoreUnavailable as e:
+        raise HTTPException(status_code=503, detail="Clash Royale key store unavailable") from e
 
     except httpx.HTTPStatusError as http_err:
         status = http_err.response.status_code if http_err.response else 502

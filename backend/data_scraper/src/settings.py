@@ -7,13 +7,16 @@ load_dotenv(find_dotenv())
 class Settings:
     """Application settings and configuration."""
 
-    # API Configuration
-    API_TOKEN: str = os.getenv("DATA_SCRAPER_API_KEY", "")
+    # Scraping starts at most one request every two seconds on each key.
+    # Zero disables the optional cap across the whole scraper pool.
+    CR_KEY_REQUESTS_PER_SECOND: float = 1.0
+    CR_KEY_POOL_REQUESTS_PER_SECOND: float = 0.0
 
     # Redis Configuration
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
     # The scraper writes versioned, reconstructible data only.
     REDIS_HOST: str = "redis-cache"
+    KEY_STORE_REDIS_HOST: str = "redis-key-store"
     REDIS_PORT: int = 6379
 
     # Application Configuration
@@ -22,9 +25,6 @@ class Settings:
 
     # Sleep time between the scraping cycles
     REQUEST_CYCLE_DURATION: float = 5 * 60  # 5 minutes
-
-    # Limitation to call the Clash Royale API
-    REQUESTS_PER_SECOND: float = 0.5
 
     # Upon unsuccessful API call
     MAX_RETRIES: int = 5

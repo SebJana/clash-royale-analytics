@@ -1,4 +1,5 @@
 # Shared module dependencies
 -r ./mongo/requirements.txt
 -r ./clash_royale_api/requirements.txt
+-r ./api_key_store/requirements.txt
 -r ./redis_service/requirements.txt

@@ -9,7 +9,10 @@ from redis_service import get_redis_json, set_redis_json, build_redis_key
 router = APIRouter(prefix="/battles", tags=["Total battles"])
 
 
-@router.get("/total_count")
+@router.get(
+    "/total_count",
+    responses={502: {"description": "Total battle count lookup failed"}},
+)
 async def fetch_battles_count(mongo_conn: DbConn, redis_conn: RedConn):
     try:
         key = await build_redis_key(

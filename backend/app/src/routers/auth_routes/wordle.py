@@ -18,7 +18,11 @@ from routers.auth_routes.common import round_token_scheme
 router = APIRouter()
 
 
-@router.get("/wordle_id", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
+@router.get(
+    "/wordle_id",
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    responses={401: {"description": "CAPTCHA token missing or expired"}},
+)
 async def get_wordle_id(
     auth_state_conn: AuthStateConn,
     credentials: HTTPAuthorizationCredentials | None = Depends(round_token_scheme),
@@ -51,7 +55,15 @@ async def get_wordle_id(
 
 
 @router.post(
-    "/verify_wordle", dependencies=[Depends(RateLimiter(times=15, seconds=60))]
+    "/verify_wordle",
+    dependencies=[Depends(RateLimiter(times=15, seconds=60))],
+    responses={
+        401: {"description": "CAPTCHA token missing or expired"},
+        404: {"description": "Wordle challenge expired or not found"},
+        422: {"description": "Invalid Wordle guess or request"},
+        429: {"description": "Wordle guesses exhausted"},
+        500: {"description": "Wordle challenge state invalid"},
+    },
 )
 async def get_wordle_token(
     auth_state_conn: AuthStateConn,

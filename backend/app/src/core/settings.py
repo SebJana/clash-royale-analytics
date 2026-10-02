@@ -7,14 +7,17 @@ load_dotenv(find_dotenv())
 class Settings:
     """Application settings and configuration."""
 
-    # API Configuration
-    API_TOKEN: str = os.getenv("APP_API_KEY", "")
-
     # Redis Configuration
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
     CACHE_REDIS_HOST: str = "redis-cache"
     AUTH_STATE_REDIS_HOST: str = "redis-auth-state"
+    KEY_STORE_REDIS_HOST: str = "redis-key-store"
     REDIS_PORT: int = 6379
+
+    # The app's key pool starts at most one request per second on each key.
+    # Zero disables the optional cap across the whole app pool.
+    CR_KEY_REQUESTS_PER_SECOND: float = 1.0
+    CR_KEY_POOL_REQUESTS_PER_SECOND: float = 0.0
 
     # JWT Secret for Admin tokens
     JWT_SECRET: str = os.getenv("JWT_SECRET", "")

@@ -38,6 +38,7 @@ services:
     container_name: data_scraper
     depends_on:
       - mongo
+      - redis-key-store
     env_file:
       - .env
     networks:
@@ -78,6 +79,22 @@ services:
     networks:
       - cr-analytics
 
+  # Shared key leases and scheduling state. Never evict active coordination data.
+  redis-key-store:
+    image: redis:8.0-alpine
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 64mb
+      --maxmemory-policy noeviction
+    volumes:
+      - redis-key-store-data:/data
+    restart: unless-stopped
+    networks:
+      - cr-analytics
+
   redis-rate-limit:
     image: redis:8.0-alpine
     command: >
@@ -99,6 +116,7 @@ services:
       - mongo
       - redis-cache
       - redis-auth-state
+      - redis-key-store
       - redis-rate-limit
     env_file:
       - .env
@@ -125,6 +143,7 @@ volumes:
   # TODO: Uncomment when switching from bind mount to named volume
   # mongo_data:
   redis-data:
+  redis-key-store-data:
 
 networks:
   cr-analytics:

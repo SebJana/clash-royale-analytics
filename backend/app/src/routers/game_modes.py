@@ -9,7 +9,7 @@ from redis_service import get_redis_json, set_redis_json, build_redis_key
 router = APIRouter(prefix="/game_modes", tags=["Game Modes"])
 
 
-@router.get("")
+@router.get("", responses={502: {"description": "Game mode lookup failed"}})
 async def fetch_game_modes(mongo_conn: DbConn, redis_conn: RedConn):
 
     try:

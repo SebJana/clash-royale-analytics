@@ -48,6 +48,7 @@ async def get_captcha_id(auth_state_conn: AuthStateConn):
 @router.get(
     "/captcha_image/{captcha_id}",
     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    responses={404: {"description": "CAPTCHA challenge expired or not found"}},
 )
 async def get_captcha_image(auth_state_conn: AuthStateConn, captcha_id: str):
 
@@ -75,7 +76,12 @@ async def get_captcha_image(auth_state_conn: AuthStateConn, captcha_id: str):
 
 
 @router.post(
-    "/verify_captcha", dependencies=[Depends(RateLimiter(times=5, seconds=60))]
+    "/verify_captcha",
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    responses={
+        401: {"description": "CAPTCHA answer incorrect"},
+        404: {"description": "CAPTCHA challenge expired or not found"},
+    },
 )
 async def get_captcha_token(auth_state_conn: AuthStateConn, req: CaptchaAnswerRequest):
 

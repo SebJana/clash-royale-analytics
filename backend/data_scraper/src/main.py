@@ -16,7 +16,8 @@ from mongo import (
 )
 from mongo import get_tracked_player_tags
 from redis_service import CacheRedisConn, build_redis_key, set_redis_json
-from api_rate_limiter import ApiRateLimiter
+from api_key_store import KeyStore, KeyStoreConfig, NoKeyAvailable, KeyStoreUnavailable, keys_from_env
+from redis.asyncio import Redis
 from settings import settings
 
 import httpx
@@ -37,9 +38,23 @@ async def init():
         SystemExit: If either Redis or MongoDB connection fails.
     """
 
-    # Retry Clash Royale API
-    cr_api = ClashRoyaleAPI(api_key=settings.API_TOKEN)
-    await retry_async(cr_api.check_connection, name="Clash Royale API")
+    # Use the same dedicated Redis server as the API app. The scraper's pool
+    # still has its own tokens, request interval, and cooldown history.
+    key_redis = Redis(host=settings.KEY_STORE_REDIS_HOST, port=settings.REDIS_PORT,
+                      password=settings.REDIS_PASSWORD, decode_responses=True)
+    await retry_async(key_redis.ping, name="key store Redis")
+    key_store = KeyStore(
+        "scraper", keys_from_env("scraper"), key_redis,
+        KeyStoreConfig(
+            requests_per_second=settings.CR_KEY_REQUESTS_PER_SECOND,
+            pool_requests_per_second=settings.CR_KEY_POOL_REQUESTS_PER_SECOND,
+        ),
+    )
+    cr_api = ClashRoyaleAPI(key_store=key_store)
+    # The probes identify bad tokens before the scraping loop starts. Unknown
+    # keys from transient failures are retried later by the store.
+    inventory = await retry_async(cr_api.check_connection, name="Clash Royale key inventory")
+    print(f"[INFO] Scraper Clash Royale keys: {inventory}")
 
     # Retry Redis
     redis_conn = CacheRedisConn(
@@ -98,9 +113,6 @@ async def retry_async(func, name):
                 exit(1)
 
 
-api_rl = ApiRateLimiter(per_second=settings.REQUESTS_PER_SECOND)
-
-
 async def process_player(
     player_tag: str,
     mode_store: UniqueGameModes,
@@ -109,7 +121,7 @@ async def process_player(
 ):
     """Fetch, validate, clean, and persist the latest battles for a single player.
 
-    The API call is throttled by a global rate limiter (max REQUESTS_PER_SECOND).
+    The API call is throttled by the shared key store.
     Transient HTTP/network errors are retried with exponential backoff.
     A maintenance error intentionally propagates to abort the entire cycle.
 
@@ -130,9 +142,7 @@ async def process_player(
     attempt = 0
     while True:
         try:
-            async with api_rl:
-                # Try to fetch the last battles for each player
-                battle_logs = await cr_api.get_player_battle_logs(player_tag=player_tag)
+            battle_logs = await cr_api.get_player_battle_logs(player_tag=player_tag)
 
             # Check whether any battle logs were returned
             if not battle_logs:
@@ -180,6 +190,7 @@ async def process_player(
                 print(f"[ERROR] HTTP {code} for {player_tag} – not retrying")
                 return
             if code in (429, 500, 502, 503, 504) and attempt < settings.MAX_RETRIES:
+                attempt += 1
                 backoff = settings.BASE_BACKOFF * (2**attempt)
                 print(
                     f"[WARNING] HTTP {code} for {player_tag} – retry in {backoff:.1f}s"
@@ -191,11 +202,23 @@ async def process_player(
 
         except httpx.RequestError as e:
             if attempt < settings.MAX_RETRIES:
+                attempt += 1
                 backoff = settings.BASE_BACKOFF * (2**attempt)
                 print(f"[WARN] Net error {e!r} – retry in {backoff:.1f}s")
                 await asyncio.sleep(backoff)
                 continue
             print(f"[ERROR] Network error for {player_tag}: {e}")
+            return
+
+        except (NoKeyAvailable, KeyStoreUnavailable) as e:
+            # Contention is expected when all keys are leased or cooling down.
+            # Stop after the scraper's retry budget and pick this player up in
+            # the next cycle; a Redis outage also must not bypass coordination.
+            if attempt < settings.MAX_RETRIES:
+                attempt += 1
+                await asyncio.sleep(min(getattr(e, "retry_after", settings.BASE_BACKOFF) * 2 ** (attempt - 1), 30))
+                continue
+            print(f"[WARNING] Deferring {player_tag}: {e}")
             return
 
         except Exception as e:
@@ -298,6 +321,18 @@ async def main():
     """
 
     cr_api, redis_conn, mongo_conn = await init()
+
+    try:
+        await scrape_loop(cr_api, redis_conn, mongo_conn)
+    finally:
+        await cr_api.close()
+        await cr_api.key_store.close()
+        await redis_conn.close()
+        mongo_conn.close()
+
+
+async def scrape_loop(cr_api, redis_conn, mongo_conn):
+    """Run scrape cycles until cancelled."""
 
     while True:
         print("[INFO] Starting new data scraping cycle...")
