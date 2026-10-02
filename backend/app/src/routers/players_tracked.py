@@ -77,11 +77,19 @@ async def add_tracked_player(player_tag: str, mongo_conn: DbConn, cr_api: CrApi)
             detail={"code": "CR_API_MAINTENANCE", "message": e.detail},
         ) from e
     except NoKeyAvailable as e:
-        raise HTTPException(status_code=503, detail={"code": "CR_API_KEYS_BUSY", "message": str(e)},
-                            headers={"Retry-After": str(int(e.retry_after))}) from e
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "CR_API_KEYS_BUSY", "message": str(e)},
+            headers={"Retry-After": str(int(e.retry_after))},
+        ) from e
     except KeyStoreUnavailable as e:
-        raise HTTPException(status_code=503, detail={"code": "CR_API_KEY_STORE_UNAVAILABLE",
-                                                     "message": "Clash Royale key store unavailable"}) from e
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "CR_API_KEY_STORE_UNAVAILABLE",
+                "message": "Clash Royale key store unavailable",
+            },
+        ) from e
     except ClashRoyaleInvalidTagError as e:
         raise HTTPException(
             status_code=404,

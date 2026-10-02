@@ -1,5 +1,7 @@
 """Final player-removal token exchange route."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi_limiter.depends import RateLimiter
@@ -17,7 +19,10 @@ router = APIRouter()
     responses={401: {"description": "Security token missing or expired"}},
 )
 async def get_remove_player_token(
-    credentials: HTTPAuthorizationCredentials | None = Depends(round_token_scheme),
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(round_token_scheme),
+    ],
 ):
     if not credentials or not validate_access_token(
         credentials.credentials,

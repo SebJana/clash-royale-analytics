@@ -5,7 +5,6 @@ from core.settings import settings
 from mongo import get_battles_count
 from redis_service import get_redis_json, set_redis_json, build_redis_key
 
-
 router = APIRouter(prefix="/battles", tags=["Total battles"])
 
 

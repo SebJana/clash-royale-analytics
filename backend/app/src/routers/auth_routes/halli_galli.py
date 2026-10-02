@@ -18,7 +18,7 @@ player win returns the saved halli_galli_token for the security questions.
 """
 
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import Response
@@ -113,11 +113,12 @@ async def get_halli_galli_id(
     auth_state_conn: AuthStateConn,
     card_image_conn: CardImageConn,
     response: Response,
-    credentials: HTTPAuthorizationCredentials | None = Depends(round_token_scheme),
-    calibration_id: str | None = Header(
-        default=None,
-        alias="X-Halli-Galli-Calibration",
-    ),
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(round_token_scheme)
+    ],
+    calibration_id: Annotated[
+        str | None, Header(alias="X-Halli-Galli-Calibration")
+    ] = None,
 ):
     """Generate a new Halli Galli ID and store this session in auth state.
 

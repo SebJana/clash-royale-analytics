@@ -10,7 +10,12 @@ from core.deps import AuthStateConn
 from core.settings import settings
 from helpers.auth import get_wordle_challenge_from_state
 from helpers.jwt import AvailableTokenTypes, create_access_token, validate_access_token
-from helpers.wordle import pick_random_wordle_solution, is_valid_guess, evaluate_guess, is_guess_solution
+from helpers.wordle import (
+    pick_random_wordle_solution,
+    is_valid_guess,
+    evaluate_guess,
+    is_guess_solution,
+)
 from models.schema import WordleAnswerRequest
 from redis_service import build_auth_state_key, set_auth_state_json
 from routers.auth_routes.common import round_token_scheme
@@ -237,5 +242,3 @@ async def get_nyt_wordle_token(redis_conn: RedConn, req: NYTWordleAnswerRequest)
         detail="No wordle token generated, incorrect answer given.",
     )
 """
-
-

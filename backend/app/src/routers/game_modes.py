@@ -5,7 +5,6 @@ from core.settings import settings
 from mongo import get_game_modes
 from redis_service import get_redis_json, set_redis_json, build_redis_key
 
-
 router = APIRouter(prefix="/game_modes", tags=["Game Modes"])
 
 

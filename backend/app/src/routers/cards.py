@@ -41,10 +41,16 @@ async def get_cards(cr_api: CrApi, redis_conn: RedConn):
         raise HTTPException(status_code=e.code, detail=e.detail)
 
     except NoKeyAvailable as e:
-        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": str(int(e.retry_after))}) from e
+        raise HTTPException(
+            status_code=503,
+            detail=str(e),
+            headers={"Retry-After": str(int(e.retry_after))},
+        ) from e
 
     except KeyStoreUnavailable as e:
-        raise HTTPException(status_code=503, detail="Clash Royale key store unavailable") from e
+        raise HTTPException(
+            status_code=503, detail="Clash Royale key store unavailable"
+        ) from e
 
     except httpx.HTTPStatusError as http_err:
         status = http_err.response.status_code if http_err.response else 502

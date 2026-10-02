@@ -1,5 +1,7 @@
 """Security question challenge route."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi_limiter.depends import RateLimiter
@@ -19,6 +21,8 @@ router = APIRouter()
 # case fuzzy matching and the .lower() comparison should be adjusted (set settings.SECURITY_FUZZY_THRESHOLD to 100)
 # NOTE: having a short Halli Galli token expiry time and a tight rate limiting for requests to solve the security questions
 # makes brute forcing the answers much harder
+# TODO: to further increase "security", add more questions and serve 3 of those randomly to make brute forcing harder, or more so more time consuming
+# Additionally upon 3 correctly being solved, rotate those ones out for X timeframe?
 @router.post(
     "/verify_security_questions",
     dependencies=[Depends(RateLimiter(times=3, seconds=60))],
@@ -26,7 +30,9 @@ router = APIRouter()
 )
 async def get_security_token(
     req: SecurityQuestionsRequest,
-    credentials: HTTPAuthorizationCredentials | None = Depends(round_token_scheme),
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(round_token_scheme)
+    ],
 ):
     if not credentials or not validate_access_token(
         credentials.credentials,
@@ -62,5 +68,3 @@ async def get_security_token(
             "message": "One or more answers are incorrect. Check all three answers and try again.",
         },
     )
-
-

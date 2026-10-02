@@ -38,7 +38,9 @@ router = APIRouter(
     "/{player_tag}/profile",
     dependencies=[Depends(RateLimiter(times=10, seconds=60))],
     responses={
-        403: {"description": "Player is untracked or Clash Royale rejected the request"},
+        403: {
+            "description": "Player is untracked or Clash Royale rejected the request"
+        },
         404: {"description": "Player not found"},
         429: {"description": "Clash Royale API rate limit exceeded"},
         500: {"description": "Player profile request failed"},
@@ -70,10 +72,16 @@ async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn
         raise HTTPException(status_code=e.code, detail=e.detail)
 
     except NoKeyAvailable as e:
-        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": str(int(e.retry_after))}) from e
+        raise HTTPException(
+            status_code=503,
+            detail=str(e),
+            headers={"Retry-After": str(int(e.retry_after))},
+        ) from e
 
     except KeyStoreUnavailable as e:
-        raise HTTPException(status_code=503, detail="Clash Royale key store unavailable") from e
+        raise HTTPException(
+            status_code=503, detail="Clash Royale key store unavailable"
+        ) from e
 
     except httpx.HTTPStatusError as http_err:
         status = http_err.response.status_code if http_err.response else 502
@@ -101,7 +109,9 @@ async def get_player_profile(player_tag: str, cr_api: CrApi, redis_conn: RedConn
 @router.get(
     "/{player_tag}/battles",
     responses={
-        403: {"description": "Invalid or untracked player, or invalid request parameters"},
+        403: {
+            "description": "Invalid or untracked player, or invalid request parameters"
+        },
         404: {"description": "No battles found for the player"},
         500: {"description": "Battle lookup failed"},
     },
@@ -154,7 +164,9 @@ async def last_battles(
 @router.get(
     "/{player_tag}/decks/stats",
     responses={
-        403: {"description": "Invalid or untracked player, or invalid request parameters"},
+        403: {
+            "description": "Invalid or untracked player, or invalid request parameters"
+        },
         404: {"description": "No decks found for the player"},
         500: {"description": "Deck statistics lookup failed"},
     },
@@ -226,7 +238,9 @@ async def deck_percentage_stats(
 @router.get(
     "/{player_tag}/cards/stats",
     responses={
-        403: {"description": "Invalid or untracked player, or invalid request parameters"},
+        403: {
+            "description": "Invalid or untracked player, or invalid request parameters"
+        },
         404: {"description": "No cards found for the player"},
         500: {"description": "Card statistics lookup failed"},
     },
@@ -298,7 +312,9 @@ async def card_percentage_stats(
 @router.get(
     "/{player_tag}/stats/daily",
     responses={
-        403: {"description": "Invalid or untracked player, or invalid request parameters"},
+        403: {
+            "description": "Invalid or untracked player, or invalid request parameters"
+        },
         404: {"description": "No daily statistics found for the player"},
         500: {"description": "Daily statistics lookup failed"},
     },

@@ -114,5 +114,3 @@ async def get_captcha_token(auth_state_conn: AuthStateConn, req: CaptchaAnswerRe
             "message": "The CAPTCHA text doesn't match. Check the image and try again.",
         },
     )
-
-
