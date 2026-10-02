@@ -25,6 +25,10 @@ export class AuthChallengeError extends Error {
   }
 }
 
+// TODO [BUG] wrong message, if for example, halli galli token expires upon trying to submit security
+// question answers, then it should say "took to long to answer questions/prove knowledge" and not
+// "Halli Galli took too long. Restart verification."
+
 const messages: Record<string, AuthErrorFeedback> = {
   CAPTCHA_INCORRECT: {
     message: "The CAPTCHA text doesn't match. Check the image and try again.",
