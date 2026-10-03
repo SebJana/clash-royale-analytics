@@ -7,7 +7,7 @@ itself.
 
 Battle syncs take priority because a late battle sync can lose battles for
 good, while a late profile is only stale. Profiles run when no battle sync is
-due, or once they are overdue by more than PROFILE_MAX_LATENESS.
+due, or, on one worker, once they are overdue by more than PROFILE_MAX_LATENESS.
 """
 
 import asyncio
@@ -100,18 +100,20 @@ class WorkerPool:
         await asyncio.gather(*self._workers.values(), return_exceptions=True)
         self._workers.clear()
 
-    async def _claim_next(self) -> tuple[Schedule, Claim] | None:
+    async def _claim_next(self, index: int) -> tuple[Schedule, Claim] | None:
         """Claim the next player by priority, or None if nothing is due."""
 
         # 1. Profiles overdue beyond the grace period, so a constantly busy
-        #    pool cannot starve profile refreshes forever.
+        #    pool cannot starve profile refreshes forever. Only worker 0 puts
+        #    them first: after a long outage every profile is overdue, and
+        #    with all workers on that backlog, due battle syncs would wait
+        #    until it is gone and could lose battles.
         # 2. Due battle syncs.
         # 3. Due profiles, using capacity the battle syncs leave unused.
-        for schedule, min_lateness_s in (
-            (self.profiles, settings.PROFILE_MAX_LATENESS),
-            (self.battles, 0),
-            (self.profiles, 0),
-        ):
+        order = [(self.battles, 0), (self.profiles, 0)]
+        if index == 0:
+            order.insert(0, (self.profiles, settings.PROFILE_MAX_LATENESS))
+        for schedule, min_lateness_s in order:
             claims = await schedule.claim(1, settings.CLAIM_TTL, min_lateness_s)
             if claims:
                 return schedule, claims[0]
@@ -149,7 +151,7 @@ class WorkerPool:
 
                 # One player per claim: a batch would hold claims on players
                 # that other, idle workers could already be processing.
-                claimed = await self._claim_next()
+                claimed = await self._claim_next(index)
                 if claimed is None:
                     await asyncio.sleep(await self._idle_wait())
                     continue
@@ -177,7 +179,18 @@ class WorkerPool:
 
     async def _process(self, schedule: Schedule, claim: Claim):
         try:
-            result = await self._run_job(schedule, claim.player_tag)
+            async with asyncio.timeout(settings.JOB_TIMEOUT):
+                result = await self._run_job(schedule, claim.player_tag)
+        except TimeoutError:
+            # Mostly a hung Mongo operation. A battle sync cut off between its
+            # insert and its state write is repaired by the next sync, which
+            # counts the battles past the watermark again.
+            logger.warning(
+                "%s job of %s timed out",
+                schedule.name.capitalize(),
+                claim.player_tag,
+            )
+            result = JobResult("failed", settings.FAILURE_BACKOFF_BASE)
         except asyncio.CancelledError:
             # Shutdown: hand the player back as due now instead of leaving it
             # blocked until the claim expires. Shielded, so the ack finishes
@@ -193,7 +206,11 @@ class WorkerPool:
             result = JobResult("failed", settings.FAILURE_BACKOFF_BASE)
 
         self.metrics.record(
-            schedule.name, result.outcome, result.inserted, claim.lateness_s
+            schedule.name,
+            result.outcome,
+            result.inserted,
+            claim.lateness_s,
+            result.possible_gap,
         )
 
         if result.outcome in ("inactive", "deactivated"):
@@ -204,8 +221,10 @@ class WorkerPool:
 
         if not await schedule.ack(claim, result.delay_s):
             # The claim expired during the job and another worker owns the
-            # player now, or it was untracked meanwhile. Both are harmless:
-            # the writes are idempotent.
+            # player now, or it was untracked meanwhile. Battle inserts and
+            # the $max watermark are safe to repeat. Other player fields
+            # (interval, name, profile) keep whichever job wrote last, which
+            # is at most one sync old and corrected by the next one.
             logger.warning(
                 "Claim of %s was no longer owned at its ack (expired or untracked)",
                 claim.player_tag,

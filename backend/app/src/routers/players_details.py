@@ -49,9 +49,10 @@ router = APIRouter(
 async def get_player_profile(
     player_tag: str, player: TrackedPlayerDep, mongo_conn: DbConn
 ):
-    # Profiles are snapshots the data scraper refreshes once a day (and the
-    # add route stores on tracking). Serving them from Mongo keeps page views
-    # from spending Clash Royale API requests.
+    # Profiles are snapshots the data scraper refreshes daily for active
+    # players and up to weekly for idle ones (and the add route stores on
+    # tracking). Serving them from Mongo keeps page views from spending Clash
+    # Royale API requests.
     try:
         stored = await get_stored_profile(mongo_conn, player_tag)
     except Exception:
@@ -72,7 +73,7 @@ async def get_player_profile(
             },
         )
     # The sync times tell the frontend how current the shown data is. Battles
-    # are checked every few minutes, the profile about once a day.
+    # are checked every few minutes, the profile daily to weekly.
     return {
         **stored["profile"],
         "syncInfo": {

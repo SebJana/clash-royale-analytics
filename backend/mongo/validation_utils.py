@@ -12,9 +12,7 @@ async def ensure_connected(conn: MongoConn):
     Raises:
         Exception: If re-connection failed
     """
-    if not await conn.is_connection_alive():
-        print("[DB] Connection lost, attempting to reconnect...")
-        await conn.connect()
+    await conn.ensure_connection()
 
 
 def check_valid_date_range(start_date, end_date):

@@ -14,12 +14,7 @@ import httpx
 
 from api_key_store import NoKeyAvailable, KeyStoreUnavailable
 from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
-from clean import (
-    clean_battle_log_list,
-    validate_battle_log_structure,
-    validate_battle_log_content,
-    get_player_name,
-)
+from clean import clean_battle_log_list, get_player_name
 from game_modes import UniqueGameModes
 from intervals import failure_backoff, next_battle_interval, not_found_delay
 from jobs.common import JobResult, pool_level_result
@@ -76,6 +71,35 @@ async def _failed(
     return JobResult("not_found", not_found_delay(base_interval_s, not_found_count))
 
 
+def _possible_gap(
+    player_tag: str,
+    battle_logs: list,
+    cleaned: list,
+    new_count: int,
+    last_battle_time: datetime | None,
+) -> bool:
+    """Check whether the battle log may have overflowed since the last sync.
+
+    Every battle of a full log being new means it no longer reaches back to
+    the watermark, so battles in between may be lost. Logged and counted to
+    check MAX_SYNC_INTERVAL against real play.
+    """
+
+    possible_gap = (
+        last_battle_time is not None
+        and new_count == len(cleaned)
+        and len(battle_logs) >= settings.BATTLE_LOG_SIZE
+    )
+    if possible_gap:
+        logger.warning(
+            "Possible battle gap for %s between %s and %s",
+            player_tag,
+            last_battle_time,
+            min(battle["battleTime"] for battle in cleaned),
+        )
+    return possible_gap
+
+
 async def sync_player_battles(
     player_tag: str,
     cr_api: ClashRoyaleAPI,
@@ -130,22 +154,24 @@ async def sync_player_battles(
 
     previous_interval = state.get("syncIntervalS")
 
+    # Checked before the emptiness test: None or {} would otherwise count as
+    # a successful sync without battles and reset the failure counters.
+    if not isinstance(battle_logs, list):
+        logger.error("Battle log of %s is not a list", player_tag)
+        return await _failed(mongo_conn, player_tag, base_interval_s)
+
     if not battle_logs:
         # A player without recent battles is still a successful sync.
         interval = next_battle_interval(base_interval_s, previous_interval, 0)
         await record_battle_sync(mongo_conn, player_tag, None, None, 0, interval)
         return JobResult("synced", interval)
 
-    # Check if the response has all the necessary fields and correct content
-    if not validate_battle_log_structure(
-        battle_logs
-    ) or not validate_battle_log_content(battle_logs):
-        logger.error("Battle logs for %s couldn't be used", player_tag)
-        return await _failed(mongo_conn, player_tag, base_interval_s)
-
-    # Prepare the data for storage
+    # Malformed entries are skipped inside; only a log without a single usable
+    # battle counts as a failure.
     cleaned = clean_battle_log_list(battle_logs, player_tag=player_tag)
-    player_name = get_player_name(cleaned, player_tag=player_tag)
+    if not cleaned:
+        logger.error("Battle log of %s has no usable battle", player_tag)
+        return await _failed(mongo_conn, player_tag, base_interval_s)
 
     # Collect modes from every fetched battle, not only the new ones. Modes
     # lost in a failed flush are then seen again on the next sync.
@@ -163,18 +189,33 @@ async def sync_player_battles(
     ]
     inserted = await insert_battles(mongo_conn, new_battles)
 
-    # Activity is judged by the battles that are new to the database, not by
-    # the size of the battle log, which always holds up to ~25 old battles.
-    interval = next_battle_interval(base_interval_s, previous_interval, inserted)
+    # Activity and the cache version follow the battles past the watermark,
+    # not the insert count. If a previous attempt inserted them and then
+    # failed to record the sync, the retry inserts only duplicates, but the
+    # cached statistics still predate these battles.
+    new_count = len(new_battles)
+    interval = next_battle_interval(base_interval_s, previous_interval, new_count)
+
+    possible_gap = _possible_gap(
+        player_tag, battle_logs, cleaned, new_count, last_battle_time
+    )
 
     # The watermark comes from all fetched battles, not only the new ones, so
     # it is also set for players whose battles were stored before this field
     # existed and the backfill found none.
+    # It also moves past battles the cleaner skipped as malformed, so those
+    # are not retried, even after a cleaner fix. Holding the watermark below
+    # them would resend every newer battle on each sync and make the player
+    # look active (lastSyncNewBattles) until the entry leaves the log.
     newest = max(battle["battleTime"] for battle in cleaned)
-    # The name is updated on every sync: users find players by name, which
-    # can change at any time.
+    # Users find players by name, which can change at any time. Without a new
+    # battle the log only holds the name from before the last sync, which
+    # would overwrite a newer name stored by a profile refresh.
+    player_name = (
+        get_player_name(new_battles, player_tag=player_tag) if new_battles else None
+    )
     await record_battle_sync(
-        mongo_conn, player_tag, newest, player_name, inserted, interval
+        mongo_conn, player_tag, newest, player_name, new_count, interval
     )
 
-    return JobResult("synced", interval, inserted)
+    return JobResult("synced", interval, inserted, possible_gap)

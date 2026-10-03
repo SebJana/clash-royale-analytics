@@ -17,7 +17,13 @@ from routers import (
 from core.settings import settings
 from redis_service import CacheRedisConn, RedisConn
 from clash_royale_api import ClashRoyaleAPI
-from api_key_store import KeyStore, KeyStoreConfig, NoKeyAvailable, KeyStoreUnavailable, keys_from_env
+from api_key_store import (
+    KeyStore,
+    KeyStoreConfig,
+    NoKeyAvailable,
+    KeyStoreUnavailable,
+    keys_from_env,
+)
 from scrape_schedule import Schedule, BATTLES_SCHEDULE, PROFILES_SCHEDULE
 from core.deps import ScrapeSchedules
 from mongo import MongoConn
@@ -81,11 +87,20 @@ async def lifespan(app: FastAPI):
     # This Redis is deliberately separate from response/media cache Redis:
     # evicting a lease or cooldown could make a busy key appear available.
     # app and scraper use the same Redis server but different pool namespaces.
-    key_redis = Redis(host=settings.KEY_STORE_REDIS_HOST, port=settings.REDIS_PORT,
-                      password=settings.REDIS_PASSWORD, decode_responses=True)
+    # Timeouts keep a hung Redis from blocking key acquisition indefinitely
+    key_redis = Redis(
+        host=settings.KEY_STORE_REDIS_HOST,
+        port=settings.REDIS_PORT,
+        password=settings.REDIS_PASSWORD,
+        decode_responses=True,
+        socket_connect_timeout=3,
+        socket_timeout=5,
+    )
     await retry_async(key_redis.ping, name="key store Redis")
     key_store = KeyStore(
-        "app", keys_from_env("app"), key_redis,
+        "app",
+        keys_from_env("app"),
+        key_redis,
         KeyStoreConfig(
             requests_per_second=settings.CR_KEY_REQUESTS_PER_SECOND,
             pool_requests_per_second=settings.CR_KEY_POOL_REQUESTS_PER_SECOND,
@@ -94,7 +109,9 @@ async def lifespan(app: FastAPI):
     cr_api = ClashRoyaleAPI(key_store=key_store)
     # Startup probes are coordinated in Redis. Multiple API workers should
     # reuse one validation pass and see the same usable-key count.
-    inventory = await retry_async(cr_api.check_connection, name="Clash Royale key inventory")
+    inventory = await retry_async(
+        cr_api.check_connection, name="Clash Royale key inventory"
+    )
     print(f"[INFO] App Clash Royale keys: {inventory}")
     app.state.cr_api = cr_api
     app.state.key_store = key_store
@@ -177,13 +194,19 @@ app = FastAPI(lifespan=lifespan)
 
 @app.exception_handler(NoKeyAvailable)
 async def no_key_available(_request: Request, exc: NoKeyAvailable):
-    return JSONResponse(status_code=503, content={"detail": "No Clash Royale API key is currently available"},
-                        headers={"Retry-After": str(max(1, int(exc.retry_after)))})
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "No Clash Royale API key is currently available"},
+        headers={"Retry-After": str(max(1, int(exc.retry_after)))},
+    )
 
 
 @app.exception_handler(KeyStoreUnavailable)
 async def key_store_unavailable(_request: Request, _exc: KeyStoreUnavailable):
-    return JSONResponse(status_code=503, content={"detail": "Clash Royale key store unavailable"})
+    return JSONResponse(
+        status_code=503, content={"detail": "Clash Royale key store unavailable"}
+    )
+
 
 # Add CORS middleware for local development
 app.add_middleware(
@@ -222,10 +245,20 @@ async def ready():
         inventory = await app.state.key_store.inventory()
         maintenance = await app.state.key_store.in_maintenance()
     except (AttributeError, KeyStoreUnavailable):
-        return JSONResponse(status_code=503, content={"status": "key_store_unavailable"})
+        return JSONResponse(
+            status_code=503, content={"status": "key_store_unavailable"}
+        )
     if maintenance:
-        return JSONResponse(status_code=503, content={"status": "maintenance", "keys": inventory})
+        return JSONResponse(
+            status_code=503, content={"status": "maintenance", "keys": inventory}
+        )
     if inventory["usable"] == 0:
-        state = "no_valid_keys" if inventory["invalid"] == inventory["configured"] else "validation_pending"
-        return JSONResponse(status_code=503, content={"status": state, "keys": inventory})
+        state = (
+            "no_valid_keys"
+            if inventory["invalid"] == inventory["configured"]
+            else "validation_pending"
+        )
+        return JSONResponse(
+            status_code=503, content={"status": state, "keys": inventory}
+        )
     return {"status": "ok", "keys": inventory}

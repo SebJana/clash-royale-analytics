@@ -16,11 +16,14 @@ class JobResult:
     outcome is one of "synced", "inactive", "deactivated", "not_found",
     "failed", "busy" or "maintenance". "inactive" and "deactivated" players
     are removed from the schedules instead of being rescheduled.
+    possible_gap marks a sync whose battle log no longer reached back to the
+    previous sync, so battles in between may be lost.
     """
 
     outcome: str
     delay_s: float
     inserted: int = 0
+    possible_gap: bool = False
 
 
 def pool_level_result(error: Exception) -> JobResult | None:

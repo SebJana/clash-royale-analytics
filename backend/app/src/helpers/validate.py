@@ -167,12 +167,14 @@ def validate_battles_request(request: BattlesRequest):
 
 
 async def validate_game_modes(redis_conn: RedConn, game_modes: Optional[List[str]]):
-    """Validate and filter game modes against cached available game modes.
+    """Deduplicate the requested game modes and drop a filter that covers every mode.
 
-    This async function validates a list of game modes by checking them against
-    the cached list of all available game modes stored in Redis. It performs
-    deduplication, filtering of invalid modes, and optimization for requests
-    that include all available game modes.
+    Modes missing from the cached list are kept. The cache can lag behind the
+    battles by a flush, so a missing mode may already exist in Mongo. Dropping
+    it would narrow the result, and dropping every requested mode would turn
+    the request into an unfiltered one. An unknown mode that really does not
+    exist simply matches no battle. The values are plain strings in an $in
+    match, so they cannot inject query operators.
 
     Args:
         redis_conn (RedConn): Active Redis connection instance for accessing cached data.
@@ -180,42 +182,24 @@ async def validate_game_modes(redis_conn: RedConn, game_modes: Optional[List[str
             Can be None or empty list.
 
     Returns:
-        Optional[List[str]]: Validated and filtered list of game modes with the following behavior:
-            - Returns None/empty list unchanged if input is None/empty
-            - Returns original list unchanged if Redis cache is empty (no validation possible)
-            - Returns deduplicated list of valid game modes that exist in cache
-            - Returns empty list if all available game modes are requested (optimization)
-
+        Optional[List[str]]: None or an empty list unchanged, an empty list if
+            the request names exactly the cached modes (no filter needed),
+            otherwise the requested modes without duplicates, in request order.
     """
-    # If there game modes is empty return unchanged
     if not game_modes:
         return game_modes
 
+    unique_modes = list(dict.fromkeys(game_modes))
+
     all_game_modes = await get_redis_json(redis_conn, GAME_MODES_CACHE_KEY)
-
-    # If there are no game modes in the redis, don't validate the given game_modes
-    # and also simply return them unchanged
+    # Without the cached list the request cannot be compared to all modes
     if not all_game_modes:
-        return game_modes
+        return unique_modes
 
-    modes_set = set(all_game_modes.keys())
-
-    # Remove any game mode from the given ones that isn't found in the cache and therefore
-    # also not in the mongo --> reduces processing work AND eliminates the risk of query injection
-    # via game modes IF the game mode cache is not empty upon validating
-    seen = set()
-    filtered = []
-    for m in game_modes:
-        if m in modes_set and m not in seen:
-            filtered.append(m)
-            seen.add(m)
-
-    # If the length of the unique given game modes is equal to the length of all game modes
-    # then the request is equal to requesting all game modes
-    if len(filtered) == len(modes_set):
-        # The mongo filtering uses all game modes upon no game modes selected, so return
-        # empty game mode list to save resources, avoiding any game mode filtering
+    # Mongo applies no game mode filter for an empty list, which saves the $in
+    # match. Only an exact match qualifies: a request with an extra, uncached
+    # mode is not known to cover every mode.
+    if set(unique_modes) == set(all_game_modes.keys()):
         return []
 
-    # Return filtered game mode list
-    return filtered
+    return unique_modes

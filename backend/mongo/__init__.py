@@ -20,7 +20,6 @@ from .players_read import (
 )
 from .players_write import (
     insert_tracked_player,
-    set_player_name,
     deactivate_tracked_player,
     record_battle_sync,
     record_battle_sync_failure,
@@ -60,7 +59,6 @@ __all__ = [
     "get_tracked_players_sync_times",
     ## write
     "insert_tracked_player",
-    "set_player_name",
     "deactivate_tracked_player",
     "record_battle_sync",
     "record_battle_sync_failure",

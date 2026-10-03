@@ -16,6 +16,7 @@ from redis.asyncio import Redis
 from api_key_store import KeyStore, KeyStoreConfig, keys_from_env
 from clash_royale_api import ClashRoyaleAPI
 from game_modes import UniqueGameModes
+from intervals import battle_demand, profile_demand
 from jobs.cards import cards_loop
 from log import setup_logging
 from metrics import Metrics, build_snapshot, publish_snapshot, start_status_server
@@ -59,6 +60,10 @@ async def init():
         port=settings.REDIS_PORT,
         password=settings.REDIS_PASSWORD,
         decode_responses=True,
+        # Without timeouts a hung Redis blocks claims, acks, and the shielded
+        # shutdown acks indefinitely. Matches the cache connection.
+        socket_connect_timeout=3,
+        socket_timeout=5,
     )
     await retry_async(key_redis.ping, name="key store Redis")
     key_store = KeyStore(
@@ -144,26 +149,28 @@ async def reconcile_loop(
     """Reconcile the schedules, plan capacity, and resize the pool until cancelled.
 
     Capacity follows the usable keys, which change when keys fail validation,
-    get rejected, or recover, and the number of tracked players. The estimate
-    sets the base battle interval, the worker count, and, through Redis, the
-    API's admission limit for new players.
+    get rejected, or recover, and the tracked players and their activity. The
+    estimate sets the base battle interval, the worker count, and, through
+    Redis, the API's admission limit for new players.
     """
 
     key_store = pool.cr_api.key_store
     while True:
         try:
-            active_players = await reconcile_schedules(battles, profiles, mongo_conn)
+            tracked = await reconcile_schedules(battles, profiles, mongo_conn)
+            players = list(tracked.values())
             inventory = await key_store.inventory()
             capacity = compute_capacity(
-                active_players=active_players,
+                active_players=len(players),
                 usable_keys=inventory["usable"],
                 per_key_rps=settings.CR_KEY_REQUESTS_PER_SECOND,
                 utilization=settings.CAPACITY_UTILIZATION,
-                # Worst case: every player refreshed at the minimum interval
+                profile_rate=profile_demand(players),
+                # Admission assumes every player is refreshed this often
                 profile_max_age_s=settings.PROFILE_MIN_INTERVAL,
                 min_interval_s=settings.MIN_SYNC_INTERVAL,
                 max_interval_s=settings.MAX_SYNC_INTERVAL,
-                admission_fraction=settings.ADMISSION_FRACTION,
+                battle_demand=lambda base_s: battle_demand(players, base_s),
             )
             await publish_capacity(key_store.redis, capacity)
             pool.resize(capacity)
@@ -237,6 +244,10 @@ async def game_modes_loop(
             except Exception:
                 # Keep the modes for the next flush instead of dropping them.
                 mode_store.restore(game_modes)
+                # The failed write may still have inserted a new mode. The
+                # retry would then not count it as new, so the cache is
+                # rebuilt on the next pass regardless.
+                next_cache_refresh = 0.0
                 logger.exception("Game mode flush failed")
 
         # A new mode is written to the cache right away, so the filter options
@@ -338,6 +349,10 @@ async def main():
         # reconcile_loop runs its first pass immediately, which also starts
         # the workers. Every loop handles its own errors, so the group only
         # ends on cancellation; Docker's restart policy covers anything else.
+        # NOTE Claims let several scraper processes share the workers, but the
+        # card and game mode loops are the only writers of their cache keys
+        # and have no leader election. Run one scraper process, or move these
+        # loops behind a Redis lock before scaling out.
         async with asyncio.TaskGroup() as tg:
             tg.create_task(reconcile_loop(battles, profiles, mongo_conn, pool, metrics))
             tg.create_task(game_modes_loop(mode_store, mongo_conn, redis_conn))

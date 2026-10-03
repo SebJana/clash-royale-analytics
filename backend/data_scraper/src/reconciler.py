@@ -43,7 +43,7 @@ def _profile_due_ms(sync: dict) -> int:
 
 async def reconcile_schedules(
     battles: Schedule, profiles: Schedule, mongo_conn: MongoConn
-) -> int:
+) -> dict[str, dict]:
     """Reconcile both schedules with the tracked players.
 
     Both schedules are read BEFORE Mongo. The API writes Mongo first and the
@@ -51,7 +51,8 @@ async def reconcile_schedules(
     the schedule snapshot or already in Mongo, and is never removed as stale.
 
     Returns:
-        int: Number of tracked players.
+        dict[str, dict]: The tracked players with their sync state (see
+            get_tracked_players_sync_times), reused for the capacity estimate.
     """
 
     battles_snapshot = await battles.scheduled_tags()
@@ -80,4 +81,4 @@ async def reconcile_schedules(
                 added,
                 removed,
             )
-    return len(tracked)
+    return tracked

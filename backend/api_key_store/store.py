@@ -8,6 +8,7 @@ environment and are added to the Authorization header by the ClashRoyaleAPI modu
 
 import asyncio
 import hashlib
+import logging
 import math
 import os
 import random
@@ -20,6 +21,8 @@ from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 from .names import env_key_prefix
+
+logger = logging.getLogger(__name__)
 
 # Leave time to process the response and release the Redis lease after HTTP ends.
 LEASE_CLEANUP_MARGIN_S = 5.0
@@ -306,28 +309,7 @@ class KeyStore:
         """
         self._probe = probe
         try:
-            registry_keys = [
-                self._name("config"),
-                "crkeys:owners",
-                self._name("ids"),
-                self._name("status"),
-                self._name("next"),
-                self._name("cooldown"),
-                self._name("last"),
-                self._name("429-count"),
-                self._name("sequence"),
-                self._name("pool-next"),
-            ]
-            result = await self.redis.eval(
-                REGISTER,
-                len(registry_keys),
-                *registry_keys,
-                self._config_id,
-                self.pool,
-                *self._ids,
-            )
-            if result != "ok":
-                raise ValueError(f"Key store {self.pool}: {result}")
+            await self._register()
             lock = self._name("validation-lock")
             owner = uuid.uuid4().hex
             lock_ttl = self._validation_lock_ttl()
@@ -348,6 +330,36 @@ class KeyStore:
             return counts
         except RedisError as exc:
             raise KeyStoreUnavailable("Key store Redis unavailable") from exc
+
+    async def _register(self):
+        """Register this inventory in Redis (see REGISTER).
+
+        Raises:
+            ValueError: If a key is already registered to another pool.
+            RedisError: If Redis is unavailable.
+        """
+        registry_keys = [
+            self._name("config"),
+            "crkeys:owners",
+            self._name("ids"),
+            self._name("status"),
+            self._name("next"),
+            self._name("cooldown"),
+            self._name("last"),
+            self._name("429-count"),
+            self._name("sequence"),
+            self._name("pool-next"),
+        ]
+        result = await self.redis.eval(
+            REGISTER,
+            len(registry_keys),
+            *registry_keys,
+            self._config_id,
+            self.pool,
+            *self._ids,
+        )
+        if result != "ok":
+            raise ValueError(f"Key store {self.pool}: {result}")
 
     async def _validate_unknown(self):
         """Test keys without a conclusive usable/invalid result yet."""
@@ -394,7 +406,22 @@ class KeyStore:
         while True:
             await asyncio.sleep(max(5.0, self.config.maintenance_probe_initial_s))
             try:
-                if await self.redis.get(self._name("config")) != self._config_id:
+                config_id = await self.redis.get(self._name("config"))
+                if config_id is None:
+                    # Redis lost the pool state (volume removed, FLUSHALL).
+                    # Every acquire fails closed until the inventory exists
+                    # again, and nothing else would recreate it in a running
+                    # process. Workers of this configuration register the same
+                    # ID, so the first one wins and the rest change nothing.
+                    # The keys are unknown again and get validated below.
+                    logger.warning(
+                        "Key store %s lost its Redis state, registering again",
+                        self.pool,
+                    )
+                    await self._register()
+                elif config_id != self._config_id:
+                    # A newer deployment owns the pool. Taking it back would
+                    # make the two configurations replace each other.
                     return
                 if await self._maintenance_delay_ms() > 0:
                     continue
@@ -424,7 +451,9 @@ class KeyStore:
                             )
                             if probe_id is None:
                                 continue
-                            status = await self._probe_with_timeout(self._keys[probe_id])
+                            status = await self._probe_with_timeout(
+                                self._keys[probe_id]
+                            )
                             if (
                                 await self.redis.get(self._name("config"))
                                 != self._config_id

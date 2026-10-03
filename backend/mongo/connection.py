@@ -1,5 +1,6 @@
 import os
 import asyncio
+import time
 from motor.motor_asyncio import AsyncIOMotorClient
 
 
@@ -17,6 +18,12 @@ def build_uri_from_parts():
     return f"mongodb://{user}:{pwd}@{host}:{port}/{db}?authSource={db}"
 
 
+# A successful ping is trusted for this long. Every Mongo helper checks the
+# connection first, and a ping per call adds a round trip to each operation.
+# An operation that fails in between still raises from the driver.
+ALIVE_CHECK_INTERVAL_S = 10.0
+
+
 class MongoConn:
     """
     Async MongoDB connection manager using Motor for the Clash Royale analytics application.
@@ -30,26 +37,47 @@ class MongoConn:
         self.client: AsyncIOMotorClient | None = None
         self.db = None
         self.is_connected = False
+        self._last_alive_at = 0.0
+        # Concurrent callers that all see a failed ping reconnect once, instead
+        # of each creating a client that is never closed.
+        self._reconnect_lock = asyncio.Lock()
 
     async def connect(self):
-        """Connect to the database and send a test ping"""
+        """Connect to the database and send a test ping.
+
+        The previous client is closed only after the new one answered, so a
+        failed reconnect leaves the old client in place for the next attempt.
+        """
+        client = AsyncIOMotorClient(self._uri, appname=self._app_name)
         try:
-            self.client = AsyncIOMotorClient(self._uri, appname=self._app_name)
-            self.db = self.client[self._db_name]
-            await self.client.admin.command("ping")
-            self.is_connected = True
-            print("[DB] Connected to MongoDB successfully.")
+            await client.admin.command("ping")
         except Exception as e:
+            client.close()
             self.is_connected = False
             print(f"[DB] Failed to connect to MongoDB: {e}")
             raise
 
+        previous = self.client
+        self.client = client
+        self.db = client[self._db_name]
+        self.is_connected = True
+        self._last_alive_at = time.monotonic()
+        if previous is not None:
+            previous.close()
+        print("[DB] Connected to MongoDB successfully.")
+
     async def is_connection_alive(self):
-        """Ping the database to check if it is up and running"""
+        """Ping the database to check if it is up and running.
+
+        A ping within the last ALIVE_CHECK_INTERVAL_S counts without a new one.
+        """
         if not self.client or not self.is_connected:
             return False
+        if time.monotonic() - self._last_alive_at < ALIVE_CHECK_INTERVAL_S:
+            return True
         try:
             await self.client.admin.command("ping")
+            self._last_alive_at = time.monotonic()
             return True
         except Exception:
             self.is_connected = False
@@ -57,7 +85,12 @@ class MongoConn:
 
     async def ensure_connection(self):
         """Ensure connection is alive, reconnect if necessary"""
-        if not await self.is_connection_alive():
+        if await self.is_connection_alive():
+            return
+        async with self._reconnect_lock:
+            # Another caller may have reconnected while this one waited
+            if await self.is_connection_alive():
+                return
             print("[DB] Connection lost, attempting to reconnect...")
             await self.connect()
 

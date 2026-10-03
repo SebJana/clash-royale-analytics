@@ -243,15 +243,16 @@ async def get_player_sync_state(conn: MongoConn, player_tag: str):
 
 async def get_tracked_players_sync_times(conn: MongoConn):
     """
-    Retrieves the sync times and current battle interval of every tracked player.
+    Retrieves the sync times, intervals and last activity of every tracked player.
 
     Args:
         conn (MongoConn): Active connection to the mongo database
 
     Returns:
         dict: Player tag mapped to {"lastBattlesSyncAt", "lastProfileSyncAt",
-            "syncIntervalS", "profileSyncIntervalS"}. Times are naive UTC datetimes. A value is None if
-            the player was never synced or has no interval yet.
+            "syncIntervalS", "profileSyncIntervalS", "lastSyncNewBattles"}.
+            Times are naive UTC datetimes. A value is None if the player was
+            never synced or has no interval yet.
 
     Raises:
         Exception: If fetching tracked players fails
@@ -269,6 +270,7 @@ async def get_tracked_players_sync_times(conn: MongoConn):
                 "lastProfileSyncAt": 1,
                 "syncIntervalS": 1,
                 "profileSyncIntervalS": 1,
+                "lastSyncNewBattles": 1,
             },
         )
 
@@ -279,6 +281,7 @@ async def get_tracked_players_sync_times(conn: MongoConn):
                 "lastProfileSyncAt": doc.get("lastProfileSyncAt"),
                 "syncIntervalS": doc.get("syncIntervalS"),
                 "profileSyncIntervalS": doc.get("profileSyncIntervalS"),
+                "lastSyncNewBattles": doc.get("lastSyncNewBattles"),
             }
         return players
 

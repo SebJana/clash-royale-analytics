@@ -36,9 +36,14 @@ async def insert_battles(conn: MongoConn, battle_logs) -> int:
 
     except BulkWriteError as bwe:
         # Duplicates (E11000) are expected when a battle was stored before.
-        # Any other write error still has to surface.
+        # Any other write error still has to surface, and so does a write
+        # concern error: the inserts were not confirmed, and the caller would
+        # advance the watermark past them. all() of no write errors is True,
+        # so the write concern check cannot rely on it.
         write_errors = bwe.details.get("writeErrors", [])
-        if all(err.get("code") == 11000 for err in write_errors):
+        if not bwe.details.get("writeConcernErrors") and all(
+            err.get("code") == 11000 for err in write_errors
+        ):
             return bwe.details.get("nInserted", 0)
         print(f"[DB] Bulk write error: {bwe.details}")
         raise

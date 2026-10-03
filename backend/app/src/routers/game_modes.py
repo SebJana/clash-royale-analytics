@@ -11,10 +11,16 @@ router = APIRouter(prefix="/game_modes", tags=["Game Modes"])
 async def fetch_game_modes(mongo_conn: DbConn, redis_conn: RedConn):
 
     try:
+        # The cache only holds a copy of Mongo, so a cache outage falls back to
+        # Mongo instead of failing the request.
         cached_game_modes = await get_redis_json(redis_conn, GAME_MODES_CACHE_KEY)
-        if cached_game_modes is not None:
-            return cached_game_modes
+    except Exception as e:
+        print(f"[CACHE] [WARNING] reading the game modes failed, using Mongo: {e}")
+        cached_game_modes = None
+    if cached_game_modes is not None:
+        return cached_game_modes
 
+    try:
         # The data scraper is the only writer of this key. Caching this Mongo read
         # could overwrite a newer list written after the read and hide a new mode
         # until the TTL ends. Misses are rare (eviction or a redis-cache restart)
@@ -22,7 +28,7 @@ async def fetch_game_modes(mongo_conn: DbConn, redis_conn: RedConn):
         return await get_game_modes(mongo_conn)
 
     except Exception as e:
-        # Upon any lookup/redis error
+        # Upon a Mongo lookup error
         raise HTTPException(
             status_code=502, detail=f"Error trying to fetch the game modes: {e}"
         )

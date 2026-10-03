@@ -1,89 +1,38 @@
 from datetime import datetime, timedelta
 import copy
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-def validate_battle_log_structure(battle_logs):
+def is_valid_battle(battle) -> bool:
     """
-    Validates the API response if it is in the correct form and syntax.
+    Checks one battle for the fields the cleaning steps require.
 
     Args:
-        battle_logs: The response from the Clash Royale API
+        battle: One entry of the battle log, after duel rounds are extracted
 
     Returns:
-        bool: True if the response is valid, False otherwise
+        bool: True if the battle can be cleaned, False otherwise
     """
 
-    # Check if battle_logs is None or empty
-    if not battle_logs:
+    if not isinstance(battle, dict):
         return False
-
-    # Check if it's a list (expected format)
-    if not isinstance(battle_logs, list):
+    if not isinstance(battle.get("battleTime"), str):
         return False
-
-    # Check if the list is empty
-    if len(battle_logs) == 0:
+    if not all(isinstance(battle.get(f), dict) for f in ("arena", "gameMode")):
         return False
+    return _is_valid_side(battle.get("team")) and _is_valid_side(battle.get("opponent"))
 
-    # Validate first battle log structure
-    first_battle = battle_logs[0]
 
-    # Check if it's a dictionary
-    if not isinstance(first_battle, dict):
-        print(f"[VALIDATION] Expected battle to be dict, got {type(first_battle)}")
+def _is_valid_side(players) -> bool:
+    # A non-empty list of players, each with a card list
+    if not isinstance(players, list) or not players:
         return False
-
-    return True
-
-
-def validate_battle_log_content(battle_logs):
-    """
-    Validates the API response to ensure it contains valid battle log data.
-
-    Args:
-        battle_logs: The response from the Clash Royale API
-
-    Returns:
-        bool: True if the response is valid, False otherwise
-    """
-
-    # Validate first battle log content
-    first_battle = battle_logs[0]
-
-    # Check for required fields
-    required_fields = ["battleTime", "team", "opponent", "arena", "gameMode"]
-    for field in required_fields:
-        if field not in first_battle:
-            print(f"[VALIDATION] Missing required field: {field}")
-            return False
-
-    # Validate team and opponent structure
-    team = first_battle.get("team")
-    opponent = first_battle.get("opponent")
-
-    if not isinstance(team, list) or not isinstance(opponent, list):
-        print("[VALIDATION] Team or opponent is not a list")
-        return False
-
-    if len(team) == 0 or len(opponent) == 0:
-        print("[VALIDATION] Team or opponent list is empty")
-        return False
-
-    # Check if team and opponent players have required fields
-    for player in team + opponent:
-        if not isinstance(player, dict):
-            print("[VALIDATION] Player is not a dictionary")
-            return False
-
-        if "cards" not in player:
-            print("[VALIDATION] Player missing cards field")
-            return False
-
-        if not isinstance(player["cards"], list):
-            print("[VALIDATION] Player cards is not a list")
-            return False
-
-    return True
+    return all(
+        isinstance(player, dict) and isinstance(player.get("cards"), list)
+        for player in players
+    )
 
 
 def adjust_card_levels(cards):
@@ -119,14 +68,23 @@ def adjust_card_levels(cards):
     # Additionally the card level can be higher than the maxLevel specified for the card
     # Clash Royale introduced Level 15 for all cards, without changing the stat in the API response
 
-    for card in cards:
-        # Determine level and rarity and offset it to the new system
+    # Some modes have no support cards, and the API omits the field then
+    for card in cards or []:
         old_card_level = card.get("level")
         rarity = card.get("rarity")
-        new_level = old_card_level + rarity_level_offsets[rarity]
+        if not isinstance(old_card_level, int) or rarity not in rarity_level_offsets:
+            # A rarity added after this mapping must not block the whole
+            # battle. The level stays in the old system until it is added.
+            logger.warning(
+                "Card %s kept its API level: unknown rarity %r or level %r",
+                card.get("name"),
+                rarity,
+                old_card_level,
+            )
+            continue
 
-        # Save the new level as card level
-        card["level"] = new_level
+        # Save the level offset to the new system as card level
+        card["level"] = old_card_level + rarity_level_offsets[rarity]
 
 
 def remove_unnecessary_card_fields(cards):
@@ -153,7 +111,7 @@ def remove_unnecessary_card_fields(cards):
         "used",  # Only a stat for a card when it's a duel
     ]
 
-    for card in cards:
+    for card in cards or []:
         for key in keys_to_remove:
             card.pop(key, None)
 
@@ -192,66 +150,74 @@ def clean_battle_log_list(battle_logs, player_tag):
     Processes and cleans a list of battle logs from the Clash Royale API.
 
     Adds metadata, converts timestamps, determines game results, and removes
-    unnecessary fields to prepare the data for database storage.
+    unnecessary fields to prepare the data for database storage. Each battle is
+    cleaned on its own: a malformed entry is logged and skipped, so it cannot
+    keep the valid battles of the same log from being stored.
 
     Args:
         battle_logs (list): List of raw battle log dictionaries from the API
         player_tag (str): The player tag to use as reference for the battles
 
     Returns:
-        list: List of cleaned and processed battle log dictionaries
+        list: The cleaned battles, newest first. Best of 3 duels are expanded
+            into one battle per round.
     """
 
-    i = 0
-    while i < len(battle_logs):
-        battle = battle_logs[i]
-
-        # Battle is a best of 3 duel, needs own extraction logic
-        if battle.get("team") and battle["team"][0].get("rounds"):
-            duel_battles = extract_duel_battles(battle)
-            battle_logs.pop(i)  # Remove the current un-extracted duel battle log
-            battle_logs[i:i] = (
-                duel_battles  # Insert the extracted duel battles, they will be cleaned after
+    cleaned = []
+    for battle in battle_logs:
+        try:
+            # A best of 3 duel holds every round in one entry
+            if battle["team"][0].get("rounds"):
+                battles = extract_duel_battles(battle)
+            else:
+                battles = [battle]
+            # A duel is only stored with all of its rounds
+            cleaned.extend([_clean_single_battle(b, player_tag) for b in battles])
+        except Exception:
+            battle_time = battle.get("battleTime") if isinstance(battle, dict) else None
+            logger.exception(
+                "Skipped malformed battle of %s at %s", player_tag, battle_time
             )
-            continue  # move to the next battle, which is the first battle of the duel
 
-        # Add a reference player tag to each battle
-        # Tag combined with time is unique identifier for each battle
-        battle["referencePlayerTag"] = player_tag
+    return cleaned
 
-        # Turn the date/time format into ISO time
-        battle_time = battle.get("battleTime")  # e.g. "20250817T022935.000Z"
-        # Parse to datetime
-        battle_time = datetime.strptime(battle_time, "%Y%m%dT%H%M%S.000Z")
-        battle["battleTime"] = battle_time
 
-        # For each battle in the log format and clean it
-        clean_battle(battle)
+def _clean_single_battle(battle, player_tag):
+    """
+    Cleans one battle (or one extracted duel round) in place.
 
-        # See if game ended in victory/defeat or draw
-        battle["gameResult"] = determine_game_result(battle)
+    Raises:
+        ValueError: If the battle lacks a field the cleaning requires.
+    """
 
-        # Remove the unnecessary stats from each battle
-        keys_to_remove = [
-            "deckSelection",
-            "isHostedMatch",
-            "leagueNumber",
-            "isLadderTournament",
-        ]
+    if not is_valid_battle(battle):
+        raise ValueError("Battle is missing required fields")
 
-        for key in keys_to_remove:
-            battle.pop(key, None)
+    # Tag combined with time is unique identifier for each battle
+    battle["referencePlayerTag"] = player_tag
 
-        # Refactor Arena and GameMode (get rid of id)
-        arena = battle.get("arena").get("name")
-        battle["arena"] = arena
+    # e.g. "20250817T022935.000Z"
+    battle["battleTime"] = datetime.strptime(battle["battleTime"], "%Y%m%dT%H%M%S.000Z")
 
-        game_mode = battle.get("gameMode").get("name")
-        battle["gameMode"] = game_mode
+    clean_battle(battle)
 
-        i += 1  # move to the next battle
+    battle["gameResult"] = determine_game_result(battle)
 
-    return battle_logs
+    # Remove the unnecessary stats from each battle
+    keys_to_remove = [
+        "deckSelection",
+        "isHostedMatch",
+        "leagueNumber",
+        "isLadderTournament",
+    ]
+    for key in keys_to_remove:
+        battle.pop(key, None)
+
+    # Refactor Arena and GameMode (get rid of id)
+    battle["arena"] = battle["arena"].get("name")
+    battle["gameMode"] = battle["gameMode"].get("name")
+
+    return battle
 
 
 def extract_duel_battles(battle):
@@ -372,7 +338,7 @@ def get_player_name(battles, player_tag):
         str: The player's name if found, otherwise the given `player_tag`.
     """
 
-    # battles[0] is the newest/earliest battle, so chances are this is the actual current name.
+    # battles[0] is the newest battle, so chances are this is the actual current name.
     # Easiest way to get the actual name would be to use the get_player_info of the clash_royale_api module,
     # but extracting it from the battle log, which is already being fetched, saves one API-call per cycle per player
     battle = battles[0]  # Take first battle of battles in the list

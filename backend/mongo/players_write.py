@@ -19,7 +19,7 @@ async def insert_tracked_player(
         player_name (str): The name to set for the player (default: "Player").
 
     Returns:
-        str: "created", "reactivated", or "already_active"
+        str: "created", "reactivated", or "already_tracked"
     """
     try:
         await ensure_connected(conn)
@@ -51,7 +51,17 @@ async def insert_tracked_player(
                 },
                 # A player deactivated after repeated 404s exists again, so
                 # its old not-found streak must not count towards a new one.
-                {"$unset": ["deactivatedReason", "firstNotFoundAt"]},
+                # The adaptive intervals describe the old session; a stretched
+                # one would delay the first refreshes of the new session.
+                {
+                    "$unset": [
+                        "deactivatedReason",
+                        "firstNotFoundAt",
+                        "syncIntervalS",
+                        "profileSyncIntervalS",
+                        "lastSyncNewBattles",
+                    ]
+                },
             ],
             upsert=False,
         )
@@ -79,40 +89,6 @@ async def insert_tracked_player(
 
     except Exception as e:
         print(f"[DB] [ERROR] during insert/reactivate for player: {player_tag}", e)
-        raise
-
-
-async def set_player_name(conn: MongoConn, player_tag: str, player_name: str):
-    """
-    Updates the name of an existing player (by tag) in the players collection.
-    It does not insert a new document if the player does not exist (upsert=False).
-
-    Args:
-        conn (MongoConn): Active MongoDB connection instance.
-        player_tag (str): The unique tag of the player (e.g., "#YYRJQY28").
-        player_name (str): The new name to set for the player.
-
-    Raises:
-        Exception: Any exception that occurs during the database update operation.
-    """
-
-    try:
-        await ensure_connected(conn)
-
-        # Set the name for the player with the specified tag
-        res = await conn.db.players.update_one(
-            {"playerTag": player_tag},
-            {"$set": {"playerName": player_name}},
-            upsert=False,
-        )
-
-        if res.matched_count == 0:
-            print(
-                f"[DB] [WARNING] player {player_tag} was not found in collection and couldn't set player name."
-            )
-
-    except Exception as e:
-        print(f"[DB] [ERROR] during name setting for player: {player_tag}", e)
         raise
 
 
@@ -160,13 +136,13 @@ async def record_battle_sync(
     player_tag: str,
     newest_battle_time: datetime | None,
     player_name: str | None,
-    inserted_count: int,
+    new_battle_count: int,
     interval_s: float | None = None,
 ):
     """
     Stores the outcome of a successful battle sync on the player document.
 
-    syncVersion is only incremented when new battles were inserted. Cached
+    syncVersion is only incremented when the sync found new battles. Cached
     statistics of a player without new battles therefore stay valid.
 
     Args:
@@ -175,7 +151,10 @@ async def record_battle_sync(
         newest_battle_time (datetime | None): battleTime of the newest battle in
             the fetched battle log, None if the log was empty.
         player_name (str | None): Current player name, None to keep the stored one.
-        inserted_count (int): Number of battles inserted by this sync.
+        new_battle_count (int): Battles newer than the previous watermark,
+            whether or not this attempt inserted them. Stored as
+            lastSyncNewBattles, so the capacity estimate can price the player
+            for any base interval.
         interval_s (float | None): Seconds until the player's next battle sync.
             Stored so the next interval can grow from it, and so a rebuilt
             schedule keeps the player's rhythm.
@@ -190,6 +169,7 @@ async def record_battle_sync(
         update = {
             "$set": {
                 "lastBattlesSyncAt": datetime.now(timezone.utc),
+                "lastSyncNewBattles": new_battle_count,
                 "consecutiveFailures": 0,
                 "consecutiveNotFound": 0,
             },
@@ -203,7 +183,7 @@ async def record_battle_sync(
             # $max keeps the watermark from moving backwards if two syncs of
             # the same player overlap after an expired claim.
             update["$max"] = {"lastBattleTime": newest_battle_time}
-        if inserted_count > 0:
+        if new_battle_count > 0:
             update["$inc"] = {"syncVersion": 1}
 
         await conn.db.players.update_one(

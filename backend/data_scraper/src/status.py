@@ -60,7 +60,8 @@ def print_status(snapshot: dict):
             f"{max_players if max_players is not None else '?'} max players, "
             f"base interval {_duration(capacity['baseIntervalS'])}, "
             f"{capacity['requestRate']} req/s planned "
-            f"({capacity['battleRate']} for battles)"
+            f"({capacity['battleRate']} for battles, "
+            f"{capacity.get('battleDemand', '?')} needed)"
         )
 
     print(f"\nLast {snapshot['windowS']:.0f}s:")
@@ -73,6 +74,7 @@ def print_status(snapshot: dict):
             line += f", {stats['inserted']} battles inserted"
         line += f", max claim lateness {_duration(stats['maxClaimLatenessS'])}"
         print(line + (f"  ({outcomes})" if outcomes else ""))
+    print(f"  Possible battle gaps since start: {snapshot.get('possibleGaps', '?')}")
 
     print("\nSchedules:")
     for kind, stats in snapshot["schedules"].items():

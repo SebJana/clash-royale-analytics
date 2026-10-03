@@ -17,15 +17,21 @@ router = APIRouter(prefix="/cards", tags=["Cards"])
 )
 async def get_cards(mongo_conn: DbConn, redis_conn: RedConn):
     try:
+        # The cache only holds a copy of Mongo, so a cache outage falls back to
+        # Mongo instead of failing the request.
         cached_cards = await get_redis_json(redis_conn, CARDS_CACHE_KEY)
-        if cached_cards is not None:
-            return cached_cards
+    except Exception as e:
+        print(f"[CACHE] [WARNING] reading the cards failed, using Mongo: {e}")
+        cached_cards = None
+    if cached_cards is not None:
+        return cached_cards
 
+    try:
         stored = await get_stored_cards(mongo_conn)
 
     except Exception as e:
-        # A Mongo or Redis error does not fall back to the Clash Royale API, so an
-        # outage cannot turn every request into a call that spends key quota.
+        # A Mongo error does not fall back to the Clash Royale API, so an outage
+        # cannot turn every request into a call that spends key quota.
         raise HTTPException(
             status_code=502, detail=f"Error trying to fetch the cards: {e}"
         )

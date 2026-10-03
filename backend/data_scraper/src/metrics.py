@@ -37,11 +37,24 @@ class Metrics:
         self.last_reconcile_at: float | None = None
         # Latest snapshot, served by the status endpoint without a Redis read
         self.latest: dict = {}
+        # Since start instead of per window: a gap is rare, and one per hour
+        # already matters.
+        self.possible_gaps = 0
 
-    def record(self, kind: str, outcome: str, inserted: int, lateness_s: float):
+    def record(
+        self,
+        kind: str,
+        outcome: str,
+        inserted: int,
+        lateness_s: float,
+        possible_gap: bool = False,
+    ):
+        self.possible_gaps += possible_gap
         bucket = self._buckets.setdefault(
             int(time.time() // _BUCKET_S),
-            defaultdict(lambda: {"outcomes": Counter(), "inserted": 0, "lateness": 0.0}),
+            defaultdict(
+                lambda: {"outcomes": Counter(), "inserted": 0, "lateness": 0.0}
+            ),
         )
         stats = bucket[kind]
         stats["outcomes"][outcome] += 1
@@ -99,6 +112,7 @@ async def build_snapshot(
                 "baseIntervalS": round(capacity.base_interval_s),
                 "requestRate": round(capacity.request_rate, 2),
                 "battleRate": round(capacity.battle_rate, 2),
+                "battleDemand": round(capacity.battle_demand, 2),
             }
             if capacity
             else None
@@ -107,6 +121,7 @@ async def build_snapshot(
         "maintenance": await key_store.in_maintenance(),
         "workers": workers,
         "lastReconcileAt": metrics.last_reconcile_at,
+        "possibleGaps": metrics.possible_gaps,
         "redis": {
             "usedMemory": info.get("used_memory"),
             "maxMemory": info.get("maxmemory"),
@@ -139,8 +154,7 @@ async def _handle_status_request(
             f"HTTP/1.1 {status}\r\n"
             "Content-Type: application/json\r\n"
             f"Content-Length: {len(payload)}\r\n"
-            "Connection: close\r\n\r\n".encode()
-            + payload
+            "Connection: close\r\n\r\n".encode() + payload
         )
         await writer.drain()
     except (asyncio.TimeoutError, ConnectionError):
