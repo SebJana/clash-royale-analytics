@@ -175,7 +175,9 @@ class WorkerPool:
                 self.mode_store,
                 self.base_interval_s,
             )
-        return await refresh_player_profile(player_tag, self.cr_api, self.mongo_conn)
+        return await refresh_player_profile(
+            player_tag, self.cr_api, self.mongo_conn, self.base_interval_s
+        )
 
     async def _process(self, schedule: Schedule, claim: Claim):
         try:

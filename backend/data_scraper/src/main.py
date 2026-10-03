@@ -10,13 +10,14 @@ import contextlib
 import logging
 import signal
 import time
+from functools import partial
 
 from redis.asyncio import Redis
 
 from api_key_store import KeyStore, KeyStoreConfig, keys_from_env
 from clash_royale_api import ClashRoyaleAPI
 from game_modes import UniqueGameModes
-from intervals import battle_demand, profile_demand
+from intervals import battle_demand, min_profile_interval, profile_demand
 from jobs.cards import cards_loop
 from log import setup_logging
 from metrics import Metrics, build_snapshot, publish_snapshot, start_status_server
@@ -165,12 +166,13 @@ async def reconcile_loop(
                 usable_keys=inventory["usable"],
                 per_key_rps=settings.CR_KEY_REQUESTS_PER_SECOND,
                 utilization=settings.CAPACITY_UTILIZATION,
-                profile_rate=profile_demand(players),
-                # Admission assumes every player is refreshed this often
-                profile_max_age_s=settings.PROFILE_MIN_INTERVAL,
+                # Admission assumes full load, where profiles are stretched
+                profile_max_age_s=min_profile_interval(settings.MAX_SYNC_INTERVAL),
                 min_interval_s=settings.MIN_SYNC_INTERVAL,
                 max_interval_s=settings.MAX_SYNC_INTERVAL,
-                battle_demand=lambda base_s: battle_demand(players, base_s),
+                # partial binds this pass's players; both are called right away
+                battle_demand=partial(battle_demand, players),
+                profile_demand=partial(profile_demand, players),
             )
             await publish_capacity(key_store.redis, capacity)
             pool.resize(capacity)
@@ -331,6 +333,8 @@ async def main():
 
     cr_api, key_redis, redis_conn, mongo_conn = await init()
 
+    # Update the existing players (once) that were added while
+    # the system was still operating as a batch based data scraper
     backfilled = await backfill_player_sync_fields(mongo_conn)
     if backfilled:
         logger.info("Added sync fields to %d existing players", backfilled)

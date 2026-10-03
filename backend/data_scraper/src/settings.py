@@ -43,11 +43,13 @@ class Settings:
     # player is synced sooner, at the base interval times the factor below.
     HIGH_ACTIVITY_BATTLES: int = 12
     HIGH_ACTIVITY_INTERVAL_FACTOR: float = 0.5
-    # Above this base interval the factor rises linearly to 1 at
-    # MAX_SYNC_INTERVAL. Under full load even the most active players then
-    # sync at the longest interval, which keeps admission at the worst case
-    # of one request per player per MAX_SYNC_INTERVAL.
-    HIGH_ACTIVITY_FADE_START: float = 30 * 60  # 30 minutes
+    # Load pressure rises linearly from 0 at this base interval to 1 at
+    # MAX_SYNC_INTERVAL. With it, the high activity factor rises to 1 and the
+    # shortest profile interval to PROFILE_PRESSURE_INTERVAL. Under full load
+    # even the most active players then sync at the longest interval, which
+    # keeps admission at the worst case of one battle request per player per
+    # MAX_SYNC_INTERVAL.
+    LOAD_FADE_START: float = 30 * 60  # 30 minutes
     # A sync without new battles stretches the previous interval by this
     # factor, up to MAX_SYNC_INTERVAL. Idle accounts then cost fewer requests.
     IDLE_INTERVAL_GROWTH: float = 1.5
@@ -56,15 +58,20 @@ class Settings:
     # Share of the raw key rate (usable keys x requests per second) that is
     # planned for. The rest is headroom for retries, 429 cooldowns, and cards.
     # New players are admitted while every tracked player, all of them active
-    # and with daily profiles, could still be synced within MAX_SYNC_INTERVAL.
+    # and with profiles at PROFILE_PRESSURE_INTERVAL, could still be synced
+    # within MAX_SYNC_INTERVAL.
     CAPACITY_UTILIZATION: float = 0.8
 
     # Profile snapshots
     # Profile stats (trophies, wins, level) only change when the player plays.
     # A player with battles since the last refresh is refreshed again after the
     # minimum interval; without battles the interval grows up to the maximum.
+    # Under load the minimum itself rises towards PROFILE_PRESSURE_INTERVAL.
     PROFILE_MIN_INTERVAL: float = 24 * 60 * 60  # 1 day
     PROFILE_MAX_INTERVAL: float = 7 * 24 * 60 * 60  # 7 days
+    # Shortest profile interval under full load. A late profile is only stale,
+    # never lost, so profiles give their requests to battle syncs first.
+    PROFILE_PRESSURE_INTERVAL: float = 7 * 24 * 60 * 60  # 7 days
     # Each refresh without battles since the previous one multiplies the
     # interval by this factor: 1 -> 2 -> 4 -> (8 but capped at) 7 days. Steeper than battles
     # (IDLE_INTERVAL_GROWTH), since a late profile is only stale, never lost.

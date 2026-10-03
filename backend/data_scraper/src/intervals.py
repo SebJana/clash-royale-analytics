@@ -16,14 +16,36 @@ from collections.abc import Iterable
 from settings import settings
 
 
+def load_pressure(base_interval_s: float) -> float:
+    """How close the pool is to full load, from the base interval.
+
+    0 up to LOAD_FADE_START, rising linearly to 1 at MAX_SYNC_INTERVAL, where
+    the keys can only just sync every player once per longest interval.
+
+    Args:
+        base_interval_s (float): Current capacity based interval.
+
+    Returns:
+        float: Pressure between 0 and 1.
+    """
+
+    start = settings.LOAD_FADE_START
+    end = settings.MAX_SYNC_INTERVAL
+    if base_interval_s <= start:
+        return 0.0
+    if base_interval_s >= end:
+        return 1.0
+    return (base_interval_s - start) / (end - start)
+
+
 def high_activity_factor(base_interval_s: float) -> float:
     """Share of the base interval a very active player gets.
 
     The shortened interval is paid for by the other players. Once the base has
     to stretch towards MAX_SYNC_INTERVAL there is nothing left to pay with, so
-    the factor rises linearly from HIGH_ACTIVITY_INTERVAL_FACTOR at
-    HIGH_ACTIVITY_FADE_START to 1 at MAX_SYNC_INTERVAL. At full load every
-    player, however active, then syncs at the longest interval.
+    the factor rises with the load pressure from HIGH_ACTIVITY_INTERVAL_FACTOR
+    to 1. At full load every player, however active, then syncs at the longest
+    interval.
 
     Args:
         base_interval_s (float): Current capacity based interval.
@@ -32,15 +54,27 @@ def high_activity_factor(base_interval_s: float) -> float:
         float: Factor between HIGH_ACTIVITY_INTERVAL_FACTOR and 1.
     """
 
-    start = settings.HIGH_ACTIVITY_FADE_START
-    end = settings.MAX_SYNC_INTERVAL
-    if base_interval_s <= start:
-        return settings.HIGH_ACTIVITY_INTERVAL_FACTOR
-    if base_interval_s >= end:
-        return 1.0
-    progress = (base_interval_s - start) / (end - start)
     factor = settings.HIGH_ACTIVITY_INTERVAL_FACTOR
-    return factor + (1.0 - factor) * progress
+    return factor + (1.0 - factor) * load_pressure(base_interval_s)
+
+
+def min_profile_interval(base_interval_s: float) -> float:
+    """Shortest profile interval at the current load.
+
+    Rises with the load pressure from PROFILE_MIN_INTERVAL to
+    PROFILE_PRESSURE_INTERVAL, so profiles hand their requests to battle
+    syncs, which lose battles when late.
+
+    Args:
+        base_interval_s (float): Current capacity based interval.
+
+    Returns:
+        float: Seconds.
+    """
+
+    low = settings.PROFILE_MIN_INTERVAL
+    high = settings.PROFILE_PRESSURE_INTERVAL
+    return low + (high - low) * load_pressure(base_interval_s)
 
 
 def _clamp_battle_interval(interval_s: float) -> float:
@@ -125,46 +159,54 @@ def battle_demand(players: Iterable[dict], base_interval_s: float) -> float:
     )
 
 
-def profile_demand(players: Iterable[dict]) -> float:
-    """Profile requests per second the players currently need.
+def profile_demand(players: Iterable[dict], base_interval_s: float) -> float:
+    """Profile requests per second the players need at a candidate base.
 
     Args:
         players (Iterable[dict]): Tracked players with profileSyncIntervalS
             (see get_tracked_players_sync_times).
+        base_interval_s (float): Candidate base interval.
 
     Returns:
-        float: Requests per second. A player without an interval yet is
-            refreshed at PROFILE_MIN_INTERVAL first.
+        float: Requests per second. Never increases with a longer base. A
+            player is priced at its stored interval, but at least at the
+            shortest interval the candidate base allows.
     """
 
+    shortest = min_profile_interval(base_interval_s)
     return sum(
-        1 / (player["profileSyncIntervalS"] or settings.PROFILE_MIN_INTERVAL)
+        1 / max(player["profileSyncIntervalS"] or shortest, shortest)
         for player in players
     )
 
 
 def next_profile_interval(
-    previous_interval_s: float | None, played_since_last_refresh: bool
+    base_interval_s: float,
+    previous_interval_s: float | None,
+    played_since_last_refresh: bool,
 ) -> float:
     """Seconds until a player's next profile refresh.
 
     Args:
+        base_interval_s (float): Current capacity based interval.
         previous_interval_s (float | None): The player's last profile interval,
             None if it has none yet.
         played_since_last_refresh (bool): The player has battles newer than the
             previous profile refresh, so the profile stats changed.
 
     Returns:
-        float: The next interval, within [PROFILE_MIN_INTERVAL, PROFILE_MAX_INTERVAL].
+        float: The next interval, within [min_profile_interval(base),
+            max(PROFILE_MAX_INTERVAL, min_profile_interval(base))].
     """
 
+    shortest = min_profile_interval(base_interval_s)
     if played_since_last_refresh or previous_interval_s is None:
-        return settings.PROFILE_MIN_INTERVAL
+        return shortest
     # Unchanged since the last refresh: check less often, the stats can only
     # change once the player plays again.
     return min(
-        previous_interval_s * settings.PROFILE_IDLE_GROWTH,
-        settings.PROFILE_MAX_INTERVAL,
+        max(previous_interval_s * settings.PROFILE_IDLE_GROWTH, shortest),
+        max(settings.PROFILE_MAX_INTERVAL, shortest),
     )
 
 

@@ -8,14 +8,16 @@ scraper's key pool itself.
 The model: every battle sync and every profile refresh costs one Clash Royale
 request. The scraper pool can start ``usable_keys * per_key_rps`` requests per
 second; a utilization factor below 1 keeps headroom for retries, 429 cooldowns,
-and card refreshes. Profile refreshes take their share first, the rest is
-available for battle syncs.
+and card refreshes. Battle syncs and profile refreshes share that rate; both
+get longer as the load rises, profiles much more so (see the data scraper's
+intervals module), since a late profile is only stale while a late battle
+sync can lose battles.
 
 The two outputs use different loads on purpose:
 - The base interval follows the actual mix of players. Idle players stretch
   their own intervals, and the requests they leave unused shorten the base for
   everyone else.
-- The admission limit assumes every player is active. Idle players start
+- The admission limit assumes every player is active, at full load. Idle players start
   playing again without notice (evenings, a new season), and players admitted
   on a quiet day must still fit within the longest interval then.
 """
@@ -25,13 +27,13 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, asdict
 
-# The base interval is searched to this precision. A second is far below the
-# 5 minute reconciliation period that recomputes it anyway.
-BASE_INTERVAL_PRECISION_S = 1.0
-
 from redis.asyncio import Redis
 
 CAPACITY_KEY = "crsched:capacity"
+
+# The base interval is searched to this precision. A second is far below the
+# 5 minute reconciliation period that recomputes it anyway.
+BASE_INTERVAL_PRECISION_S = 1.0
 
 
 @dataclass(frozen=True)
@@ -60,11 +62,11 @@ def compute_capacity(
     usable_keys: int,
     per_key_rps: float,
     utilization: float,
-    profile_rate: float,
     profile_max_age_s: float,
     min_interval_s: float,
     max_interval_s: float,
     battle_demand: Callable[[float], float],
+    profile_demand: Callable[[float], float],
 ) -> Capacity:
     """Compute the base battle interval and the admission limit.
 
@@ -74,10 +76,8 @@ def compute_capacity(
         per_key_rps (float): Requests per second each key may start.
         utilization (float): Share of the raw request rate that is planned for
             (0..1). The rest is headroom.
-        profile_rate (float): Profile requests per second the tracked players
-            currently need.
-        profile_max_age_s (float): Shortest profile refresh period. Admission
-            assumes every player is refreshed this often.
+        profile_max_age_s (float): Shortest profile refresh period at full
+            load. Admission assumes every player is refreshed this often.
         min_interval_s (float): Shortest battle interval; a small deployment
             never syncs more often than this.
         max_interval_s (float): Longest battle interval that still keeps every
@@ -85,19 +85,23 @@ def compute_capacity(
         battle_demand (Callable[[float], float]): Battle requests per second
             the tracked players need at a given base interval. Must not
             increase with a longer base.
+        profile_demand (Callable[[float], float]): Profile requests per second
+            at a given base interval, with the same requirement.
 
     Returns:
         Capacity: The estimate, stamped with the current time.
     """
 
     request_rate = usable_keys * per_key_rps * utilization
-    battle_rate = max(request_rate - profile_rate, 0.0)
 
-    # The shortest base whose demand fits the battle rate. Demand only falls
-    # as the base grows, so a bisection finds it.
-    if battle_demand(min_interval_s) <= battle_rate:
+    def fits(base_s: float) -> bool:
+        return battle_demand(base_s) + profile_demand(base_s) <= request_rate
+
+    # The shortest base whose battle and profile demand fit the request rate.
+    # Both only fall as the base grows, so a bisection finds it.
+    if fits(min_interval_s):
         base_interval_s = min_interval_s
-    elif battle_demand(max_interval_s) > battle_rate:
+    elif not fits(max_interval_s):
         # More demand than the keys can serve at all: everyone gets the
         # longest interval and is late anyway.
         base_interval_s = max_interval_s
@@ -105,11 +109,12 @@ def compute_capacity(
         low, high = min_interval_s, max_interval_s
         while high - low > BASE_INTERVAL_PRECISION_S:
             middle = (low + high) / 2
-            if battle_demand(middle) <= battle_rate:
+            if fits(middle):
                 high = middle
             else:
                 low = middle
         base_interval_s = high
+    battle_rate = max(request_rate - profile_demand(base_interval_s), 0.0)
 
     max_players = None
     if request_rate > 0:
@@ -119,7 +124,7 @@ def compute_capacity(
         # players fades out towards A.
         #   R = request_rate, requests per second the keys may start
         #   P = profile_max_age_s, every player costs one profile request
-        #       per P seconds
+        #       per P seconds (the stretched profile interval at full load)
         #   A = max_interval_s, seconds within which every player has to be
         #       synced once
         # N players need N / P requests per second for profiles, which leaves
@@ -130,8 +135,8 @@ def compute_capacity(
         #   N * (1 + A / P) <= A * R
         #   N <= A * R / (1 + A / P)
         # Example with the default settings and 1 key at 1 request/s:
-        # R = 0.8, A = 3600 s, P = 86400 s
-        # -> N <= 3600 * 0.8 / (1 + 3600 / 86400) = 2764 players
+        # R = 0.8, A = 3600 s, P = 604800 s (7 days)
+        # -> N <= 3600 * 0.8 / (1 + 3600 / 604800) = 2862 players
         max_players = math.floor(
             max_interval_s * request_rate / (1 + max_interval_s / profile_max_age_s)
         )

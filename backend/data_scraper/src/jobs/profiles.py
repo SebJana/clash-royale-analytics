@@ -20,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 async def refresh_player_profile(
-    player_tag: str, cr_api: ClashRoyaleAPI, mongo_conn: MongoConn
+    player_tag: str,
+    cr_api: ClashRoyaleAPI,
+    mongo_conn: MongoConn,
+    base_interval_s: float,
 ) -> JobResult:
     """Fetch the player's profile and store it as the latest snapshot.
 
@@ -32,6 +35,8 @@ async def refresh_player_profile(
         player_tag (str): Player tag (e.g., "#YYRJQY28").
         cr_api (ClashRoyaleAPI): API client backed by the scraper key pool.
         mongo_conn (MongoConn): Mongo connection used to read state and write data.
+        base_interval_s (float): Current capacity based battle interval. Under
+            load it stretches the profile interval as well.
 
     Returns:
         JobResult: What happened and when the profile is due again.
@@ -76,7 +81,9 @@ async def refresh_player_profile(
     played = last_refresh is None or (
         last_battle is not None and last_battle > last_refresh
     )
-    interval = next_profile_interval(state.get("profileSyncIntervalS"), played)
+    interval = next_profile_interval(
+        base_interval_s, state.get("profileSyncIntervalS"), played
+    )
 
     await save_player_profile(mongo_conn, player_tag, profile, interval)
     return JobResult("synced", interval)

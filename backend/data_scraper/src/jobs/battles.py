@@ -181,6 +181,9 @@ async def sync_player_battles(
 
     # Only battles after the watermark are new. Without this filter nearly
     # every insert would be a duplicate rejected by the unique index.
+    # NOTE Assumes the battle log never adds a battle older than one already
+    # fetched. A battle that appears late, with a battleTime at or before the
+    # watermark, is skipped for good.
     last_battle_time = state.get("lastBattleTime")
     new_battles = [
         battle
