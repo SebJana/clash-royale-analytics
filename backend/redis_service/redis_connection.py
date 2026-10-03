@@ -5,9 +5,13 @@ from urllib.parse import quote
 from datetime import date, datetime, time
 import random
 
-# Card metadata is refreshed on a timer, not per scraping cycle, so its key has
-# no version. The data scraper writes it and the API reads it.
-CARDS_CACHE_KEY = "static:crApi:allCards"
+# The data scraper is the only writer of the card list (see jobs/cards.py) and
+# refreshes it on a timer, so the key has no version. The API only reads it.
+CARDS_CACHE_KEY = "crApi:allCards"
+
+# The data scraper is the only writer of the game mode list (see game_modes_loop)
+# and rewrites it as soon as a new mode is stored. The API only reads it.
+GAME_MODES_CACHE_KEY = "crApi:allGameModes"
 
 
 class RedisConn:

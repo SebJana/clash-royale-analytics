@@ -23,10 +23,11 @@ from mongo import (
     MongoConn,
     backfill_player_sync_fields,
     backfill_tracking_gaps,
+    get_game_modes,
     insert_game_modes,
 )
 from reconciler import reconcile_schedules
-from redis_service import CacheRedisConn
+from redis_service import GAME_MODES_CACHE_KEY, CacheRedisConn, set_redis_json
 from scrape_schedule import (
     BATTLES_SCHEDULE,
     PROFILES_SCHEDULE,
@@ -176,22 +177,84 @@ async def reconcile_loop(
         await asyncio.sleep(settings.RECONCILE_INTERVAL)
 
 
-async def game_modes_loop(mode_store: UniqueGameModes, mongo_conn: MongoConn):
-    """Write newly seen game modes to Mongo until cancelled."""
+async def store_game_modes(game_modes: list, mongo_conn: MongoConn) -> bool:
+    """Write game modes to Mongo and report whether any of them is new.
 
+    Args:
+        game_modes (list): Unique game mode names seen since the last flush.
+        mongo_conn (MongoConn): Active Mongo connection.
+
+    Returns:
+        bool: True if at least one mode was not stored before.
+
+    Raises:
+        Exception: If the Mongo write fails. The caller keeps the modes for a retry.
+    """
+
+    result = await insert_game_modes(mongo_conn, game_modes)
+    if not result.get("inserted"):
+        return False
+    logger.info("%d new game modes inserted", result["inserted"])
+    return True
+
+
+async def refresh_game_modes_cache(mongo_conn: MongoConn, redis_conn: CacheRedisConn):
+    """Rebuild the API's cached game mode list from Mongo.
+
+    Raises:
+        Exception: Any Mongo or Redis error; the caller retries on the next flush.
+    """
+
+    game_modes = await get_game_modes(mongo_conn)
+    await set_redis_json(
+        redis_conn,
+        GAME_MODES_CACHE_KEY,
+        game_modes,
+        ttl=settings.CACHE_TTL_GAME_MODES,
+    )
+
+
+async def game_modes_loop(
+    mode_store: UniqueGameModes, mongo_conn: MongoConn, redis_conn: CacheRedisConn
+):
+    """Write newly seen game modes to Mongo and keep the cached list current.
+
+    This loop is the only writer of GAME_MODES_CACHE_KEY. The API reads it and
+    falls back to Mongo without caching, because a cache write from a request
+    that read Mongo before a new mode was inserted could land after this loop's
+    write and hide the new mode for a full TTL. Writes from this single task are
+    ordered, so the cached list never goes back to an older state.
+    """
+
+    # Zero builds the cached list on the first pass
+    next_cache_refresh = 0.0
     while True:
-        await asyncio.sleep(settings.GAME_MODES_FLUSH_INTERVAL)
+        new_mode = False
         game_modes = mode_store.drain()
-        if not game_modes:
-            continue
-        try:
-            result = await insert_game_modes(mongo_conn, game_modes)
-            if result.get("inserted"):
-                logger.info("%d new game modes inserted", result["inserted"])
-        except Exception:
-            # Keep the modes for the next flush instead of dropping them.
-            mode_store.restore(game_modes)
-            logger.exception("Game mode flush failed")
+        if game_modes:
+            try:
+                new_mode = await store_game_modes(game_modes, mongo_conn)
+            except Exception:
+                # Keep the modes for the next flush instead of dropping them.
+                mode_store.restore(game_modes)
+                logger.exception("Game mode flush failed")
+
+        # A new mode is written to the cache right away, so the filter options
+        # include it as soon as its battles can show up. The timed refresh
+        # restores the list after an eviction or a restart of redis-cache.
+        if new_mode or time.monotonic() >= next_cache_refresh:
+            try:
+                await refresh_game_modes_cache(mongo_conn, redis_conn)
+                next_cache_refresh = (
+                    time.monotonic() + settings.GAME_MODES_CACHE_REFRESH_INTERVAL
+                )
+            except Exception:
+                # Zero retries on the next flush, which also covers a new mode
+                # that is already in Mongo and would not count as new again.
+                next_cache_refresh = 0.0
+                logger.exception("Game mode cache refresh failed")
+
+        await asyncio.sleep(settings.GAME_MODES_FLUSH_INTERVAL)
 
 
 async def monitoring_loop(
@@ -277,7 +340,7 @@ async def main():
         # ends on cancellation; Docker's restart policy covers anything else.
         async with asyncio.TaskGroup() as tg:
             tg.create_task(reconcile_loop(battles, profiles, mongo_conn, pool, metrics))
-            tg.create_task(game_modes_loop(mode_store, mongo_conn))
+            tg.create_task(game_modes_loop(mode_store, mongo_conn, redis_conn))
             tg.create_task(cards_loop(cr_api, mongo_conn, redis_conn))
             tg.create_task(monitoring_loop(metrics, battles, profiles, pool))
     except asyncio.CancelledError:
@@ -292,7 +355,8 @@ async def main():
         remaining = mode_store.drain()
         if remaining:
             try:
-                await insert_game_modes(mongo_conn, remaining)
+                if await store_game_modes(remaining, mongo_conn):
+                    await refresh_game_modes_cache(mongo_conn, redis_conn)
             except Exception:
                 logger.exception("Final game mode flush failed")
         await cr_api.close()

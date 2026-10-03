@@ -58,7 +58,7 @@ class Settings:
     PROFILE_MIN_INTERVAL: float = 24 * 60 * 60  # 1 day
     PROFILE_MAX_INTERVAL: float = 7 * 24 * 60 * 60  # 7 days
     # Each refresh without battles since the previous one multiplies the
-    # interval by this factor: 1 -> 2 -> 4 -> 7 days. Steeper than battles
+    # interval by this factor: 1 -> 2 -> 4 -> (8 but capped at) 7 days. Steeper than battles
     # (IDLE_INTERVAL_GROWTH), since a late profile is only stale, never lost.
     PROFILE_IDLE_GROWTH: float = 2.0
     # Profiles only run when no battle sync is due, unless they are overdue by
@@ -104,6 +104,9 @@ class Settings:
 
     # How often newly seen game modes are written to Mongo
     GAME_MODES_FLUSH_INTERVAL: float = 60  # seconds
+    # How often the cached game mode list is rebuilt from Mongo without a new
+    # mode. Bounds how long the list stays missing after an eviction.
+    GAME_MODES_CACHE_REFRESH_INTERVAL: float = 10 * 60  # 10 minutes
 
     # How often the card list is fetched from the Clash Royale API
     CARDS_REFRESH_INTERVAL: float = 6 * 60 * 60  # 6 hours
@@ -127,6 +130,8 @@ class Settings:
     # Cache TTL (Time To Live) in seconds
     # Twice the refresh interval keeps the cards cached if one refresh fails
     CACHE_TTL_CARDS: int = 2 * CARDS_REFRESH_INTERVAL
+    # Twice the refresh interval keeps the game modes cached if one refresh fails
+    CACHE_TTL_GAME_MODES: int = int(2 * GAME_MODES_CACHE_REFRESH_INTERVAL)
 
 
 # Global settings instance

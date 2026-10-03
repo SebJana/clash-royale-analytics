@@ -69,6 +69,10 @@ async def ensure_tracking_capacity(
 # invalidated when a player is added, removed, or renamed. Every home page
 # visit currently loads all tracked players, which grows with every player.
 # Beyond ~10k players, replace it with a server-side search by tag/name prefix.
+# But possibly cache the last X viewed players on the client, so that they
+# still see them in recently viewed and can click there.
+# TODO also some sort of browsing should be available, so one can see the players
+# in a list, just not the main list upon search, but a paginated approach
 @router.get(
     "",
     dependencies=[Depends(RateLimiter(times=15, seconds=60))],
@@ -205,7 +209,7 @@ async def add_tracked_player(
             print(f"[WARNING] Could not schedule {player_tag} immediately: {e}")
 
     if status_insert == "reactivated":
-            return {"status": "Player is now being tracked again", "tag": player_tag}
+        return {"status": "Player is now being tracked again", "tag": player_tag}
     if status_insert == "created":
         return {"status": "Player is now being tracked", "tag": player_tag}
     if status_insert == "already_tracked":

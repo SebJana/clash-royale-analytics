@@ -183,10 +183,8 @@ class Settings:
     # whenever the data scraper stores new battles for that player. Cached data is
     # therefore always as up-to-date as the most recently scraped data in MongoDB.
     # Keep TTL still in the minutes to hours range as fallback, and for data
-    # without a per-player version (game modes, total battle count)
+    # without a per-player version (total battle count)
 
-    CACHE_TTL_CARDS: int = 6 * 60 * 60  # 6 hours
-    CACHE_TTL_GAME_MODES: int = 1 * 60 * 60  # 1 hour
     CACHE_TTL_TOTAL_BATTLES: int = 15 * 60  # 15 minutes
     CACHE_TTL_PLAYER_BATTLE_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_BATTLES: int = (
@@ -194,6 +192,10 @@ class Settings:
     )  # 1 minute (short cache time, query params likely to change often with before timestamp. Also no real calculation effort needed for retrieving last battles)
     CACHE_TTL_DECK_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_CARD_STATS: int = 10 * 60  # 10 minutes
+
+    # Retry-After for /cards before the data scraper's first card refresh on a
+    # fresh install. The scraper refreshes right after it starts.
+    CARDS_NOT_READY_RETRY_AFTER: int = 30  # seconds
 
     # Get set both in current and ahead version of the cache, and therefore not invalidated with every cycle
     CACHE_TTL_CAPTCHA_CHALLENGE: int = (

@@ -2,8 +2,9 @@
 
 Cards change rarely and do not belong to any player, so they are refreshed on
 their own timer instead of with the battle syncs. Mongo keeps the durable copy
-and Redis the fast one; the API reads Redis, then Mongo, and only calls the
-Clash Royale API when both are empty (a fresh install).
+and Redis the fast one. This job is the only writer of both: the API reads Redis,
+then Mongo, never caches what it read, and never calls the Clash Royale API for
+cards. A single writer keeps an older list from overwriting a newer one.
 """
 
 import asyncio

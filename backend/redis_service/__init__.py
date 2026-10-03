@@ -1,6 +1,7 @@
 from .redis_connection import CacheRedisConn, RedisConn
 from .redis_connection import (
     CARDS_CACHE_KEY,
+    GAME_MODES_CACHE_KEY,
     build_auth_state_key,
     build_redis_key,
     consume_auth_state_json,
@@ -13,6 +14,7 @@ from .redis_connection import (
 __all__ = [
     "CARDS_CACHE_KEY",
     "CacheRedisConn",
+    "GAME_MODES_CACHE_KEY",
     "RedisConn",
     "build_auth_state_key",
     "build_redis_key",

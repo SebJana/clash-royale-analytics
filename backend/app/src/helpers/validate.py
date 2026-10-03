@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, time
 from zoneinfo import ZoneInfo
 from models.schema import BetweenRequest, BattlesRequest
 from core.deps import RedConn
-from redis_service import get_redis_json, build_redis_key
+from redis_service import GAME_MODES_CACHE_KEY, get_redis_json
 from typing import Optional, List
 from core.settings import settings
 
@@ -191,8 +191,7 @@ async def validate_game_modes(redis_conn: RedConn, game_modes: Optional[List[str
     if not game_modes:
         return game_modes
 
-    key = build_redis_key(service="crApi", resource="allGameModes")
-    all_game_modes = await get_redis_json(redis_conn, key)
+    all_game_modes = await get_redis_json(redis_conn, GAME_MODES_CACHE_KEY)
 
     # If there are no game modes in the redis, don't validate the given game_modes
     # and also simply return them unchanged
