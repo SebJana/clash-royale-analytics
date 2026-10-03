@@ -139,8 +139,20 @@ class Settings:
     # Monitoring
     # How often the metrics snapshot is written to Redis
     METRICS_INTERVAL: float = 10  # seconds
+    # Longest wait for the Mongo health check of one snapshot. Below
+    # METRICS_INTERVAL, so a hung Mongo cannot delay the next snapshot.
+    MONGO_HEALTH_TIMEOUT: float = 5  # seconds
     # Time window the throughput counters cover
     METRICS_WINDOW: float = 60  # seconds
+    # Length of one history sample. The dashboard plots one point per sample
+    # (fewer for long ranges, see HISTORY_MAX_POINTS).
+    METRICS_HISTORY_INTERVAL: float = 60  # seconds
+    # How far back the history reaches. Samples are ~700 bytes, so 7 days are
+    # ~7 MB in redis-key-store (128 MB, noeviction).
+    METRICS_HISTORY_RETENTION: float = 7 * 24 * 60 * 60  # 7 days
+    # Most points a history response returns. Longer ranges merge neighboring
+    # samples, so a 7 day chart stays small enough to render quickly.
+    HISTORY_MAX_POINTS: int = 720
     # How often a throughput and schedule summary is logged
     STATUS_LOG_INTERVAL: float = 60  # seconds
     # Port of the read-only status endpoint inside the container. Compose

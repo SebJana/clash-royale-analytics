@@ -35,6 +35,14 @@ router = APIRouter(
 )
 
 
+# TODO Count views per player to know which tracked players are viewed
+# regularly. This route is the per page view signal: the other player routes
+# fire several times per view. Exclude the frontend's polling during a first
+# sync. Store the counts in Mongo, not redis-cache: that cache evicts under
+# memory pressure. E.g. $inc viewCount and set lastViewedAt on the player
+# document, which the scraper already reads for its sync state, without
+# delaying the response. The counts could later shorten the sync intervals of
+# viewed players and lengthen those of players nobody opens.
 @router.get(
     "/{player_tag}/profile",
     # The profile is a database lookup now, so the limit only guards against

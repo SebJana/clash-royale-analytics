@@ -102,6 +102,15 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
         )
 
 
+# NOTE The app key pool is the hard limit on how fast players can be added,
+# independent of the per-client limit below. Every add spends one Clash
+# Royale request (the profile check), and this is the API's only Clash Royale
+# call. At most CR_API_APP_KEY count x CR_KEY_REQUESTS_PER_SECOND adds start
+# per second across all clients: with 1 key at 1 req/s, 60 per minute. Misuse
+# that spreads over many IPs to get past the per-client limit still cannot
+# exceed it; the surplus waits for a key and then gets 503 with Retry-After.
+# Adding app keys raises this ceiling. Total tracked players stay bounded by
+# the scraper's capacity check (TRACKING_CAPACITY_REACHED).
 @router.post(
     "/{player_tag}",
     dependencies=[Depends(RateLimiter(times=3, seconds=60))],

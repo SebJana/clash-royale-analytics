@@ -23,6 +23,9 @@ from settings import settings
 def _duration(seconds) -> str:
     if seconds is None:
         return "-"
+    # Job durations are mostly below a second, which whole seconds would hide.
+    if seconds < 10:
+        return f"{seconds:.1f}s"
     seconds = int(seconds)
     if seconds < 120:
         return f"{seconds}s"
@@ -72,7 +75,11 @@ def print_status(snapshot: dict):
         line = f"  {kind:<9} {stats['jobs']:>5} jobs"
         if kind == "battles":
             line += f", {stats['inserted']} battles inserted"
-        line += f", max claim lateness {_duration(stats['maxClaimLatenessS'])}"
+        line += (
+            f", claim lateness p95 {_duration(stats.get('p95ClaimLatenessS'))}"
+            f" / max {_duration(stats['maxClaimLatenessS'])}"
+            f", duration p95 {_duration(stats.get('p95DurationS'))}"
+        )
         print(line + (f"  ({outcomes})" if outcomes else ""))
     print(f"  Possible battle gaps since start: {snapshot.get('possibleGaps', '?')}")
 

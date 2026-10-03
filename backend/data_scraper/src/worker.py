@@ -13,6 +13,7 @@ due, or, on one worker, once they are overdue by more than PROFILE_MAX_LATENESS.
 import asyncio
 import logging
 import math
+import time
 
 from clash_royale_api import ClashRoyaleAPI
 from game_modes import UniqueGameModes
@@ -180,6 +181,7 @@ class WorkerPool:
         )
 
     async def _process(self, schedule: Schedule, claim: Claim):
+        started = time.monotonic()
         try:
             async with asyncio.timeout(settings.JOB_TIMEOUT):
                 result = await self._run_job(schedule, claim.player_tag)
@@ -211,8 +213,9 @@ class WorkerPool:
             schedule.name,
             result.outcome,
             result.inserted,
-            claim.lateness_s,
-            result.possible_gap,
+            lateness_s=claim.lateness_s,
+            duration_s=time.monotonic() - started,
+            possible_gap=result.possible_gap,
         )
 
         if result.outcome in ("inactive", "deactivated"):

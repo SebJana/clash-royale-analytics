@@ -19,7 +19,10 @@ async def fetch_battles_count(mongo_conn: DbConn, redis_conn: RedConn):
 
         if cached_battle_count is not None:
             return {"totalBattleCount": cached_battle_count}
-        # Fetch the amount of battles saved in Mongo
+        # TODO Count with estimated_document_count() instead. get_battles_count
+        # uses count_documents({}), which scans every battle and slows down as
+        # the scraper adds thousands per minute. The estimate reads collection
+        # metadata in constant time and is accurate enough for this display.
         battle_count = await get_battles_count(mongo_conn)
         await set_redis_json(
             redis_conn, key, battle_count, ttl=settings.CACHE_TTL_TOTAL_BATTLES

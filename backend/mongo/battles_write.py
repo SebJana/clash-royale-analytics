@@ -2,6 +2,18 @@ from pymongo.errors import BulkWriteError
 from .connection import MongoConn
 from .validation_utils import ensure_connected
 
+# TODO Evaluate compacting old battles into aggregated stats to save storage.
+# Raw battles are kept indefinitely for now, so the data can accumulate first.
+# Before building anything, measure: storage per battle and growth per month,
+# and how much smaller rollups would be (e.g. per player, day, deck and game
+# mode: games, wins, losses, crowns, cards). Then decide on a cutoff (after X
+# months or seasons) past which raw battles are replaced by those rollups.
+# Constraint: the deck, card and daily stats (battles_read.py) aggregate raw
+# battles over arbitrary date ranges, and the battle list shows single games,
+# so compacted periods must still answer those queries or be marked as
+# summary only. Raw battles cannot be recovered from the API after the battle
+# log rotates, so compaction is irreversible; keep backups from before it.
+
 
 async def insert_battles(conn: MongoConn, battle_logs) -> int:
     """

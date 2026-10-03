@@ -36,6 +36,8 @@ from .cards_write import save_cards
 from .player_profiles_read import get_player_profile
 from .player_profiles_write import save_player_profile
 
+from .database_read import get_database_health
+
 __all__ = [
     "MongoConn",
     # battles
@@ -79,4 +81,7 @@ __all__ = [
     "get_player_profile",
     ## write
     "save_player_profile",
+    # database
+    ## read
+    "get_database_health",
 ]

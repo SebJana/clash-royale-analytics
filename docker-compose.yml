@@ -43,7 +43,8 @@ services:
       - .env
     networks:
       - cr-analytics
-    # Read-only scraper status for administrators. Bound to the host's
+    # Read-only scraper dashboard (/), snapshot (/status) and history
+    # (/history) for administrators. Bound to the host's
     # loopback interface only: reachable from a shell on this machine or an
     # SSH tunnel, never from the network. Do not proxy it through nginx.
     ports:

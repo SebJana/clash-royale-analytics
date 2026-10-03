@@ -26,6 +26,9 @@ CAPACITY_MAX_AGE_S = 15 * 60  # 15 minutes
 
 # Snapshot of the scraper's monitoring metrics (JSON), read by the status CLI.
 METRICS_KEY = "crsched:metrics"
+# Per-minute metric samples (a capped list of JSON strings, oldest first),
+# read by the scraper's status dashboard.
+METRICS_HISTORY_KEY = "crsched:metrics:history"
 
 __all__ = [
     "Schedule",
@@ -38,4 +41,5 @@ __all__ = [
     "PROFILES_SCHEDULE",
     "CAPACITY_MAX_AGE_S",
     "METRICS_KEY",
+    "METRICS_HISTORY_KEY",
 ]

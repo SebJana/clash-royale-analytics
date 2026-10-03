@@ -48,6 +48,12 @@ class MongoConn:
         The previous client is closed only after the new one answered, so a
         failed reconnect leaves the old client in place for the next attempt.
         """
+        # TODO Bound the time a slow Mongo can hold a caller. Without
+        # waitQueueTimeoutMS, a caller waits indefinitely for a free pooled
+        # connection once all maxPoolSize (default 100) are busy, and requests
+        # hang instead of failing. Set an explicit maxPoolSize per service,
+        # plus a deterministic limit of ~10 seconds (waitQueueTimeoutMS and
+        # timeoutMS), and map the resulting timeout to a 503 in the API.
         client = AsyncIOMotorClient(self._uri, appname=self._app_name)
         try:
             await client.admin.command("ping")

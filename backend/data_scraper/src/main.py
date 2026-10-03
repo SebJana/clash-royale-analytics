@@ -20,11 +20,19 @@ from game_modes import UniqueGameModes
 from intervals import battle_demand, min_profile_interval, profile_demand
 from jobs.cards import cards_loop
 from log import setup_logging
-from metrics import Metrics, build_snapshot, publish_snapshot, start_status_server
+from metrics import (
+    Metrics,
+    append_history,
+    build_history_sample,
+    build_snapshot,
+    publish_snapshot,
+    start_status_server,
+)
 from mongo import (
     MongoConn,
     backfill_player_sync_fields,
     backfill_tracking_gaps,
+    get_database_health,
     get_game_modes,
     insert_game_modes,
 )
@@ -271,22 +279,49 @@ async def game_modes_loop(
 
 
 async def monitoring_loop(
-    metrics: Metrics, battles: Schedule, profiles: Schedule, pool: WorkerPool
+    metrics: Metrics,
+    battles: Schedule,
+    profiles: Schedule,
+    pool: WorkerPool,
+    mongo_conn: MongoConn,
 ):
-    """Publish the metrics snapshot and log a summary line until cancelled."""
+    """Publish the snapshot, record history samples, and log until cancelled."""
 
     key_store = pool.cr_api.key_store
     last_log = time.monotonic()
+    last_sample = time.monotonic()
     while True:
         await asyncio.sleep(settings.METRICS_INTERVAL)
+        # Collected apart from the snapshot and bounded in time, so a Mongo
+        # outage shows up as unreachable instead of stalling the Redis based
+        # status until the driver's own timeouts expire.
+        try:
+            async with asyncio.timeout(settings.MONGO_HEALTH_TIMEOUT):
+                mongo = {"ok": True, **await get_database_health(mongo_conn)}
+        except Exception:
+            mongo = {"ok": False}
+            logger.warning("Mongo health check failed")
         try:
             snapshot = await build_snapshot(
-                metrics, battles, profiles, key_store, pool.target
+                metrics, battles, profiles, key_store, pool.target, mongo
             )
             await publish_snapshot(metrics, key_store, snapshot)
         except Exception:
             logger.exception("Metrics snapshot failed")
             continue
+
+        if time.monotonic() - last_sample >= settings.METRICS_HISTORY_INTERVAL:
+            span_s = time.monotonic() - last_sample
+            last_sample = time.monotonic()
+            sample = build_history_sample(
+                metrics.take_sample_counts(), snapshot, span_s
+            )
+            try:
+                await append_history(key_store.redis, sample)
+            except Exception:
+                # The counts are gone, so the charts show a missing point
+                # instead of a later one that counts two periods as one.
+                logger.exception("Metrics history write failed")
 
         # The log line keeps a coarse history in the container logs, which
         # the snapshot (always only the latest state) does not.
@@ -347,7 +382,7 @@ async def main():
     mode_store = UniqueGameModes()
     metrics = Metrics()
     pool = WorkerPool(battles, profiles, cr_api, mongo_conn, mode_store, metrics)
-    status_server = await start_status_server(metrics)
+    status_server = await start_status_server(metrics, key_redis)
 
     try:
         # reconcile_loop runs its first pass immediately, which also starts
@@ -361,7 +396,9 @@ async def main():
             tg.create_task(reconcile_loop(battles, profiles, mongo_conn, pool, metrics))
             tg.create_task(game_modes_loop(mode_store, mongo_conn, redis_conn))
             tg.create_task(cards_loop(cr_api, mongo_conn, redis_conn))
-            tg.create_task(monitoring_loop(metrics, battles, profiles, pool))
+            tg.create_task(
+                monitoring_loop(metrics, battles, profiles, pool, mongo_conn)
+            )
     except asyncio.CancelledError:
         logger.info("Stopping data scraper")
         raise

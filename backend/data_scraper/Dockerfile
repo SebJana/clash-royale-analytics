@@ -1,3 +1,11 @@
+# Bundles the dashboard with uPlot and its font, so the page needs no CDN.
+FROM node:22-alpine AS dashboard
+WORKDIR /dashboard
+COPY data_scraper/dashboard/package.json data_scraper/dashboard/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY data_scraper/dashboard/build.mjs data_scraper/dashboard/index.html data_scraper/dashboard/dashboard.css data_scraper/dashboard/dashboard.js ./
+RUN npm run build
+
 # Use an official Python runtime as a parent image
 FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
@@ -23,6 +31,8 @@ COPY api_key_store/ /app/api_key_store/
 COPY scrape_schedule/ /app/scrape_schedule/
 COPY redis_service/ /app/redis_service/
 COPY data_scraper/src/ /app/src/
+# metrics.py resolves the dashboard relative to src/
+COPY --from=dashboard /dashboard/dist /app/dashboard/dist
 
 # Make the package importable
 ENV PYTHONPATH=/app
