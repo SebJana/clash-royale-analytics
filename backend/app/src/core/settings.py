@@ -185,7 +185,8 @@ class Settings:
     # Keep TTL still in the minutes to hours range as fallback, and for data
     # without a per-player version (total battle count)
 
-    CACHE_TTL_TOTAL_BATTLES: int = 15 * 60  # 15 minutes
+    # Metadata estimates are cheap enough to refresh frequently as battles arrive.
+    CACHE_TTL_TOTAL_BATTLES: int = 60  # 1 minute
     CACHE_TTL_PLAYER_BATTLE_STATS: int = 10 * 60  # 10 minutes
     CACHE_TTL_BATTLES: int = (
         1 * 60

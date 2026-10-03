@@ -9,23 +9,23 @@ from datetime import datetime, date
 from typing import Optional, Iterable
 
 
-async def get_battles_count(conn: MongoConn):
+async def get_battles_count(conn: MongoConn) -> int:
     """
-    Gets the total count of documents in the battles collection.
+    Estimates the total battle count from collection metadata to avoid a scan.
 
     Args:
-        conn (MongoConn): Active connection to the mongo database
+        conn (MongoConn): Active connection to the MongoDB database.
 
     Returns:
-        int: Number of documents in the collection
+        int: Estimated number of documents in the battles collection.
 
     Raises:
-        Exception: If query fails
+        Exception: If the connection check or count query fails.
     """
 
     try:
         await ensure_connected(conn)
-        count = await conn.db.battles.count_documents({})
+        count = await conn.db.battles.estimated_document_count()
         return count
     except Exception as e:
         print(f"[DB] [ERROR] fetching document count: {e}")
