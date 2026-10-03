@@ -6,6 +6,7 @@ import httpx
 
 from api_key_store import NoKeyAvailable, KeyStoreUnavailable
 from clash_royale_api import ClashRoyaleMaintenanceError
+from intervals import failure_backoff, jitter
 from settings import settings
 
 
@@ -43,17 +44,20 @@ def pool_level_result(error: Exception) -> JobResult | None:
     if isinstance(error, NoKeyAvailable):
         if error.reason == "maintenance":
             return JobResult("maintenance", settings.MAINTENANCE_RETRY_DELAY)
-        # Every key is leased or cooling down
-        return JobResult("busy", error.retry_after)
+        # Every key is leased or cooling down. Every worker hits this at the
+        # same time, so the retries are jittered to not arrive together again.
+        return JobResult(
+            "busy", jitter(error.retry_after, settings.FAILURE_BACKOFF_JITTER)
+        )
 
     if isinstance(error, KeyStoreUnavailable):
-        return JobResult("busy", settings.FAILURE_BACKOFF_BASE)
+        return JobResult("busy", failure_backoff(1))
 
     if isinstance(error, httpx.HTTPStatusError):
         code = error.response.status_code if error.response is not None else 0
         if code in (401, 403, 429):
             # The API client already moved the request across keys. Still
             # rejected or rate limited means a key/pool problem.
-            return JobResult("busy", settings.FAILURE_BACKOFF_BASE)
+            return JobResult("busy", failure_backoff(1))
 
     return None

@@ -16,7 +16,12 @@ from api_key_store import NoKeyAvailable, KeyStoreUnavailable
 from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
 from clean import clean_battle_log_list, get_player_name
 from game_modes import UniqueGameModes
-from intervals import failure_backoff, next_battle_interval, not_found_delay
+from intervals import (
+    failure_backoff,
+    next_battle_interval,
+    not_found_delay,
+    scheduled_battle_delay,
+)
 from jobs.common import JobResult, pool_level_result
 from mongo import (
     MongoConn,
@@ -106,6 +111,7 @@ async def sync_player_battles(
     mongo_conn: MongoConn,
     mode_store: UniqueGameModes,
     base_interval_s: float,
+    lateness_s: float = 0.0,
 ) -> JobResult:
     """Fetch, validate, clean, and persist the new battles of one player.
 
@@ -115,6 +121,8 @@ async def sync_player_battles(
         mongo_conn (MongoConn): Mongo connection used to read state and write data.
         mode_store (UniqueGameModes): Collects game modes until the next flush.
         base_interval_s (float): Current capacity based battle interval.
+        lateness_s (float): How long the player waited after it became due.
+            A long wait spreads the next due time (scheduled_battle_delay).
 
     Returns:
         JobResult: What happened and when the player is due again.
@@ -153,6 +161,9 @@ async def sync_player_battles(
         return await _failed(mongo_conn, player_tag, base_interval_s)
 
     previous_interval = state.get("syncIntervalS")
+    # No interval yet: added (or reactivated) due immediately, so this sync
+    # ran in the batch it was added with, whatever its claim lateness says.
+    first_sync = previous_interval is None
 
     # Checked before the emptiness test: None or {} would otherwise count as
     # a successful sync without battles and reset the failure counters.
@@ -164,7 +175,9 @@ async def sync_player_battles(
         # A player without recent battles is still a successful sync.
         interval = next_battle_interval(base_interval_s, previous_interval, 0)
         await record_battle_sync(mongo_conn, player_tag, None, None, 0, interval)
-        return JobResult("synced", interval)
+        return JobResult(
+            "synced", scheduled_battle_delay(interval, lateness_s, first_sync)
+        )
 
     # Malformed entries are skipped inside; only a log without a single usable
     # battle counts as a failure.
@@ -221,4 +234,10 @@ async def sync_player_battles(
         mongo_conn, player_tag, newest, player_name, new_count, interval
     )
 
-    return JobResult("synced", interval, inserted, possible_gap)
+    # Mongo stores the planned interval; only the due time is spread.
+    return JobResult(
+        "synced",
+        scheduled_battle_delay(interval, lateness_s, first_sync),
+        inserted,
+        possible_gap,
+    )

@@ -11,12 +11,17 @@ import httpx
 
 from api_key_store import NoKeyAvailable, KeyStoreUnavailable
 from clash_royale_api import ClashRoyaleAPI, ClashRoyaleMaintenanceError
-from intervals import next_profile_interval
+from intervals import jitter, next_profile_interval
 from jobs.common import JobResult, pool_level_result
 from mongo import MongoConn, get_player_sync_state, save_player_profile
 from settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _retry_delay() -> float:
+    # Failures usually hit many profiles at once (API errors, timeouts).
+    return jitter(settings.PROFILE_RETRY_DELAY, settings.FAILURE_BACKOFF_JITTER)
 
 
 async def refresh_player_profile(
@@ -63,17 +68,17 @@ async def refresh_player_profile(
             return pool_result
         code = e.response.status_code if e.response is not None else 0
         logger.warning("HTTP %s for the profile of %s", code, player_tag)
-        return JobResult("failed", settings.PROFILE_RETRY_DELAY)
+        return JobResult("failed", _retry_delay())
 
     except httpx.RequestError as e:
         logger.warning("Network error for the profile of %s: %r", player_tag, e)
-        return JobResult("failed", settings.PROFILE_RETRY_DELAY)
+        return JobResult("failed", _retry_delay())
 
     if not isinstance(profile, dict) or not profile.get("name"):
         # Keep the previous snapshot rather than replacing it with an
         # unusable response.
         logger.error("Profile of %s couldn't be used", player_tag)
-        return JobResult("failed", settings.PROFILE_RETRY_DELAY)
+        return JobResult("failed", _retry_delay())
 
     # Battles stored after the previous refresh mean the profile stats changed
     last_battle = state.get("lastBattleTime")
@@ -86,4 +91,7 @@ async def refresh_player_profile(
     )
 
     await save_player_profile(mongo_conn, player_tag, profile, interval)
-    return JobResult("synced", interval)
+    # Mongo stores the planned interval; only the due time is jittered, so
+    # profiles refreshed in one batch drift apart (intervals.py, "Spreading
+    # due times").
+    return JobResult("synced", jitter(interval, settings.INTERVAL_JITTER))

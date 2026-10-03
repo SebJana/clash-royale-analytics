@@ -17,6 +17,7 @@ import time
 
 from clash_royale_api import ClashRoyaleAPI
 from game_modes import UniqueGameModes
+from intervals import failure_backoff
 from jobs.battles import sync_player_battles
 from jobs.common import JobResult
 from jobs.profiles import refresh_player_profile
@@ -167,24 +168,25 @@ class WorkerPool:
                 logger.exception("Worker %d error", index)
                 await asyncio.sleep(settings.IDLE_POLL_INTERVAL)
 
-    async def _run_job(self, schedule: Schedule, player_tag: str) -> JobResult:
+    async def _run_job(self, schedule: Schedule, claim: Claim) -> JobResult:
         if schedule is self.battles:
             return await sync_player_battles(
-                player_tag,
+                claim.player_tag,
                 self.cr_api,
                 self.mongo_conn,
                 self.mode_store,
                 self.base_interval_s,
+                claim.lateness_s,
             )
         return await refresh_player_profile(
-            player_tag, self.cr_api, self.mongo_conn, self.base_interval_s
+            claim.player_tag, self.cr_api, self.mongo_conn, self.base_interval_s
         )
 
     async def _process(self, schedule: Schedule, claim: Claim):
         started = time.monotonic()
         try:
             async with asyncio.timeout(settings.JOB_TIMEOUT):
-                result = await self._run_job(schedule, claim.player_tag)
+                result = await self._run_job(schedule, claim)
         except TimeoutError:
             # Mostly a hung Mongo operation. A battle sync cut off between its
             # insert and its state write is repaired by the next sync, which
@@ -194,7 +196,7 @@ class WorkerPool:
                 schedule.name.capitalize(),
                 claim.player_tag,
             )
-            result = JobResult("failed", settings.FAILURE_BACKOFF_BASE)
+            result = JobResult("failed", failure_backoff(1))
         except asyncio.CancelledError:
             # Shutdown: hand the player back as due now instead of leaving it
             # blocked until the claim expires. Shielded, so the ack finishes
@@ -207,7 +209,7 @@ class WorkerPool:
             logger.exception(
                 "%s job of %s failed", schedule.name.capitalize(), claim.player_tag
             )
-            result = JobResult("failed", settings.FAILURE_BACKOFF_BASE)
+            result = JobResult("failed", failure_backoff(1))
 
         self.metrics.record(
             schedule.name,

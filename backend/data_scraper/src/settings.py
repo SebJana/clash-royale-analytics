@@ -54,6 +54,24 @@ class Settings:
     # factor, up to MAX_SYNC_INTERVAL. Idle accounts then cost fewer requests.
     IDLE_INTERVAL_GROWTH: float = 1.5
 
+    # Spreading due times (see intervals.py, "Spreading due times")
+    # Players synced back to back, e.g. after a bulk insert or downtime, would
+    # otherwise stay one block that saturates the keys every cycle. Each value
+    # is a share of the delay it randomizes; every spread keeps the average
+    # delay, so the capacity estimate stays valid.
+    # Every punctual battle sync: random factor in [0.9, 1.1]
+    INTERVAL_JITTER: float = 0.1
+    # A battle sync that waited in a backlog (claimed later than this share of
+    # its interval, or its first sync): random factor in [0.5, 1.5]
+    BACKLOG_LATENESS_SHARE: float = 0.1
+    BACKLOG_SPREAD: float = 0.5
+    # Retries after failures, which often hit many players at once
+    FAILURE_BACKOFF_JITTER: float = 0.2
+    # First profile refresh of a player without a stored profile (bulk
+    # inserted, or tracked before snapshots existed): random time within this
+    # window instead of all at once. A late profile is only stale.
+    PROFILE_FIRST_REFRESH_SPREAD: float = 6 * 60 * 60  # 6 hours
+
     # Capacity planning
     # Share of the raw key rate (usable keys x requests per second) that is
     # planned for. The rest is headroom for retries, 429 cooldowns, and cards.

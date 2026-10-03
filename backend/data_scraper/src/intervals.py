@@ -9,8 +9,31 @@ actually be lost.
 battle_demand prices that mix for any candidate base with the same rules
 next_battle_interval applies, so the estimate and the actual intervals cannot
 drift apart.
+
+Spreading due times
+-------------------
+A player's next due time is the end of its sync plus its interval. Players
+that were synced back to back therefore come due back to back again, every
+cycle: after a bulk insert, scraper downtime, or an API outage, all affected
+players form one block that the keys work through at full rate (busy jobs,
+long key waits), followed by idle time. Equal intervals never dissolve that
+block, and the adaptive intervals only split it slowly.
+
+The scheduled delay is therefore randomized, while the stored interval stays
+the planned one, so the capacity estimate, the idle growth, and a schedule
+rebuilt from Mongo keep working from exact values:
+
+- A sync that waited in a backlog, or a first sync, is spread over 0.5x to
+  1.5x its interval. One step turns the block into an even spread.
+- Every other sync gets a small jitter, so players cannot fall back into step.
+- Failure retries get a jitter, so a shared failure does not retry in waves.
+
+Every spread is centred on the planned delay, so the average request rate
+stays what the capacity estimate planned for. Shortening only (e.g. 0.5x to
+1x) would add requests right after a backlog and could cause the next one.
 """
 
+import random
 from collections.abc import Iterable
 
 from settings import settings
@@ -210,13 +233,58 @@ def next_profile_interval(
     )
 
 
+def jitter(delay_s: float, spread: float) -> float:
+    """Scale a delay by a random factor in [1 - spread, 1 + spread].
+
+    The factor is uniform, so the average delay stays delay_s.
+
+    Args:
+        delay_s (float): Planned delay in seconds.
+        spread (float): Largest relative deviation, e.g. 0.1 for +-10%.
+
+    Returns:
+        float: The randomized delay in seconds.
+    """
+
+    return delay_s * random.uniform(1.0 - spread, 1.0 + spread)
+
+
+def scheduled_battle_delay(
+    interval_s: float, lateness_s: float, first_sync: bool
+) -> float:
+    """Seconds until a player is due again, spread around its interval.
+
+    See "Spreading due times" in the module docstring for why.
+
+    Args:
+        interval_s (float): The planned interval from next_battle_interval.
+        lateness_s (float): How long the player waited after it became due
+            (the claim lateness). 0 for a first sync, see first_sync.
+        first_sync (bool): The player has no interval yet. It was added due
+            immediately, so its lateness says nothing, but it was synced in
+            whatever batch it was added with.
+
+    Returns:
+        float: The delay, at most MAX_SYNC_INTERVAL. The cap keeps the battle
+        log guarantee of the longest interval.
+    """
+
+    backlog = first_sync or lateness_s > settings.BACKLOG_LATENESS_SHARE * interval_s
+    spread = settings.BACKLOG_SPREAD if backlog else settings.INTERVAL_JITTER
+    return min(jitter(interval_s, spread), settings.MAX_SYNC_INTERVAL)
+
+
 def failure_backoff(consecutive_failures: int) -> float:
-    """Delay before retrying a player after its n-th consecutive failure."""
+    """Delay before retrying a player after its n-th consecutive failure.
+
+    Jittered, because failures usually hit many players at once (API errors,
+    timeouts). Equal delays would retry them all in the same moment again.
+    """
 
     exponent = max(0, consecutive_failures - 1)
+    delay = settings.FAILURE_BACKOFF_BASE * 2 ** min(exponent, 16)
     return min(
-        settings.FAILURE_BACKOFF_BASE * 2 ** min(exponent, 16),
-        settings.FAILURE_BACKOFF_MAX,
+        jitter(delay, settings.FAILURE_BACKOFF_JITTER), settings.FAILURE_BACKOFF_MAX
     )
 
 

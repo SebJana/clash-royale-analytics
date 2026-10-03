@@ -6,6 +6,7 @@ before the schedules existed would otherwise leave players unscheduled forever.
 """
 
 import logging
+import random
 import time
 from datetime import datetime, timezone
 
@@ -33,10 +34,15 @@ def _battle_due_ms(sync: dict) -> int:
 
 def _profile_due_ms(sync: dict) -> int:
     if sync["lastProfileSyncAt"] is None:
-        # Players tracked before snapshots existed. Due now but not at score 0:
-        # profiles never jump ahead of due battle syncs unless they are late
-        # by more than PROFILE_MAX_LATENESS.
-        return int(time.time() * 1000)
+        # Players without a profile: bulk inserted, or tracked before
+        # snapshots existed. Spread over PROFILE_FIRST_REFRESH_SPREAD instead
+        # of all due now, which would put every one of them into one block
+        # (intervals.py, "Spreading due times"). Never score 0: profiles never
+        # jump ahead of due battle syncs unless they are late by more than
+        # PROFILE_MAX_LATENESS. Players added through the API store their
+        # profile on adding, so they do not get here.
+        spread_s = random.uniform(0, settings.PROFILE_FIRST_REFRESH_SPREAD)
+        return int((time.time() + spread_s) * 1000)
     interval = sync["profileSyncIntervalS"] or settings.PROFILE_MIN_INTERVAL
     return _epoch_ms(sync["lastProfileSyncAt"], interval)
 
