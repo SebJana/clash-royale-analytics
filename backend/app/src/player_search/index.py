@@ -19,9 +19,9 @@ name without one of them cannot contain the query.
 Not thread-safe. All mutations and searches run on the event loop; only a
 fresh index is built in a worker thread.
 
-Why in memory instead of SQLite FTS5 or Postgres pg_trgm. Measured on
-synthetic names, where a common trigram like "roy" sits in about 5% of all
-names, all with this ranking (desktop CPU):
+Why in memory instead of SQLite FTS5 or Postgres pg_trgm?
+Measured on synthetic names, where a common trigram like "roy" sits in
+about 5% of all names, all with this ranking (desktop CPU):
 
     per search, 50k players     this: 0.005-0.15 ms
                                 SQLite FTS5: 0.1-8 ms
@@ -39,6 +39,35 @@ request. Here that ranking is done once, ahead of time, so the query reads
 the first `limit` entries of a list. Longer queries only check the shortest
 trigram list. There is no network hop, query planner or second store to
 keep in sync.
+
+The design targets tens to a few hundred thousand tracked players. At that
+scale a dedicated database or search engine buys nothing but cost: another
+container to run and monitor, a network hop on every keystroke, another
+dependency and driver, and a second copy of the players to keep in sync
+with Mongo. This index lives in the API process, needs only the standard
+library, and stays fast up to roughly 500k-1M players. Far beyond that,
+memory, build time and long queries outgrow a single process, and a search
+service with change-based sync becomes the better fit.
+
+Ranking: Every match gets a sort key, smaller is better, and a search returns
+the first `limit` keys over all matches:
+
+    (tier, position, key length, key, tag)
+
+    tier         kind of match, best first for a plain name query: exact tag,
+                 exact name, name prefix, word start inside the name, anywhere
+                 else in the name, tag prefix, anywhere else in the tag. A
+                 query with a digit moves tag prefixes up to third; a query
+                 starting with "#" puts every tag match first. An existing
+                 full tag is pinned first in every mode.
+    position     where the match starts; earlier is better.
+    key length   shorter keys are closer to what was typed.
+    key, tag     alphabetical, then the unique tag, so equal names still get
+                 a fixed order.
+
+For "roy" that gives: Roy (exact name), Royal King (prefix), TheRoyal (word
+start at 3), SuperRoy (word start at 5), xxroyxx (inside, at 2), Ployroyd
+(inside, at 3). Word starts come from normalize.normalize_name.
 
 Size: A key of length n is listed under at most 2 prefixes and n - 2
 trigrams, so at most n lists; a Chinese, Japanese or Korean key adds up to
@@ -72,9 +101,9 @@ from .normalize import is_dense, normalize_name, normalize_tag, parse_query
 # Korean queries are the exception (see normalize.is_dense).
 GRAM = 3
 
-# Match tiers, best first for a plain name query; the orders below move the
-# tag tiers up for tag-like queries. Within one tier: earlier match position,
-# then shorter key (closer to what was typed), then key, then tag.
+# Match tiers, the first part of the sort key (see "Ranking" in the module
+# docstring). Best first for a plain name query; the orders below move the
+# tag tiers up for tag-like queries.
 EXACT_TAG = 0
 EXACT_NAME = 1
 NAME_PREFIX = 2
@@ -137,6 +166,8 @@ def _name_match(key: str, starts: int, query: str) -> tuple[int, int] | None:
         return (EXACT_NAME if len(key) == len(query) else NAME_PREFIX), 0
     if len(query) < GRAM and not is_dense(query):
         return None
+    # The first occurrence may sit inside a word while a later one starts a
+    # word; walk the occurrences until one does.
     word = pos
     while word >= 0:
         if starts >> word & 1:
@@ -184,10 +215,18 @@ class _Side:
     """The prefix, trigram and dense lists of one field (names or tags)."""
 
     def __init__(self, sort_key: Callable[[int, str], tuple]):
+        # Each list holds slot numbers as array("I"): raw 4 byte unsigned
+        # ints in one block. A Python list would hold an 8 byte pointer to a
+        # ~28 byte int object per entry, about 36 bytes instead of 4. "I" is
+        # 4 bytes on every common platform ("L" is 8 on Linux), which caps
+        # slots at 2**32 - 1. The price: inserting or deleting in the middle
+        # shifts the rest of the array, which is most of what upsert and
+        # remove spend their time on in large lists.
         self.prefixes: dict[str, array] = {}
         self.grams: dict[str, array] = {}
         self.dense: dict[str, array] = {}
-        # (slot, query) -> (tier, position, key length, key, tag key)
+        # (slot, query) -> (tier, position, key length, key, tag key), the
+        # order every list is kept in.
         self.sort_key = sort_key
 
     @property
@@ -203,6 +242,9 @@ class _Side:
                 if slots is None:
                     lists[group] = array("I", [slot])
                     continue
+                # Binary search by the sort key the list is ordered by. The
+                # list stores slots, so the key is computed per probed slot;
+                # g=group binds this loop's group into the lambda.
                 at = bisect_left(
                     slots,
                     self.sort_key(slot, group),
@@ -216,16 +258,28 @@ class _Side:
         for lists, members in zip(self.all_lists, _groups(key)):
             for group in members:
                 slots = lists[group]
+                # Sort keys end with the unique tag, so no two slots share
+                # one and the search lands exactly on this slot.
                 at = bisect_left(
                     slots,
                     self.sort_key(slot, group),
                     key=lambda s, g=group: self.sort_key(s, g),
                 )
+                # Only possible if a list was corrupted or the entry changed
+                # before unlinking; failing loudly beats a silent stale hit.
                 if at >= len(slots) or slots[at] != slot:
                     raise RuntimeError(f"Search list {group!r} lost slot {slot}")
                 del slots[at]
                 if not slots:
                     del lists[group]
+
+    def _short_query_lists(self, query: str) -> dict[str, array]:
+        """The lists whose entry for query already holds every match, in order."""
+
+        if len(query) == GRAM:
+            return self.grams
+        # Short Chinese, Japanese and Korean queries match anywhere.
+        return self.dense if is_dense(query) else self.prefixes
 
     def matches(self, query: str, order: tuple, limit: int) -> Iterator[tuple]:
         """Yield the matches for query, best first, as merge-ready tuples.
@@ -236,18 +290,19 @@ class _Side:
         overall top `limit`.
         """
 
+        # Yielded as (order position, position, key length, key, tag key,
+        # tier, slot). heapq.merge compares them up to the tag key, which is
+        # unique, so tier and slot only ride along: the tier names the match
+        # type in the result, the slot finds the player.
         if len(query) <= GRAM:
-            if len(query) == GRAM:
-                lists = self.grams
-            elif is_dense(query):
-                lists = self.dense
-            else:
-                lists = self.prefixes
-            for slot in lists.get(query, ()):
+            for slot in self._short_query_lists(query).get(query, ()):
                 tier, pos, *rest = self.sort_key(slot, query)
                 yield (order[tier], pos, *rest, tier, slot)
             return
 
+        # Every match contains every trigram of the query, so any one list is
+        # a complete candidate set; the shortest is the cheapest to check. A
+        # trigram no key has means no match at all.
         candidates = None
         for i in range(len(query) - 2):
             slots = self.grams.get(query[i : i + GRAM])
@@ -257,6 +312,8 @@ class _Side:
                 candidates = slots
         found = []
         for slot in candidates:
+            # None when the trigrams occur, but not as one run ("aab...aaa"
+            # holds both trigrams of "aaab" without containing it).
             rank = self.sort_key(slot, query)
             if rank is not None:
                 tier, pos, *rest = rank
@@ -268,8 +325,13 @@ class PlayerSearchIndex:
     """Ranked substring search over player names and tags. See the module docstring."""
 
     def __init__(self):
+        # slot -> player. A slot is just a player's position here, 0 to N-1
+        # after a build, and the number every list stores. It carries no
+        # meaning; the order inside a list comes from the sort key. A removed
+        # player's slot goes to _free and the next new player reuses it.
         self._entries: list[_Entry | None] = []
         self._free: list[int] = []
+        # tag key -> slot, for exact tags, upsert and remove.
         self._by_tag: dict[str, int] = {}
         self._names = _Side(self._name_sort_key)
         self._tags = _Side(self._tag_sort_key)
@@ -286,6 +348,8 @@ class PlayerSearchIndex:
         match = _tag_match(e.tag_key, query)
         if match is None:
             return None
+        # The tag key fills both the key and the tie-break place, so name and
+        # tag sort keys have the same shape and merge into one ranking.
         return (*match, len(e.tag_key), e.tag_key, e.tag_key)
 
     @staticmethod
@@ -323,6 +387,9 @@ class PlayerSearchIndex:
                 index._by_tag[tag_key] = slot
             index._entries[slot] = cls._entry(tag, name, tag_key)
 
+        # A player's position in these orders is their tie-break rank: one
+        # small int that sorts like (key length, key, tag), the last three
+        # parts of every sort key, so _fill can pack whole keys into ints.
         entries = index._entries
         by_name = sorted(
             range(len(entries)),
@@ -354,7 +421,12 @@ class PlayerSearchIndex:
             for lists, members in zip(packed, _groups(key)):
                 for group in members:
                     tier, pos = sort_key(slot, group)[:2]
+                    # One int per entry, bits from high to low: tier, match
+                    # position (32 bits), tie-break rank (32 bits). Comparing
+                    # these ints compares the full sort keys.
                     lists[group].append((tier << 32 | pos) << _RANK_BITS | rank)
+        # Sorted ints back to slots: the low bits are the rank, and
+        # slot_by_rank turns a rank into its slot.
         for target, lists in zip(side.all_lists, packed):
             for group, values in lists.items():
                 values.sort()
@@ -383,6 +455,8 @@ class PlayerSearchIndex:
             old = self._entries[slot]
             if old.tag == tag and old.name == (name or ""):
                 return False
+            # Unlinked while the old entry is still in place: the lists find
+            # a slot by its sort key, which comes from the entry.
             self._names.unlink(slot, old.name_key)
             self._tags.unlink(slot, old.tag_key)
         elif self._free:
@@ -438,6 +512,10 @@ class PlayerSearchIndex:
             order = _TAG_PREFIX_FIRST
         else:
             order = _NAME_FIRST
+        # Both sides yield best first in the same order, so merging them gives
+        # one ranking without sorting. A player matching by name and by tag
+        # comes up twice; the first, better match wins and the second is
+        # skipped. The sides are lazy, so only about `limit` entries are read.
         sides = []
         if parsed.name:
             sides.append(self._names.matches(parsed.name, order, limit))

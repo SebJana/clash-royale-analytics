@@ -87,6 +87,7 @@ export function PlayerSearch({
 
   const typedTag = normalizePlayerTag(searchText);
   let options: SearchOption[] = results;
+  // If search returned this tag, the real result is already pinned first.
   if (typedTag && !results.some((p) => p.tag === typedTag)) {
     const typed: TypedTagOption = {
       tag: typedTag,

@@ -201,17 +201,23 @@ def normalize_name(name: str) -> tuple[str, int]:
             "NFKC", "".join(" " if c in _DECORATIONS else c for c in name)
         )
     parts = []
+    # Key length so far, i.e. the key position the next folded text starts at.
     length = 0
     starts = 0
+    # A removed separator came since the last kept character.
     separated = False
+    # Last kept source character (for case steps) and last key character
+    # (for digit and script switches).
     prev_raw = ""
     prev_kept = ""
     for ch in name:
         folded = _fold_char(ch)
         if not folded:
+            # Symbols and spaces separate words; invisible characters don't.
             if not _is_invisible(ch):
                 separated = True
             continue
+        # length > 0 skips position 0, which is a prefix match anyway.
         if length and (
             separated
             or (ch.isupper() and prev_raw.islower())

@@ -143,6 +143,8 @@ class PlayerSearchService:
                 index stays in place.
         """
 
+        # API changes logged after this point may be missing from the
+        # snapshot read below, so they win over it.
         started = self._generation
         players = await get_tracked_players(self._mongo)
 
@@ -150,6 +152,7 @@ class PlayerSearchService:
             began = time.perf_counter()
             index = await asyncio.to_thread(PlayerSearchIndex.build, players.items())
             # Adds and removes made during the build are missing from it.
+            # _Change sorts by generation first, so they replay in order.
             for change in sorted(self._changes.values()):
                 if change.generation > started:
                     if change.removed:
@@ -166,6 +169,8 @@ class PlayerSearchService:
         else:
             await self._apply_snapshot(players, started)
 
+        # Changes up to `started` were written to Mongo before the read, so
+        # this snapshot already holds them and later ones still matter.
         self._changes = {
             key: change
             for key, change in self._changes.items()
@@ -175,6 +180,8 @@ class PlayerSearchService:
     async def _apply_snapshot(self, players: dict[str, str | None], started: int):
         index = self._index
         snapshot_keys = {normalize_tag(tag) for tag in players}
+        # Indexed but no longer active in Mongo: deactivated by the scraper,
+        # or added by the API after the read (guarded by _changed_since).
         stale = [
             tag for tag, _ in index.items() if normalize_tag(tag) not in snapshot_keys
         ]
@@ -184,7 +191,7 @@ class PlayerSearchService:
             if i and i % _DIFF_CHUNK == 0:
                 await asyncio.sleep(0)
             # Checked right before applying: the loop may have run API
-            # changes during the sleep.
+            # changes during the sleep. The index stores a missing name as "".
             if index.get(tag) != (name or "") and not self._changed_since(tag, started):
                 index.upsert(tag, name)
                 updated += 1
