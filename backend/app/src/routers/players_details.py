@@ -42,7 +42,10 @@ router = APIRouter(
 # memory pressure. E.g. $inc viewCount and set lastViewedAt on the player
 # document, which the scraper already reads for its sync state, without
 # delaying the response. The counts could later shorten the sync intervals of
-# viewed players and lengthen those of players nobody opens.
+# viewed players and lengthen those of players nobody opens. The explore list
+# (TODO above /players/count in players_tracked.py) ranks by views in the
+# last 30 days, so keep the counts per day as well; a single running total
+# cannot be windowed.
 @router.get(
     "/{player_tag}/profile",
     # The profile is a database lookup now, so the limit only guards against

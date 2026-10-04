@@ -198,6 +198,21 @@ class Settings:
     # fresh install. The scraper refreshes right after it starts.
     CARDS_NOT_READY_RETRY_AFTER: int = 30  # seconds
 
+    # Player search returns at most this many players per query.
+    SEARCH_RESULT_LIMIT: int = 20
+    # Longer queries are rejected before they reach the index: they cannot
+    # match anything. Names are at most 15 characters (the game's limit,
+    # emoji variation selectors included) and "#" plus a tag at most 13(?).
+    # NOTE Keep maxQueryLength in the frontend's usePlayerSearch.ts equal.
+    # The frontend trims whitespace before it applies the limit.
+    SEARCH_QUERY_MAX_LENGTH: int = 15
+    # The API indexes its own adds and removes instantly. The refresh only
+    # picks up the data scraper's renames and deactivations, which may lag.
+    SEARCH_REFRESH_INTERVAL_S: int = 15 * 60  # 15 minutes
+    # Retry delay while the first index build has not succeeded, also sent
+    # as Retry-After with the 503 search responses in the meantime.
+    SEARCH_BUILD_RETRY_S: int = 30  # seconds
+
     # Get set both in current and ahead version of the cache, and therefore not invalidated with every cycle
     CACHE_TTL_CAPTCHA_CHALLENGE: int = (
         5 * 60

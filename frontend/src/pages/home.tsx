@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { LockKeyhole, LockKeyholeOpen, CircleCheck } from "lucide-react";
 import { useNavigate } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  fetchAllTrackedPlayers,
   fetchAllTrackedPlayersCount,
   trackPlayer,
   untrackPlayer,
@@ -13,9 +13,10 @@ import { formatNumberWithSuffix } from "../utils/number";
 import { validatePlayerTagSyntax } from "../utils/playerTag";
 import { useFetch } from "../hooks/useFetch";
 import { useAuth } from "../hooks/useAuthHook";
-import type { Players, PlayerCount } from "../types/players";
+import type { PlayerCount } from "../types/players";
 import type { TotalBattleCount } from "../types/battles";
 import { PlayerSearch } from "../components/playerSearch/playerSearch";
+import { PLAYER_SEARCH_QUERY_KEY } from "../hooks/usePlayerSearch";
 import { AuthModal } from "../components/auth/authModal";
 import Lottie from "lottie-react";
 import construction from "../assets/animations/construction.json";
@@ -77,19 +78,17 @@ function getErrorMessage(error: unknown): string {
 }
 
 function HomePage() {
-  // Incremented after a player is added or removed, so the player list and
-  // the tracked player count are fetched again instead of staying stale.
+  // Incremented after a player is added or removed, so the tracked player
+  // count is fetched again instead of staying stale.
   const [trackedPlayersVersion, setTrackedPlayersVersion] = useState(0);
+  const queryClient = useQueryClient();
 
-  // Refetch the search list and the tracked player count on this page
-  const refreshTrackedPlayers = () =>
+  // The API indexes adds and removes instantly; cached search results would
+  // still show the old state, so they are dropped too.
+  const refreshTrackedPlayers = () => {
     setTrackedPlayersVersion((version) => version + 1);
-
-  const {
-    data: players,
-    loading: playersLoading,
-    error: playersError,
-  } = useFetch<Players>(fetchAllTrackedPlayers, [trackedPlayersVersion]);
+    void queryClient.invalidateQueries({ queryKey: [PLAYER_SEARCH_QUERY_KEY] });
+  };
 
   const {
     data: playerCount,
@@ -130,12 +129,11 @@ function HomePage() {
   // Only the first load replaces the page with a spinner. A refetch after
   // adding or removing a player keeps the page and its status messages.
   if (
-    (playersLoading && !players) ||
     (playerCountLoading && !playerCount) ||
     (battleCountLoading && !battleCount)
   )
     return <CircularProgress className="home-loading-spinner" />;
-  if (playersError || playerCountError || battleCountError)
+  if (playerCountError || battleCountError)
     return (
       <>
         <Lottie
@@ -148,13 +146,6 @@ function HomePage() {
         </h2>
       </>
     );
-
-  const playerList = players
-    ? Object.entries(players.activePlayers).map(([tag, name]) => ({
-        tag,
-        name,
-      }))
-    : [];
 
   function canEnableViewButton() {
     /**
@@ -274,10 +265,16 @@ function HomePage() {
               Search and view analytics for players already being tracked in our
               system.
             </p>
+            {/* TODO Add an "Explore most popular players" button that pages
+            through all tracked players, most profile views in the last 30 days
+            first. Search only shows the best matches for a query, so this is
+            the way to discover players without knowing a name. Needs the
+            backend list from the TODO above GET /players/count in
+            players_tracked.py. */}
             <PlayerSearch
-              players={playerList}
-              selectedPlayerTag={selectedPlayerTag}
-              onSelectPlayer={(player) => setSelectedPlayerTag(player.tag)}
+              onSelectPlayer={(player) =>
+                setSelectedPlayerTag(player?.tag ?? "")
+              }
             />
             <button
               className="view-button"

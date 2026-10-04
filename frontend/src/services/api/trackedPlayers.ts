@@ -1,9 +1,23 @@
 import api from "./axios";
 import { validatePlayerTagSyntax } from "../../utils/playerTag";
-import type { Players, PlayerCount } from "../../types/players";
+import type { PlayerCount, PlayerSearchResponse } from "../../types/players";
 
-export async function fetchAllTrackedPlayers(): Promise<Players> {
-  const response = await api.get<Players>("/players");
+/**
+ * Search tracked players by name or tag, best match first.
+ *
+ * @param query - Text as typed. A leading "#" ranks tag matches first.
+ * @param signal - Aborts the request once a newer query replaces it
+ * @returns Up to SEARCH_RESULT_LIMIT ranked players (an API setting), and
+ *   whether more players match
+ */
+export async function searchTrackedPlayers(
+  query: string,
+  signal?: AbortSignal,
+): Promise<PlayerSearchResponse> {
+  const response = await api.get<PlayerSearchResponse>("/players/search", {
+    params: { q: query },
+    signal,
+  });
   return response.data;
 }
 
@@ -13,7 +27,7 @@ export async function fetchAllTrackedPlayersCount(): Promise<PlayerCount> {
 }
 
 export async function trackPlayer(
-  playerTag: string
+  playerTag: string,
 ): Promise<{ status: string; tag: string }> {
   const tag = playerTag.trim();
   if (!validatePlayerTagSyntax(tag)) {
@@ -25,7 +39,7 @@ export async function trackPlayer(
 }
 
 export async function untrackPlayer(
-  playerTag: string
+  playerTag: string,
 ): Promise<{ status: string; tag: string }> {
   const tag = playerTag.trim();
   if (!validatePlayerTagSyntax(tag)) {

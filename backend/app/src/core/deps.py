@@ -9,6 +9,7 @@ from redis_service import CacheRedisConn, RedisConn
 from clash_royale_api import ClashRoyaleAPI
 from mongo import MongoConn, get_tracked_player_cache_state
 from scrape_schedule import Schedule
+from player_search import PlayerSearchService
 from redis.asyncio import Redis
 
 
@@ -85,6 +86,15 @@ def get_scrape_schedules(request: Request) -> ScrapeSchedules:
     return schedules
 
 
+def get_player_search(request: Request) -> PlayerSearchService:
+    """Return the in-memory player search, which holds every tracked player."""
+
+    search = getattr(request.app.state, "player_search", None)
+    if search is None:
+        raise HTTPException(status_code=500, detail="Player search not initialized")
+    return search
+
+
 # Global dependencies for usage in the routes
 CrApi = Annotated[ClashRoyaleAPI, Depends(get_cr_api)]
 DbConn = Annotated[MongoConn, Depends(get_mongo)]
@@ -92,6 +102,7 @@ RedConn = Annotated[CacheRedisConn, Depends(get_redis)]
 AuthStateConn = Annotated[RedisConn, Depends(get_auth_state_redis)]
 CardImageConn = Annotated[RedisConn, Depends(get_card_image_redis)]
 Schedules = Annotated[ScrapeSchedules, Depends(get_scrape_schedules)]
+PlayerSearch = Annotated[PlayerSearchService, Depends(get_player_search)]
 
 
 @dataclass(frozen=True)
@@ -208,7 +219,9 @@ auth_scheme = HTTPBearer()
 
 
 # Dependency that ensures authorization token is received and validated
-def require_remove_player_token(credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)):
+def require_remove_player_token(
+    credentials: HTTPAuthorizationCredentials = Depends(auth_scheme),
+):
     """
     Validates a Bearer token provided via the Authorization header.
     """

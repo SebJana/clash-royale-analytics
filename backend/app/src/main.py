@@ -27,6 +27,7 @@ from api_key_store import (
 from scrape_schedule import Schedule, BATTLES_SCHEDULE, PROFILES_SCHEDULE
 from core.deps import ScrapeSchedules
 from mongo import MongoConn
+from player_search import PlayerSearchService
 from helpers.ip_utils import rate_limit_key_func
 
 # NOTE time response from Clash Royale/MongoDB is in UTC so frontend needs conversion logic
@@ -36,8 +37,6 @@ from helpers.ip_utils import rate_limit_key_func
 # TODO add internal for whole backend via logger and don't send full error detail as HttpException
 # TODO timestamp based logging
 
-# TODO (potentially) add optional query param to tracked players
-# so that user can search the players with a name/tag or a substring of them
 # TODO (potentially) add own game mode id to keep query params short
 
 
@@ -159,6 +158,16 @@ async def lifespan(app: FastAPI):
     await retry_async(mongo_conn.connect, name="MongoDB")
     app.state.mongo = mongo_conn
 
+    # Built before serving, so the first visitors can already search. A failed
+    # build does not stop startup; search answers 503 until a retry succeeds.
+    player_search = PlayerSearchService(
+        mongo_conn,
+        refresh_interval_s=settings.SEARCH_REFRESH_INTERVAL_S,
+        retry_s=settings.SEARCH_BUILD_RETRY_S,
+    )
+    await player_search.start()
+    app.state.player_search = player_search
+
     async def initialize_rate_limit_redis() -> Redis:
         """Connect rate limiting separately so it cannot reuse auth/cache clients."""
 
@@ -180,6 +189,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
+    await player_search.close()
     await app.state.cr_api.close()
     await app.state.key_store.close()
     mongo_conn.close()

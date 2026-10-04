@@ -1,11 +1,13 @@
 import time
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi_limiter.depends import RateLimiter
 from redis.exceptions import RedisError
 from core.deps import (
     DbConn,
     CrApi,
+    PlayerSearch,
     Schedules,
     TrackedPlayerDep,
     require_remove_player_token,
@@ -21,7 +23,6 @@ from clash_royale_api import (
 )
 from api_key_store import NoKeyAvailable, KeyStoreUnavailable
 from mongo import (
-    get_tracked_players,
     insert_tracked_player,
     deactivate_tracked_player,
     get_players_count,
@@ -29,6 +30,7 @@ from mongo import (
     save_player_profile,
 )
 from scrape_schedule import CAPACITY_MAX_AGE_S, read_capacity
+from player_search import SearchIndexNotReady
 from core.settings import settings
 
 router = APIRouter(prefix="/players", tags=["Tracked Players"])
@@ -65,29 +67,13 @@ async def ensure_tracking_capacity(
         )
 
 
-# TODO Paginate this list (cursor by playerTag, limit per page) and cache it,
-# invalidated when a player is added, removed, or renamed. Every home page
-# visit currently loads all tracked players, which grows with every player.
-# Beyond ~10k players, replace it with a server-side search by tag/name prefix.
-# But possibly cache the last X viewed players on the client, so that they
-# still see them in recently viewed and can click there.
-# TODO also some sort of browsing should be available, so one can see the players
-# in a list, just not the main list upon search, but a paginated approach
-@router.get(
-    "",
-    dependencies=[Depends(RateLimiter(times=15, seconds=60))],
-    responses={500: {"description": "Tracked player lookup failed"}},
-)
-async def list_tracked_players(mongo_conn: DbConn):
-    try:
-        players = await get_tracked_players(mongo_conn)
-        return {"activePlayers": players}
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Failed to fetch all tracked players"
-        )
-
-
+# TODO Add a paged list behind an "Explore most popular players" button on the
+# home page: all tracked players, most profile views in the last 30 days
+# first, with a cursor on (views, playerTag) and a page size limit. Needs the
+# view counts from the TODO in players_details.py, kept per day so a 30 day
+# window can be summed (e.g. a playerViews collection of {playerTag, day,
+# count} with a TTL index on day). Never return every player in one
+# response; search covers finding a known player.
 @router.get(
     "/count",
     responses={500: {"description": "Tracked player count lookup failed"}},
@@ -100,6 +86,56 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
         raise HTTPException(
             status_code=500, detail="Failed to fetch the count of all tracked players"
         )
+
+
+# NOTE Keep this above any future GET "/{player_tag}" route, which would
+# otherwise capture "/search" as a player tag.
+@router.get(
+    "/search",
+    # Autocomplete with a ~150 ms debounce sends a few requests per second
+    # while typing; this still stops scripted enumeration of all players.
+    dependencies=[Depends(RateLimiter(times=120, seconds=60))],
+    responses={
+        422: {"description": "Query missing or too long"},
+        429: {"description": "Too many searches from this client"},
+        503: {"description": "Search index is still being built"},
+    },
+)
+async def search_tracked_players(
+    search: PlayerSearch,
+    q: Annotated[str, Query(max_length=settings.SEARCH_QUERY_MAX_LENGTH)],
+):
+    """Search tracked players by name or tag, best match first.
+
+    Names and tags are both searched and a complete tag is pinned first. A
+    leading "#" ranks every tag match above every name match. Matches at the
+    start of a
+    name rank above matches at a word start, which rank above matches
+    anywhere else. Queries shorter than three characters only match the
+    start of a name or tag, except Chinese, Japanese and Korean ones,
+    where one character is already a word. hasMore tells the frontend that matches beyond
+    the returned ones exist, so it can ask for a more specific query.
+    """
+
+    limit = settings.SEARCH_RESULT_LIMIT
+    try:
+        # One extra result reveals whether more matches exist.
+        results = search.search(q, limit + 1)
+    except SearchIndexNotReady as e:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "SEARCH_INDEX_NOT_READY",
+                "message": "Player search is starting up",
+            },
+            headers={"Retry-After": str(settings.SEARCH_BUILD_RETRY_S)},
+        ) from e
+    return {
+        "players": [
+            {"tag": r.tag, "name": r.name, "match": r.match} for r in results[:limit]
+        ],
+        "hasMore": len(results) > limit,
+    }
 
 
 # NOTE The app key pool is the hard limit on how fast players can be added,
@@ -125,7 +161,11 @@ async def fetch_tracked_player_count(mongo_conn: DbConn):
     },
 )
 async def add_tracked_player(
-    player_tag: str, mongo_conn: DbConn, cr_api: CrApi, schedules: Schedules
+    player_tag: str,
+    mongo_conn: DbConn,
+    cr_api: CrApi,
+    schedules: Schedules,
+    search: PlayerSearch,
 ):
     # Use the same trimmed tag for the Clash Royale check and the stored player.
     player_tag = player_tag.strip()
@@ -201,6 +241,10 @@ async def add_tracked_player(
             status_code=500, detail=f"Player {player_tag} could not be tracked"
         )
 
+    # Searchable before the response goes out. Already tracked players are
+    # upserted too: the profile was just fetched, so it repairs a stale name.
+    search.upsert(player_tag, profile["name"])
+
     if status_insert in ("created", "reactivated"):
         # Due time 0 puts the player in front of the battle schedule, so its
         # first battle sync starts within seconds instead of after a full
@@ -239,8 +283,9 @@ async def add_tracked_player(
 async def remove_tracked_player(
     mongo_conn: DbConn,
     schedules: Schedules,
+    search: PlayerSearch,
     player: TrackedPlayerDep,
-    _=Depends(require_remove_player_token),
+    _: Annotated[None, Depends(require_remove_player_token)],
 ):
     player_tag = player.tag
     try:
@@ -254,6 +299,8 @@ async def remove_tracked_player(
                 status_code=404,
                 detail=f"Player with tag {player_tag} is not being tracked",
             )
+
+        search.remove(player_tag)
 
         try:
             await schedules.battles.remove(player_tag)

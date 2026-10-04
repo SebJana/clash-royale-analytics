@@ -40,29 +40,85 @@
   color: var(--color-primary);
 }
 
-/* Dropdown styling */
-.player-search .MuiAutocomplete-paper {
+/* Dropdown styling. MUI renders the dropdown in a portal outside
+   .player-search, so these rules target the paper's own class. */
+.player-search-paper.MuiAutocomplete-paper {
   background-color: var(--bg-dark);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 32px var(--shadow-medium);
 }
 
-.player-search .MuiAutocomplete-option {
+.player-search-paper .MuiAutocomplete-option {
   padding: var(--spacing-md) var(--spacing-lg);
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-light);
 }
 
-.player-search .MuiAutocomplete-option:last-child {
+.player-search-paper .MuiAutocomplete-option:last-child {
   border-bottom: none;
 }
 
-.player-search .MuiAutocomplete-option:hover {
+.player-search-paper .MuiAutocomplete-option:hover,
+.player-search-paper .MuiAutocomplete-option.Mui-focused {
   background-color: var(--bg-overlay-medium);
 }
 
-.player-search .MuiListItemText-secondary {
+.player-search-paper .MuiListItemText-secondary {
   color: var(--text-secondary);
   font-size: var(--font-sm);
+}
+
+.player-search-paper .MuiAutocomplete-noOptions,
+.player-search-paper .MuiAutocomplete-loading {
+  color: var(--text-secondary);
+}
+
+.player-search-more-hint {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-top: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  cursor: default;
+}
+
+/* "Open #TAG" is an action, not a search result: accent color, a bar on the
+   left and a dashed line apart from the results. */
+.player-search-paper .MuiAutocomplete-option.player-search-typed-tag {
+  border-left: 3px solid var(--color-primary);
+  border-top: 1px dashed var(--border-medium);
+  background-color: var(--bg-overlay-light);
+}
+
+.player-search-paper
+  .MuiAutocomplete-option.player-search-typed-tag:first-child {
+  border-top: none;
+  border-bottom: 1px dashed var(--border-medium);
+}
+
+.player-search-paper .MuiAutocomplete-option.player-search-typed-tag:hover,
+.player-search-paper
+  .MuiAutocomplete-option.player-search-typed-tag.Mui-focused {
+  background-color: var(--bg-overlay-strong);
+}
+
+/* Same arrow as the Continue buttons (authOutcome.css): after the label,
+   18px icon and 8px gap at 14px text, kept as ratios of the font size. */
+.player-search-typed-tag-action {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8em / 14);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.player-search-typed-tag-action svg {
+  display: block;
+  flex: none;
+  width: calc(18em / 14);
+  height: calc(18em / 14);
+}
+
+.player-search-paper .player-search-typed-tag .MuiListItemText-secondary {
+  font-style: italic;
 }

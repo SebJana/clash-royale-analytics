@@ -32,3 +32,18 @@ export function validatePlayerTagSyntax(playerTag: string): boolean {
 
   return true;
 }
+
+/**
+ * Turn typed text into a player tag if it can be one: "#" optional, any
+ * case, whitespace ignored, and O read as 0 (the tag alphabet has no O).
+ *
+ * NOTE: Mirrors normalize_tag in backend/app/src/player_search/normalize.py.
+ *
+ * @param input - Text as typed, e.g. "yyrjqy28" or "# YYRJQY2O"
+ * @returns The tag with a leading "#" (e.g. "#YYRJQY28"), or null
+ */
+export function normalizePlayerTag(input: string): string | null {
+  const compact = input.normalize("NFKC").replace(/\s+/g, "");
+  const tag = `#${compact.replace(/#/g, "").toUpperCase().replace(/O/g, "0")}`;
+  return validatePlayerTagSyntax(tag) ? tag : null;
+}
